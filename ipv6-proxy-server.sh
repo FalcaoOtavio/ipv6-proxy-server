@@ -1,4 +1,12 @@
 #!/bin/bash
+# The legacy manager and API installation must never coexist, even if stopped.
+for api_marker in /etc/ipv6-proxy-api.env /etc/systemd/system/ipv6-proxy-api.service /opt/ipv6-proxy-server /var/lib/ipv6-proxy-api; do
+  if [[ -e "$api_marker" || -L "$api_marker" ]]; then
+    echo "API installation detected; legacy manager disabled. Use sudo ipv6-proxy or the API." >&2
+    exit 1
+  fi
+done
+
 # Script must be running from root
 if [ "$EUID" -ne 0 ];
   then echo "Please run as root";
@@ -467,6 +475,14 @@ function create_startup_script(){
   # Add main script that runs proxy server and rotates external ip's, if server is already running
   cat > $startup_script_path <<-EOF
   #!$bash_location
+
+# The legacy manager and API installation must never coexist, even if stopped.
+for api_marker in /etc/ipv6-proxy-api.env /etc/systemd/system/ipv6-proxy-api.service /opt/ipv6-proxy-server /var/lib/ipv6-proxy-api; do
+  if [[ -e "\$api_marker" || -L "\$api_marker" ]]; then
+    echo "API installation detected; legacy manager disabled. Use sudo ipv6-proxy or the API." >&2
+    exit 1
+  fi
+done
 
   # Remove leading whitespaces in every string in text
   function dedent() {

@@ -18,12 +18,57 @@ sudo bash install-ipv6-proxy.sh --subnet 2001:db8:1234::/64 --interface eth0 --i
 ```
 
 O script instala dependencias via apt, compila a revisao fixa do 3proxy 0.9.4,
-instala a API em `/opt/ipv6-proxy-server`, gera token aleatorio e habilita
+instala a API em `/opt/ipv6-proxy-server` e o CLI em `/usr/local/bin/ipv6-proxy`,
+gera token aleatorio e habilita
 `ipv6-proxy-api.service` no boot. Confirma resposta autenticada da API.
 O token fica em `/etc/ipv6-proxy-api.env`, acessivel somente ao root.
 Nao imprime o token nos logs de instalacao. Estado fica em `/var/lib/ipv6-proxy-api`.
 
+O modo normal funciona com somente `install-ipv6-proxy.sh` baixado: ele clona
+este repositorio para obter API, unidade systemd e CLI quando nao ha checkout
+completo junto ao instalador. Isso e diferente de `--cli-only`, abaixo.
+
+## Instalar ou atualizar somente o CLI
+
+Para uma API ja instalada, obtenha um checkout completo e atualizado desta
+versao (nao apenas `install.sh`, nem o repositorio upstream legado):
+
+```bash
+git clone https://github.com/FalcaoOtavio/ipv6-proxy-server.git ipv6-proxy-cli-source
+cd ipv6-proxy-cli-source
+sudo bash install.sh --cli-only
+sudo ipv6-proxy --help
+sudo ipv6-proxy list
+```
+
+`--cli-only` exige `install.sh` e `ipv6-proxy` juntos e reconhece a API pelos
+arquivos/diretorio padrao. Adiciona ou substitui atomicamente apenas o cliente
+root:root `0755`; nao instala dependencias, nao altera token, configuracao ou
+estado, nao faz daemon-reload e nao reinicia API/3proxy. Nao aceita flags de
+subnet/interface/IPv4. Recusa sobrescrever um CLI desconhecido, symlink ou com
+permissoes inesperadas. O modo normal continua recusando instalacao existente.
+Esse modo nao migra legado nem atualiza o servidor API.
+
 ## Acessar e usar
+
+Na VPS, sem precisar copiar token:
+
+```bash
+sudo ipv6-proxy list
+sudo ipv6-proxy create --port 30000 --protocol http --username cliente
+sudo ipv6-proxy rotate 30000
+sudo ipv6-proxy delete 30000
+sudo ipv6-proxy list --output json
+```
+
+A senha e solicitada sem eco. Para automacao use `--password-stdin --yes` e
+forneca uma linha pelo stdin; veja [contrato do CLI](API.md#cliente-cli).
+**Toda mutacao (create/rotate/delete) pela API ou CLI reinicia todos os proxies
+da API e desconecta todas as sessoes ativas**, inclusive de outras portas.
+O CLI pede confirmacao, ou aceita `--yes`. CLI e API compartilham o mesmo
+estado/serializacao, portanto podem ser usados juntos; nao inicie outro manager.
+
+Para usar Swagger no navegador:
 
 No seu computador, abra um tunel e mantenha o comando em execucao:
 
@@ -55,7 +100,14 @@ sudo systemctl restart ipv6-proxy-api
 
 O instalador recusa sobrescrever diretorios, binario e configuracoes existentes.
 Reexecutar nao troca token nem apaga proxies. Ele tambem recusa um processo
-3proxy ativo. Desative cron e processo do gerenciador legado antes de instalar.
+3proxy ativo, diretorio legado `/root/proxyserver` ou cron `proxy-startup.sh`.
+Legado e API nao podem coexistir, mesmo em portas diferentes ou API parada.
+Antes de instalar, desative cron/startups antigos, pare o processo legado
+especifico e retire sua instalacao. Nao execute o desinstalador legado depois.
+A copia local de `ipv6-proxy-server.sh` e os novos startups que ela gera bloqueiam
+execucao ao detectar marcadores da API, antes de efeitos colaterais. Isso nao
+protege copias upstream ou startups antigos ja gerados: desative-os manualmente.
+Nao existe importacao automatica do pool legado.
 
 Se houver falha parcial, consulte o erro e complete a instalacao seguindo
 [API.md](API.md#instalacao-debianubuntu-com-systemd). O script nao remove

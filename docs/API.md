@@ -2,7 +2,8 @@
 
 Esta extensao usa FastAPI para controlar o mesmo motor 3proxy 0.9.4 do
 repositorio original. O script Bash original continua disponivel como modo
-legado; nao execute ambos sobre as mesmas portas ou enderecos.
+legado; ele nao pode coexistir com a API nesta VPS, mesmo em portas diferentes
+ou com o servico API parado. O CLI `ipv6-proxy` e um cliente da API, nao o legado.
 
 ## Contrato
 
@@ -52,6 +53,7 @@ das portas para esse IPv4 local. O token deve ter pelo menos 32 caracteres ASCII
 sudo install -m 0644 deploy/ipv6-proxy-api.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now ipv6-proxy-api
+sudo bash install.sh --cli-only  # checkout completo, sem reiniciar API
 sudo journalctl -u ipv6-proxy-api -f
 ```
 
@@ -64,7 +66,7 @@ antes, mantendo configuracao original, e so depois altere configuracao.
 
 Se houver instalacao legada, desative previamente suas entradas cron de
 `proxy-startup.sh` e encerre seu processo 3proxy especifico. Nao execute o
-instalador/desinstalador legado enquanto API estiver ativa: script legado pode
+instalador/desinstalador legado depois de instalar a API, mesmo parada: ele pode
 encerrar outros processos 3proxy. Nao existe importacao automatica do pool legado.
 
 API escuta `127.0.0.1:8000`. Acesso remoto pode usar tunel SSH:
@@ -78,6 +80,67 @@ API exige Bearer token em todos os endpoints operacionais; Swagger em `/docs`.
 Libere portas TCP de proxies no firewall do host e do provedor conforme clientes
 autorizados. Sem `username`/`password`, proxy nao exige autenticacao; restrinja
 acesso no firewall. Credenciais proxy sao independentes do token da API.
+
+## Cliente CLI
+
+Instalado pelo autoinstalador em `/usr/local/bin/ipv6-proxy`. Requer Python 3
+padrao (sem dependencias FastAPI no cliente) e sudo nos comandos operacionais;
+`ipv6-proxy --help` funciona sem root. Para API existente, veja
+[`--cli-only`](INSTALL.md#instalar-ou-atualizar-somente-o-cli).
+
+```bash
+sudo ipv6-proxy list
+sudo ipv6-proxy create --port 30000 --protocol socks5 --username cliente
+sudo ipv6-proxy rotate 30000
+sudo ipv6-proxy delete 30000
+sudo ipv6-proxy list --output json
+```
+
+`create` sem `--port` usa a primeira livre na faixa configurada (padrao
+30000–39999); protocolo padrao `http`. Sem `--username` cria proxy sem auth.
+Com username, solicita senha sem eco em terminal; nao existe argumento de senha.
+Em automacao, forneca exatamente uma linha terminada em newline pelo stdin,
+com `--password-stdin --yes`. Exemplo com arquivo secreto protegido, nao coloque
+senha em historico nem em argumentos de processos:
+
+```bash
+sudo -v
+sudo ipv6-proxy create --username cliente --password-stdin --yes --output json < /caminho/seguro/senha.txt
+sudo ipv6-proxy rotate 30000 --yes --output json
+sudo ipv6-proxy delete 30000 --yes --output json
+```
+
+**Cada mutacao reinicia todos os proxies da API e desconecta todas as sessoes
+ativas**; o aviso aparece em stderr e o CLI pede confirmacao. `--yes` dispensa
+somente a pergunta, nao o aviso. CLI e HTTP/Swagger podem operar simultaneamente
+no mesmo pool: um unico manager na API serializa operacoes e rejeita conflitos.
+Isso garante consistencia de estado, nao continuidade de conexoes.
+
+O CLI conecta somente a `http://127.0.0.1:8000`, sem proxy de ambiente, redirects
+ou retries. Le token de `/etc/ipv6-proxy-api.env` (arquivo regular root, sem
+acesso de grupo/outros; use `0600`), sem `source`/eval. Nao controla 3proxy ou
+rede diretamente. Para remoto, execute o CLI na VPS via SSH, por exemplo
+`ssh -t usuario@IP_PUBLICO 'sudo ipv6-proxy create --username cliente'`.
+
+`--output json` funciona nos quatro comandos: list retorna array; create/rotate
+retornam objeto como API; delete retorna `{"deleted":true,"port":30000}`.
+Stdout contem somente o resultado; avisos/erros vao para stderr. Senhas e token
+nao sao retornados. Corpos de erro HTTP nao sao exibidos pois podem refletir
+segredos enviados ao servidor.
+
+| Codigo de saida | Significado |
+|---|---|
+| 0 | Sucesso |
+| 2 | Argumento/credencial invalida ou confirmacao cancelada/ausente |
+| 3 | Privilegio/configuracao/token invalido (inclui HTTP 401) |
+| 4 | Erro HTTP 4xx, exceto 401 (ex.: 404, 409, 422) |
+| 5 | Erro do servidor, redirect ou resposta invalida |
+| 6 | Falha de transporte; resultado da mutacao pode ser desconhecido |
+| 130 | Interrompido pelo usuario |
+
+Apos timeout ou interrupcao, consulte `list` antes de repetir uma mutacao: o
+servidor pode ter aplicado a alteracao apesar de o cliente nao receber resposta.
+O token e estado da API continuam administrados somente pelo servico/instalacao.
 
 ## Endpoints
 
@@ -157,7 +220,9 @@ python3 -m venv .venv
 .venv/bin/python -m pytest -q
 ```
 
-Testes padrao usam backend simulado, sem alterar interfaces locais.
+Testes padrao usam backend simulado, sem alterar interfaces locais. Incluem
+CLI e HTTP concorrentes contra a mesma API em loopback, conflito de porta,
+validacao de configuracao/respostas e protecao contra proxy/redirect.
 
 Teste opcional com binario real, usando somente loopback IPv4/IPv6:
 

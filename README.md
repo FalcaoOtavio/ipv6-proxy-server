@@ -15,7 +15,7 @@ sudo bash install-ipv6-proxy.sh
 ```
 
 Informe a subnet; o instalador sugere interface e IPv4 local, instala o 3proxy
-e a API, gera o token e inicia o servico automaticamente no boot.
+a API e o CLI `ipv6-proxy`, gera o token e inicia o servico automaticamente no boot.
 
 - [Guia do autoinstalador e acesso pelo navegador](docs/INSTALL.md)
 - [Endpoints, exemplos e validacao dos proxies](docs/API.md)
@@ -28,10 +28,50 @@ existentes. Configure credenciais ao criar proxies e libere suas portas apenas
 para clientes autorizados. Publicar este repositorio no GitHub disponibiliza o
 codigo; os proxies devem rodar na sua VPS.
 
+## CLI e API no mesmo pool
+
+O CLI e cliente do **mesmo servico HTTP local**, nao um segundo gerenciador.
+Pode ser usado junto com Swagger/curl: todas as alteracoes passam pela mesma
+serializacao e pelo mesmo estado da API. Portas duplicadas retornam conflito.
+
+Na VPS:
+
+```bash
+sudo ipv6-proxy list
+sudo ipv6-proxy create --port 30000 --protocol http --username cliente
+# A senha e solicitada sem eco, nunca como argumento.
+sudo ipv6-proxy rotate 30000
+sudo ipv6-proxy delete 30000
+sudo ipv6-proxy list --output json
+```
+
+**Toda mutacao (create/rotate/delete), pela API ou CLI, reinicia todos os
+proxies da API e desconecta todas as sessoes ativas**, mesmo de outras portas.
+O CLI pede confirmacao; `--yes` confirma explicitamente em automacao.
+Nao ha retry automatico. Apos falha de comunicacao, consulte `list` antes de repetir.
+
+O cliente usa Python 3 padrao, le o token do arquivo root `0600`
+`/etc/ipv6-proxy-api.env` sem executar shell, ignora proxies de ambiente e nao
+segue redirecionamentos. Nao altera arquivos de estado, interfaces ou servicos.
+Para SSH interativo: `ssh -t usuario@IP_PUBLICO 'sudo ipv6-proxy list'`.
+
+API ja instalada? Use `sudo bash install.sh --cli-only` a partir de um **checkout
+completo atualizado**; nao use apenas o instalador baixado com curl nesse modo.
+O comando adiciona/atualiza somente `/usr/local/bin/ipv6-proxy`, sem reiniciar
+servico nem trocar token/estado. Veja [instalacao existente](docs/INSTALL.md#instalar-ou-atualizar-somente-o-cli).
+Detalhes de senha via stdin, saida e erros em [API.md](docs/API.md#cliente-cli).
+
 ## Projeto original (modo legado)
 
-As instrucoes abaixo pertencem ao script original. Nao execute os dois
-gerenciadores simultaneamente. Para a API, use o autoinstalador acima.
+As instrucoes abaixo sao referencia historica do script original, **nao sao o
+CLI da API**. Legado e API nao podem coexistir nesta VPS, nem com portas
+separadas ou API parada: o legado pode encerrar processos e alterar rede fora
+do seu pool. Use `ipv6-proxy`, nao `ipv6-proxy-server.sh`, para controlar a API.
+Esta copia do legado e os futuros scripts de startup gerados por ela recusam
+execucao quando detectam arquivos/diretorios da instalacao API. Copias upstream
+e startups antigos nao possuem essa protecao. Antes de instalar API, desative
+cron/startup legado, pare seu processo especifico e retire a instalacao antiga.
+Nao execute o desinstalador legado depois de instalar a API.
 
 ## IPv6 Proxy Server [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 

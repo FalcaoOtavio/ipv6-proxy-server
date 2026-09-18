@@ -1,0 +1,352 @@
+#!/usr/bin/python3
+# ipv6-proxy-api-client
+"""Command-line client for the local IPv6 Proxy Server API."""
+
+import argparse
+import getpass
+import ipaddress
+import http.client
+import json
+import os
+import re
+import stat
+import sys
+import urllib.error
+import urllib.request
+import warnings
+from pathlib import Path
+
+API_URL = "http://127.0.0.1:8000"
+ENV_FILE = Path("/etc/ipv6-proxy-api.env")
+# Allow all 64,512 supported ports, including maximum-length view fields.
+MAX_BODY = 16 * 1024 * 1024
+MAX_ENV = 64 * 1024
+MUTATION_WARNING = "Esta operacao reinicia todos os proxies da API (3proxy) e desconecta todas as sessoes ativas."
+USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
+PASSWORD_RE = re.compile(r"^[A-Za-z0-9_.!@%+=-]{1,128}$")
+
+
+class CliError(Exception):
+    def __init__(self, message, exit_code):
+        super().__init__(message)
+        self.exit_code = exit_code
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(
+        prog="ipv6-proxy",
+        description="Gerencia proxies pelo mesmo servico da API local.",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    list_parser = subparsers.add_parser("list", help="Lista os proxies")
+    add_output(list_parser)
+
+    create = subparsers.add_parser("create", help="Cria um proxy")
+    create.add_argument("--port", type=port, help="Porta TCP; omita para usar a primeira livre")
+    create.add_argument("--protocol", choices=("http", "socks5"), default="http")
+    create.add_argument("--username", help="Usuario do proxy")
+    create.add_argument(
+        "--password-stdin",
+        action="store_true",
+        help="Le a senha de uma unica linha da entrada padrao (requer --yes)",
+    )
+    add_mutation_options(create)
+    add_output(create)
+
+    rotate = subparsers.add_parser("rotate", help="Troca somente o IPv6 de uma porta")
+    rotate.add_argument("port", type=port)
+    add_mutation_options(rotate)
+    add_output(rotate)
+
+    delete = subparsers.add_parser("delete", help="Remove um proxy")
+    delete.add_argument("port", type=port)
+    add_mutation_options(delete)
+    add_output(delete)
+    return parser
+
+
+def add_output(parser):
+    parser.add_argument("--output", choices=("table", "json"), default="table")
+
+
+def add_mutation_options(parser):
+    parser.add_argument("--yes", action="store_true", help="Confirma a interrupcao de conexoes")
+
+
+def port(value):
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("a porta deve ser um numero inteiro") from exc
+    if not 1024 <= parsed <= 65535:
+        raise argparse.ArgumentTypeError("a porta deve estar entre 1024 e 65535")
+    return parsed
+
+
+def load_token(path=ENV_FILE, expected_uid=0):
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise CliError(f"Nao foi possivel ler {path}; execute com sudo e verifique a instalacao.", 3) from exc
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise CliError(f"Arquivo de configuracao inseguro: {path} nao e um arquivo regular.", 3)
+        if metadata.st_uid != expected_uid or metadata.st_mode & 0o077:
+            raise CliError(f"Arquivo de configuracao inseguro: {path} deve pertencer ao root e usar modo 0600.", 3)
+        if metadata.st_size > MAX_ENV:
+            raise CliError(f"Arquivo de configuracao excede {MAX_ENV} bytes.", 3)
+        chunks = []
+        total = 0
+        while True:
+            chunk = os.read(descriptor, min(8192, MAX_ENV + 1 - total))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+            if total > MAX_ENV:
+                raise CliError(f"Arquivo de configuracao excede {MAX_ENV} bytes.", 3)
+    except OSError as exc:
+        raise CliError("Falha ao ler o arquivo de configuracao.", 3) from exc
+    finally:
+        os.close(descriptor)
+
+    try:
+        text = b"".join(chunks).decode("ascii")
+    except UnicodeDecodeError as exc:
+        raise CliError("Arquivo de configuracao deve conter somente ASCII.", 3) from exc
+
+    values = {}
+    for number, line in enumerate(text.splitlines(), 1):
+        if not line.strip() or line.lstrip().startswith(("#", ";")):
+            continue
+        if "=" not in line:
+            raise CliError(f"Linha {number} invalida no arquivo de configuracao.", 3)
+        name, value = line.split("=", 1)
+        if not re.fullmatch(r"[A-Z][A-Z0-9_]*", name) or not value:
+            raise CliError(f"Linha {number} invalida no arquivo de configuracao.", 3)
+        if name in values:
+            raise CliError(f"Variavel duplicada no arquivo de configuracao: {name}.", 3)
+        if any(ord(character) < 33 or ord(character) > 126 for character in value):
+            raise CliError(f"Valor invalido para {name} no arquivo de configuracao.", 3)
+        values[name] = value
+
+    token = values.get("PROXY_API_TOKEN", "")
+    if len(token) < 32:
+        raise CliError("PROXY_API_TOKEN ausente ou curto no arquivo de configuracao.", 3)
+    return token
+
+
+def confirm(args, stdin, stderr):
+    print(MUTATION_WARNING, file=stderr)
+    if args.yes:
+        return
+    if not stdin.isatty():
+        raise CliError("Use --yes para confirmar uma alteracao sem terminal interativo.", 2)
+    print("Continuar? [y/N] ", end="", file=stderr, flush=True)
+    if stdin.readline().strip().lower() not in {"y", "yes", "s", "sim"}:
+        raise CliError("Operacao cancelada.", 2)
+
+
+def read_password(args, stdin):
+    if args.username is None:
+        if args.password_stdin:
+            raise CliError("--password-stdin exige --username.", 2)
+        return None
+    if not USERNAME_RE.fullmatch(args.username):
+        raise CliError("Username deve ter 1-64 caracteres: letras, numeros, _, . ou -.", 2)
+    if args.password_stdin:
+        if not args.yes:
+            raise CliError("--password-stdin exige --yes; a entrada padrao esta reservada para a senha.", 2)
+        first = stdin.readline(130)
+        extra = stdin.read(1)
+        if extra or not first.endswith(("\n", "\r")):
+            raise CliError("A senha na entrada padrao deve ocupar exatamente uma linha.", 2)
+        password = first.rstrip("\r\n")
+    else:
+        if not stdin.isatty():
+            raise CliError("Sem terminal: use --password-stdin com --yes para fornecer a senha.", 2)
+        try:
+            # getpass must never fall back to an echoed read from stdin.
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", getpass.GetPassWarning)
+                password = getpass.getpass("Senha do proxy: ")
+        except (getpass.GetPassWarning, EOFError, OSError) as exc:
+            raise CliError("Nao foi possivel ler a senha sem eco; use --password-stdin com --yes.", 2) from exc
+    if not PASSWORD_RE.fullmatch(password):
+        raise CliError("Senha deve ter 1-128 caracteres permitidos: letras, numeros, _ . ! @ % + = -.", 2)
+    return password
+
+
+def request(method, path, token, payload=None, opener=None):
+    data = None if payload is None else json.dumps(payload, separators=(",", ":")).encode("ascii")
+    headers = {"Authorization": "Bearer " + token, "Accept": "application/json"}
+    if data is not None:
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(API_URL + path, data=data, headers=headers, method=method)
+    client = opener or urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+    try:
+        with client.open(req, timeout=60) as response:
+            status_code = response.status
+            body = response.read(MAX_BODY + 1)
+    except urllib.error.HTTPError as exc:
+        # Error bodies can reflect credentials in detail/msg/loc/input. Do not
+        # render or parse them, even when they look like validation messages.
+        exc.close()
+        raise_api_error(exc.code)
+    except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException) as exc:
+        message = "Falha de comunicacao com a API local"
+        if method != "GET":
+            message += "; o resultado pode ser desconhecido. Execute 'sudo ipv6-proxy list' antes de tentar novamente"
+        raise CliError(message + ".", 6) from exc
+
+    if len(body) > MAX_BODY:
+        raise CliError("Resposta da API excedeu o limite permitido.", 5)
+    return status_code, body
+
+
+def raise_api_error(status_code):
+    descriptions = {
+        401: "token invalido ou ausente",
+        404: "proxy nao encontrado",
+        409: "conflito de porta, credenciais ou pool esgotado",
+        422: "entrada invalida; verifique os argumentos e a faixa de portas configurada",
+        503: "servico indisponivel; consulte os logs da API",
+    }
+    message = f"API retornou HTTP {status_code}"
+    if status_code in descriptions:
+        message += ": " + descriptions[status_code]
+    if status_code == 401:
+        raise CliError(message, 3)
+    if 400 <= status_code < 500:
+        raise CliError(message, 4)
+    raise CliError(message, 5)
+
+def decode_json(body):
+    if len(body) > MAX_BODY:
+        raise CliError("Resposta da API excedeu o limite permitido.", 5)
+    try:
+        return json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError, RecursionError) as exc:
+        raise CliError("API retornou JSON invalido.", 5) from exc
+
+
+def proxy_view(value):
+    if not isinstance(value, dict):
+        raise CliError("API retornou um proxy invalido.", 5)
+    required = {"port", "protocol", "ipv4", "ipv6", "username"}
+    if not required.issubset(value):
+        raise CliError("API retornou um proxy incompleto.", 5)
+    item_port = value["port"]
+    username = value["username"]
+    if isinstance(item_port, bool) or not isinstance(item_port, int) or not 1024 <= item_port <= 65535:
+        raise CliError("API retornou uma porta invalida.", 5)
+    if not isinstance(value["protocol"], str) or value["protocol"] not in {"http", "socks5"}:
+        raise CliError("API retornou um protocolo invalido.", 5)
+    if username is not None and (not isinstance(username, str) or not USERNAME_RE.fullmatch(username)):
+        raise CliError("API retornou um username invalido.", 5)
+    if (not isinstance(value["ipv4"], str) or not isinstance(value["ipv6"], str)
+            or "%" in value["ipv6"]):
+        raise CliError("API retornou um endereco IP invalido.", 5)
+    try:
+        ipv4 = str(ipaddress.IPv4Address(value["ipv4"]))
+        ipv6 = str(ipaddress.IPv6Address(value["ipv6"]))
+    except (ipaddress.AddressValueError, TypeError) as exc:
+        raise CliError("API retornou um endereco IP invalido.", 5) from exc
+    return {"port": item_port, "protocol": value["protocol"], "ipv4": ipv4,
+            "ipv6": ipv6, "username": username}
+
+
+def parse_response(command, status_code, body, requested_port=None):
+    expected = {"list": 200, "create": 201, "rotate": 200, "delete": 204}[command]
+    if status_code != expected:
+        raise CliError(f"API retornou HTTP {status_code}; esperado {expected}.", 5)
+    if command == "delete":
+        if body:
+            raise CliError("API retornou conteudo inesperado ao excluir.", 5)
+        return {"deleted": True, "port": requested_port}
+    decoded = decode_json(body)
+    if command == "list":
+        if not isinstance(decoded, list):
+            raise CliError("API retornou uma lista invalida.", 5)
+        return [proxy_view(item) for item in decoded]
+    return proxy_view(decoded)
+
+
+def render(command, value, output, stdout):
+    if output == "json":
+        json.dump(value, stdout, ensure_ascii=True, separators=(",", ":"))
+        stdout.write("\n")
+        return
+    if command == "delete":
+        print(f"Proxy da porta {value['port']} removido.", file=stdout)
+        return
+    records = value if command == "list" else [value]
+    if not records:
+        print("Nenhum proxy.", file=stdout)
+        return
+    rows = [["PORTA", "PROTOCOLO", "IPV4", "IPV6", "USUARIO"]]
+    rows.extend([[str(item["port"]), item["protocol"], item["ipv4"], item["ipv6"],
+                  item["username"] or "-"] for item in records])
+    widths = [max(len(row[index]) for row in rows) for index in range(len(rows[0]))]
+    for row in rows:
+        print("  ".join(cell.ljust(widths[index]) for index, cell in enumerate(row)).rstrip(), file=stdout)
+
+
+def execute(args, token, stdin, stdout, stderr, opener=None):
+    if args.command == "list":
+        status_code, body = request("GET", "/proxies", token, opener=opener)
+        result = parse_response("list", status_code, body)
+    elif args.command == "create":
+        confirm(args, stdin, stderr)
+        password = read_password(args, stdin)
+        payload = {"protocol": args.protocol}
+        if args.port is not None:
+            payload["port"] = args.port
+        if args.username is not None:
+            payload.update(username=args.username, password=password)
+        status_code, body = request("POST", "/proxies", token, payload, opener)
+        result = parse_response("create", status_code, body)
+    elif args.command == "rotate":
+        confirm(args, stdin, stderr)
+        status_code, body = request("POST", f"/proxies/{args.port}/rotate", token, opener=opener)
+        result = parse_response("rotate", status_code, body)
+    else:
+        confirm(args, stdin, stderr)
+        status_code, body = request("DELETE", f"/proxies/{args.port}", token, opener=opener)
+        result = parse_response("delete", status_code, body, args.port)
+    render(args.command, result, args.output, stdout)
+
+
+def main(argv=None, stdin=None, stdout=None, stderr=None, env_file=ENV_FILE,
+         expected_uid=0, effective_uid=None, opener=None):
+    stdin = stdin or sys.stdin
+    stdout = stdout or sys.stdout
+    stderr = stderr or sys.stderr
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    uid = os.geteuid() if effective_uid is None else effective_uid
+    if uid != 0:
+        print("Erro: execute os comandos operacionais com sudo.", file=stderr)
+        return 3
+    try:
+        token = load_token(env_file, expected_uid)
+        execute(args, token, stdin, stdout, stderr, opener)
+        return 0
+    except CliError as exc:
+        print(f"Erro: {exc}", file=stderr)
+        return exc.exit_code
+    except KeyboardInterrupt:
+        print("\nOperacao interrompida.", file=stderr)
+        return 130
+
+
+if __name__ == "__main__":
+    sys.exit(main())
