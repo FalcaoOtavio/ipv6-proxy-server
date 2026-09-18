@@ -15,7 +15,8 @@ def main():
                       headers={"Authorization": "Bearer " + env["PROXY_API_TOKEN"],
                                "Content-Type": "application/json"},
                       data=json.dumps(payload).encode() if payload is not None else None)
-        with urlopen(req, timeout=5) as response:
+        # Mutations may wait 10s for 3proxy shutdown, then start new listeners.
+        with urlopen(req, timeout=60) as response:
             body = response.read()
             return json.loads(body) if body else None
 
