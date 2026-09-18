@@ -1,3 +1,38 @@
+# IPv6 Proxy Server API
+
+API para criar, listar, remover e rotacionar proxies HTTP/SOCKS5, com um IPv6
+fixo por porta IPv4. Extensao FastAPI baseada no projeto de
+[Temporalitas](https://github.com/Temporalitas/ipv6-proxy-server), sob licenca MIT.
+
+## Instalacao facil
+
+Na VPS **Ubuntu 22.04/24.04/26.04 ou Debian 12/13**, com systemd e uma subnet IPv6
+dedicada roteada pelo provedor:
+
+```bash
+curl -fsSLo install-ipv6-proxy.sh https://raw.githubusercontent.com/FalcaoOtavio/ipv6-proxy-server/main/install.sh
+sudo bash install-ipv6-proxy.sh
+```
+
+Informe a subnet; o instalador sugere interface e IPv4 local, instala o 3proxy
+e a API, gera o token e inicia o servico automaticamente no boot.
+
+- [Guia do autoinstalador e acesso pelo navegador](docs/INSTALL.md)
+- [Endpoints, exemplos e validacao dos proxies](docs/API.md)
+- API: `http://127.0.0.1:8000/docs` (use tunel SSH para acesso remoto).
+- Token: `sudo cat /etc/ipv6-proxy-api.env` na VPS.
+- Status: `sudo systemctl status ipv6-proxy-api`.
+
+O instalador nao configura roteamento/NDP ou firewall e preserva instalacoes
+existentes. Configure credenciais ao criar proxies e libere suas portas apenas
+para clientes autorizados. Publicar este repositorio no GitHub disponibiliza o
+codigo; os proxies devem rodar na sua VPS.
+
+## Projeto original (modo legado)
+
+As instrucoes abaixo pertencem ao script original. Nao execute os dois
+gerenciadores simultaneamente. Para a API, use o autoinstalador acima.
+
 ## IPv6 Proxy Server [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Create your own IPv6 backconnect proxy server with only one script on any Linux distribution. Any number of random IPs on the subnet, ideal for parsing and traffic arbitrage (Google/Facebook/Youtube/Instagram and many others support IPv6).
@@ -56,7 +91,7 @@ Proxy server will stopped, all configuration files, firewalls, shedulers and so 
 - `-l` or `--localhost` - bool parameter without value, if used, all backconnect proxy will be available only on localhost (`127.0.0.1:30000` instead of `180.113.14.28:30000`)
 - `-b` or `--backconnect-ip` - server IPv4 backconnect address for proxies, use ONLY if script cannot parse IP correctly and your server has non-standard IP configuration
 - `-f` or `--backconnect-proxies-file` - path to file, in which backconnect proxies list will be written when proxies start working (default `~/proxyserver/backconnect_proxies.list`). You can just copy all proxies from this file and use them in your soft as list of IPv6 proxies.
-- `-m` or `--ipv6-mask` - first blocks on server subnet, unchanged part, without final colon(s) at the end, use ONLY if script cannot parse ipv6 mask automatically. For example, if the external ipv6 address on server is `2a03:6f01:5::1da6` and you want to use entire /64 subnet, script cannot parse ipv6 gateway because of address zero-field replacement with `::`. Real mask for /64 subnet is first four blocks - `2a03:6f01:5:0`. 
+- `-m` or `--ipv6-mask` - first blocks on server subnet, unchanged part, without final colon(s) at the end, use ONLY if script cannot parse ipv6 mask automatically. For example, if the external ipv6 address on server is `2a03:6f01:5::1da6` and you want to use entire /64 subnet, script cannot parse ipv6 gateway because of address zero-field replacement with `::`. Real mask for /64 subnet is first four blocks - `2a03:6f01:5:0`.
   If you want to provide manually allocated subnet that isn't divisible by 16, you should provide FULL last block. For example, if you want all /56 subnet and you allocated `2a01:7e01:f403:a000` on your server, run command with `--ipv6-mask 2a01:7e01:f403:a000`, not `--ipv6-mask 2a01:7e01:f403:a0` - don't remove last numbers of block!
 - `-i` or `--interface` - ethernet interface name, to which IPv6 subnet is allocated and where all proxies will be raised. Automatically parsed from system info by default, use ONLY if you have non-standard/additional interfaces on your server.
 - `--uninstall` - uninstall proxy server, you don't need to provide any other parameters with it.
