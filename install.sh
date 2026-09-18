@@ -20,7 +20,9 @@ while (($#)); do
     case "$1" in
         --help|-h) usage; exit 0 ;;
         --subnet|--interface|--ipv4)
-            (($# >= 2)) && [[ -n "$2" && "$2" != --* ]] || die "Falta valor para $1"
+            if (($# < 2)) || [[ -z "$2" || "$2" == --* ]]; then
+                die "Falta valor para $1"
+            fi
             case "$1" in
                 --subnet) subnet=$2 ;;
                 --interface) interface=$2 ;;
