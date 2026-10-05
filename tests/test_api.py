@@ -105,15 +105,28 @@ def test_rollback(client, settings):
     assert json.loads((settings.data_dir / "state.json").read_text())["proxies"][0]["ipv6"] == first["ipv6"]
 
 
-def test_rollback_failure_blocks_writes(client):
+def test_rollback_failure_fences_only_the_touched_port(client):
+    first = client.post("/proxies", json={}).json()
+    other = client.post("/proxies", json={}).json()
+    manager = client.app.state.manager
+    manager.backend.failures = 2  # the delete and its rollback both fail
+    assert client.delete(f"/proxies/{first['port']}").status_code == 503
+    assert not manager.broken and manager.broken_ports == {first["port"]}
+    # The fenced port is out of the backend; the other keeps serving and mutating.
+    assert [r.port for r in manager.backend.records] == [other["port"]]
+    assert client.post(f"/proxies/{first['port']}/rotate").status_code == 503
+    assert client.delete(f"/proxies/{first['port']}").status_code == 503
+    assert client.post(f"/proxies/{other['port']}/rotate").status_code == 200
+    assert client.post("/proxies", json={}).status_code == 201
+
+def test_failed_fence_blocks_writes(client):
     client.post("/proxies", json={})
     manager = client.app.state.manager
-    manager.backend.failures = 2
+    manager.backend.failures = 3
     assert client.delete("/proxies/30000").status_code == 503
     assert manager.broken
     assert client.post("/proxies", json={}).status_code == 503
     assert client.get("/proxies").status_code == 503
-
 
 def test_restart(settings):
     app = create_app(settings, FakeBackend)

@@ -29,6 +29,7 @@ class Manager:
         self.backend = backend
         self.lock = RLock()
         self.broken = False
+        self.broken_ports = set()
         self.path = settings.data_dir / "state.json"
         self.legacy_path = settings.data_dir / "proxies.json"
         self.file_lock = (settings.data_dir / "manager.lock").open("a")
@@ -97,20 +98,42 @@ class Manager:
         """
         if self.broken:
             raise HTTPException(503, "Recovery required; restart service and inspect logs")
+        old = {r.port: r for r in self.records}
+        new = {r.port: r for r in records}
+        changed = {p for p in old.keys() | new.keys() if old.get(p) != new.get(p)}
+        if changed & self.broken_ports:
+            raise HTTPException(503, "Port requires recovery; restart service and inspect logs")
         try:
-            self.backend.apply(records)
+            self.backend.apply(self._serving(records))
             self._write(records, keys)
         except Exception:
             logger.exception("Proxy update failed; restoring previous state")
             try:
-                self.backend.apply(self.records)
                 self._write(self.records, self.keys)
             except Exception:
+                # Disk no longer trusted: refuse every write, but keep the
+                # running ports serving. Closing the backend here would drop
+                # tenants that were never part of this mutation.
                 self.broken = True
-                self.backend.close()
-                logger.exception("Rollback failed; service requires recovery")
+                logger.exception("State rollback failed; writes blocked until recovery")
+            try:
+                self.backend.apply(self._serving(self.records))
+            except Exception:
+                # Only the ports this mutation touched are uncertain. They are
+                # fenced (no mutations, left out of later applies) until a
+                # restart repairs them; every other port keeps its process.
+                self.broken_ports |= changed
+                logger.exception("Rollback failed for ports %s; they require recovery", sorted(changed))
+                try:
+                    self.backend.apply(self._serving(self.records))
+                except Exception:
+                    self.broken = True
+                    logger.exception("Could not fence failed ports; writes blocked until recovery")
             raise HTTPException(503, "Proxy update failed; inspect service logs")
         self.records, self.keys = records, keys
+
+    def _serving(self, records):
+        return [r for r in records if r.port not in self.broken_ports]
 
     def mutate(self, scope, key, request_fingerprint, plan):
         """Run one mutation, at most once per (scope, key).

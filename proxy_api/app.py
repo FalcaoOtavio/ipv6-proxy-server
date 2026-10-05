@@ -92,9 +92,12 @@ def create_app(settings=None, backend_factory=LinuxBackend):
     def list_proxies(owner=Depends(principal)):
         manager = app.state.manager
         with manager.lock:
-            if manager.broken or not manager.backend.healthy(manager.records):
+            # Health is scoped to what the caller sees: a fenced port of one
+            # owner must not turn every other owner's listing into a 503.
+            visible = manager.visible(owner)
+            if manager.broken or not manager.backend.healthy(visible):
                 raise HTTPException(503, "3proxy unavailable; inspect service logs")
-            return [manager.view(record) for record in manager.visible(owner)]
+            return [manager.view(record) for record in visible]
 
     @app.post("/proxies", response_model=ProxyView, status_code=201)
     def create_proxy(request: ProxyCreate, owner=Depends(principal), key=Depends(idempotency_key)):
