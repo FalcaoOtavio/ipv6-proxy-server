@@ -465,7 +465,8 @@ def test_live_http_cli_share_serialized_state(live_api, env_file):
             records = list(pool.map(create, range(12)))
         assert len({r["port"] for r in records}) == 12
         assert len({r["ipv6"] for r in records}) == 12
-        listed = http.get("/proxies").json()
+        # The CLI view keeps its 0.1.0 fields; owner is API-only.
+        listed = [{k: v for k, v in r.items() if k != "owner"} for r in http.get("/proxies").json()]
         result = process_cli(env_file, url, "list", "--output", "json")
         assert result.returncode == 0 and json.loads(result.stdout) == listed
         assert {r["port"] for r in listed} == {r["port"] for r in records}
@@ -488,8 +489,9 @@ def test_live_http_cli_share_serialized_state(live_api, env_file):
         with ThreadPoolExecutor(max_workers=12) as pool:
             survivors = [r for r in pool.map(mutate, range(12)) if r]
         listed = http.get("/proxies").json()
-        assert sorted(listed, key=lambda r: r["port"]) == sorted(survivors, key=lambda r: r["port"])
-        persisted = json.loads((settings.data_dir / "proxies.json").read_text())
+        cli_view = [{k: v for k, v in r.items() if k != "owner"} for r in listed]
+        assert sorted(cli_view, key=lambda r: r["port"]) == sorted(survivors, key=lambda r: r["port"])
+        persisted = json.loads((settings.data_dir / "state.json").read_text())["proxies"]
         backend = [r.model_dump(mode="json") for r in app.state.manager.backend.records]
         assert persisted == backend
         assert [{**{k: v for k, v in r.items() if k != "password"}, "ipv4": "127.0.0.1"}

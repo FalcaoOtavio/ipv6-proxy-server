@@ -1,6 +1,7 @@
 import os
 from ipaddress import IPv4Address, IPv6Network
 from pathlib import Path
+from typing import Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -14,6 +15,9 @@ class Settings(BaseModel):
     binary: Path = Path("/usr/local/bin/3proxy")
     port_start: int = Field(default=30000, ge=1024, le=65535)
     port_end: int = Field(default=39999, ge=1024, le=65535)
+    # JSON {"owner": "sha256 hex of that client's token"}; a client token only
+    # sees and mutates proxies of its own owner. Hashes only: no secret at rest.
+    client_tokens_file: Optional[Path] = None
 
     @model_validator(mode="after")
     def validate_ranges(self):
@@ -34,5 +38,6 @@ class Settings(BaseModel):
             "interface": "PROXY_INTERFACE", "api_token": "PROXY_API_TOKEN",
             "data_dir": "PROXY_DATA_DIR", "binary": "PROXY_3PROXY_BINARY",
             "port_start": "PROXY_PORT_START", "port_end": "PROXY_PORT_END",
+            "client_tokens_file": "PROXY_CLIENT_TOKENS_FILE",
         }
         return cls(**{key: os.environ[name] for key, name in names.items() if name in os.environ})

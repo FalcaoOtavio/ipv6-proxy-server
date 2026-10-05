@@ -42,10 +42,12 @@ def test_real_ipv4_to_ipv6_and_auth(tmp_path):
                         api_token="x" * 32, data_dir=tmp_path)
     records = [ProxyRecord(port=ports[0], protocol="http", username="alice", password="secret", ipv6="::1"),
                ProxyRecord(port=ports[1], protocol="socks5", username="bob", password="other", ipv6="::1")]
-    config = tmp_path / "3proxy.cfg"
-    config.write_text(render_config(settings, records))
-    process = subprocess.Popen([os.environ["TEST_3PROXY_BINARY"], str(config)],
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    processes = []
+    for record in records:
+        config = tmp_path / f"3proxy-{record.port}.cfg"
+        config.write_text(render_config(settings, record))
+        processes.append(subprocess.Popen([os.environ["TEST_3PROXY_BINARY"], str(config)],
+                                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     try:
         for port in ports:
             deadline = time.monotonic() + 5
@@ -55,7 +57,7 @@ def test_real_ipv4_to_ipv6_and_auth(tmp_path):
                         break
                 except OSError:
                     assert time.monotonic() < deadline
-                    assert process.poll() is None
+                    assert all(process.poll() is None for process in processes)
                     time.sleep(0.05)
         for scheme, port, credentials in [("http", ports[0], "alice:secret"),
                                            ("socks5h", ports[1], "bob:other")]:
@@ -70,12 +72,13 @@ def test_real_ipv4_to_ipv6_and_auth(tmp_path):
             command[command.index(credentials)] = "bob:other" if scheme == "http" else "alice:secret"
             assert subprocess.run(command, capture_output=True, timeout=10).returncode != 0
     finally:
-        process.terminate()
-        try:
-            process.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait()
+        for process in processes:
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)

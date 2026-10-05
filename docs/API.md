@@ -13,8 +13,23 @@ ou com o servico API parado. O CLI `ipv6-proxy` e um cliente da API, nao o legad
 - Rotacao conserva porta, protocolo e credenciais; troca somente IPv6 escolhido.
 - HTTP/CONNECT e SOCKS5 usam `-6`, sem fallback de saida IPv4. Destinos precisam
   aceitar IPv6. Para SOCKS5, use resolucao DNS no proxy (`socks5h://`).
-- Alteracoes reiniciam o processo 3proxy inteiro e interrompem conexoes abertas
-  de todos os proxies. Enderecos dos demais proxies permanecem iguais.
+- Cada porta roda em processo 3proxy proprio. Criar, rotacionar ou excluir uma
+  porta reinicia somente o processo dela; conexoes das demais portas continuam
+  (testado com 3proxy real em `tests/test_isolation_3proxy.py`). Falha ou morte
+  do 3proxy de uma porta nao derruba as outras.
+- `GET /capabilities` devolve `{"spec":"ashford.proxy/1","capabilities":[...]}`
+  com `isolated_mutations`, `owner_scoping`, `idempotency_keys` e
+  `socks5_udp_associate`, cada um coberto por teste com 3proxy real.
+- Posse: `PROXY_CLIENT_TOKENS_FILE` aponta para JSON `{"owner":"sha256-hex do
+  token"}`. Token de cliente so lista/muda proxies do proprio owner (de outro
+  owner responde 404, como inexistente) e nao pode agir por outro owner (403).
+  O token admin ve tudo; `X-Proxy-Owner` apenas o restringe. Proxies sem owner
+  (legados) so sao visiveis ao admin.
+- `Idempotency-Key` (`[A-Za-z0-9._:-]{1,128}`) em POST/rotate/DELETE: repeticao
+  devolve o resultado gravado sem repetir a mutacao; mesma chave com outro
+  pedido gera 422. Chaves valem 24h por owner e sao gravadas no mesmo
+  `state.json` (rename atomico) que o pool.
+- SOCKS5 aceita UDP ASSOCIATE; o relay UDP sai pelo mesmo IPv6 da porta.
 - Estado persiste em disco; reinicio restaura portas, enderecos e credenciais.
 - API serializa mutacoes, impede portas duplicadas e tenta rollback em falhas.
   Falha no rollback retorna 503 e bloqueia mutacoes ate recuperacao/reinicio.
@@ -110,8 +125,8 @@ sudo ipv6-proxy rotate 30000 --yes --output json
 sudo ipv6-proxy delete 30000 --yes --output json
 ```
 
-**Cada mutacao reinicia todos os proxies da API e desconecta todas as sessoes
-ativas**; o aviso aparece em stderr e o CLI pede confirmacao. `--yes` dispensa
+**Cada mutacao reinicia somente o 3proxy da porta afetada e desconecta as
+sessoes dessa porta**; o aviso aparece em stderr e o CLI pede confirmacao. `--yes` dispensa
 somente a pergunta, nao o aviso. CLI e HTTP/Swagger podem operar simultaneamente
 no mesmo pool: um unico manager na API serializa operacoes e rejeita conflitos.
 Isso garante consistencia de estado, nao continuidade de conexoes.
@@ -150,6 +165,7 @@ O token e estado da API continuam administrados somente pelo servico/instalacao.
 | GET | `/proxies` | Lista pool; 200 |
 | POST | `/proxies/{port}/rotate` | Troca IPv6 da porta; 200 |
 | DELETE | `/proxies/{port}` | Remove proxy e IPv6; 204 |
+| GET | `/capabilities` | Contrato `ashford.proxy/1`; 200 |
 
 ```bash
 export API_TOKEN='TOKEN_CONFIGURADO_NO_SERVIDOR'
@@ -168,9 +184,8 @@ curl -i -X DELETE http://127.0.0.1:8000/proxies/30000 \
 Criacao aceita `{}`: HTTP, primeira porta livre na faixa configurada, sem auth.
 Protocolo tambem aceita `socks5`. Username e password devem vir juntos; username
 aceita letras ASCII, numeros, `_`, `.`, `-`; password aceita tambem `!@%+=`.
-Caracteres de controle e sintaxe especial do 3proxy sao rejeitados. Mesmo
-username em portas distintas precisa usar mesma senha, pois 3proxy compartilha
-cadastro de usuarios. ACL restringe cada porta ao username correspondente.
+Caracteres de controle e sintaxe especial do 3proxy sao rejeitados. Cada
+porta tem cadastro de usuario proprio; ACL restringe a porta ao seu username.
 Respostas nunca incluem senha.
 
 Exemplo de resposta (IPv4/IPv6 de documentacao):

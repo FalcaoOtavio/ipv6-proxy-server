@@ -21,7 +21,7 @@ ENV_FILE = Path("/etc/ipv6-proxy-api.env")
 # Allow all 64,512 supported ports, including maximum-length view fields.
 MAX_BODY = 16 * 1024 * 1024
 MAX_ENV = 64 * 1024
-MUTATION_WARNING = "Esta operacao reinicia todos os proxies da API (3proxy) e desconecta todas as sessoes ativas."
+MUTATION_WARNING = "Esta operacao reinicia somente o 3proxy da porta afetada e desconecta as sessoes dessa porta."
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 PASSWORD_RE = re.compile(r"^[A-Za-z0-9_.!@%+=-]{1,128}$")
 

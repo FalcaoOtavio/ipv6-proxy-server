@@ -59,9 +59,11 @@ def test_lifecycle(client, settings):
     assert rotated["port"] == first["port"]
     assert rotated["username"] == "alice"
     assert client.get("/proxies").json()[1] == second
-    config = render_config(settings, client.app.state.manager.records)
+    records = client.app.state.manager.records
+    config = render_config(settings, records[0])
     assert f"proxy -6 -n -a -p{first['port']} -i127.0.0.1 -e{rotated['ipv6']}" in config
-    assert "socks -6 -a" in config
+    assert "users alice:CL:secret" in config
+    assert "socks -6 -a" in render_config(settings, records[1])
     assert client.delete(f"/proxies/{first['port']}").status_code == 204
     assert client.get("/proxies").json() == [second]
     assert client.delete(f"/proxies/{first['port']}").status_code == 404
@@ -88,7 +90,8 @@ def test_conflicts(client):
     payload = {"port": 30000, "username": "a", "password": "one"}
     assert client.post("/proxies", json=payload).status_code == 201
     assert client.post("/proxies", json=payload).status_code == 409
-    assert client.post("/proxies", json={"username": "a", "password": "two"}).status_code == 409
+    # Each port runs its own 3proxy, so user databases no longer collide.
+    assert client.post("/proxies", json={"username": "a", "password": "two"}).status_code == 201
     assert client.post("/proxies/39999/rotate").status_code == 404
 
 
@@ -99,7 +102,7 @@ def test_rollback(client, settings):
     assert client.post(f"/proxies/{first['port']}/rotate").status_code == 503
     assert client.get("/proxies").json() == [first]
     assert str(manager.backend.records[0].ipv6) == first["ipv6"]
-    assert json.loads((settings.data_dir / "proxies.json").read_text())[0]["ipv6"] == first["ipv6"]
+    assert json.loads((settings.data_dir / "state.json").read_text())["proxies"][0]["ipv6"] == first["ipv6"]
 
 
 def test_rollback_failure_blocks_writes(client):
@@ -128,9 +131,10 @@ def test_concurrent_creation_and_worker_lock(settings):
         with pytest.raises(RuntimeError, match="one worker"):
             Manager(settings, FakeBackend(settings))
         with ThreadPoolExecutor(max_workers=8) as executor:
-            records = list(executor.map(lambda _: manager.create(ProxyCreate()), range(20)))
-        assert len({r.port for r in records}) == 20
-        assert len({r.ipv6 for r in records}) == 20
+            create = lambda _: manager.mutate("", None, None, lambda: manager.plan_create(ProxyCreate()))[1]
+            records = list(executor.map(create, range(20)))
+        assert len({r["port"] for r in records}) == 20
+        assert len({r["ipv6"] for r in records}) == 20
     finally:
         manager.close()
 

@@ -1,7 +1,9 @@
 import fcntl
+import hashlib
 import json
 import logging
 import secrets
+import time
 from ipaddress import IPv6Address
 from threading import RLock
 
@@ -12,6 +14,14 @@ from .models import ProxyRecord
 
 logger = logging.getLogger(__name__)
 
+# Idempotency entries live in the same state document as the proxies, so a
+# mutation and its replayable result commit in one atomic rename.
+IDEMPOTENCY_TTL = 24 * 3600
+IDEMPOTENCY_MAX = 10000
+STATE_VERSION = 2
+
+def fingerprint(*parts):
+    return hashlib.sha256(json.dumps(parts, sort_keys=True, default=str).encode()).hexdigest()
 
 class Manager:
     def __init__(self, settings, backend):
@@ -19,7 +29,8 @@ class Manager:
         self.backend = backend
         self.lock = RLock()
         self.broken = False
-        self.path = settings.data_dir / "proxies.json"
+        self.path = settings.data_dir / "state.json"
+        self.legacy_path = settings.data_dir / "proxies.json"
         self.file_lock = (settings.data_dir / "manager.lock").open("a")
         try:
             fcntl.flock(self.file_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -27,7 +38,7 @@ class Manager:
             self.file_lock.close()
             raise RuntimeError("Another manager owns this data directory; use one worker")
         try:
-            raw = json.loads(self.path.read_text()) if self.path.exists() else []
+            raw, self.keys = self._load()
             self.records = [ProxyRecord.model_validate(item) for item in raw]
             if len({r.port for r in self.records}) != len(self.records):
                 raise ValueError("Duplicate persisted ports")
@@ -37,10 +48,31 @@ class Manager:
                 if record.ipv6 not in settings.subnet or not settings.port_start <= record.port <= settings.port_end:
                     raise ValueError("Persisted proxies do not match configured subnet/port range")
             backend.apply(self.records)
+            if not self.path.exists():
+                # Upgrade from the 0.1.0 layout: state.json becomes the source of
+                # truth; proxies.json is kept, renamed, as the rollback copy.
+                self._write(self.records, self.keys)
+                if self.legacy_path.exists():
+                    self.legacy_path.rename(self.legacy_path.with_suffix(".json.v1-backup"))
         except Exception:
             backend.close()
             self.file_lock.close()
             raise
+
+    def _load(self):
+        if self.path.exists():
+            state = json.loads(self.path.read_text())
+            if state.get("version") != STATE_VERSION:
+                raise ValueError("Unsupported state.json version")
+            return state["proxies"], state["idempotency"]
+        if self.legacy_path.exists():
+            return json.loads(self.legacy_path.read_text()), {}
+        return [], {}
+
+    def _write(self, records, keys):
+        atomic_json(self.path, {"version": STATE_VERSION,
+                                "proxies": [record.model_dump(mode="json") for record in records],
+                                "idempotency": keys})
 
     def _address(self):
         used = {int(r.ipv6) for r in self.records}
@@ -56,58 +88,88 @@ class Manager:
             candidate = candidate % capacity + 1
         return IPv6Address(base + candidate)
 
-    def _commit(self, records):
+    def _commit(self, records, keys):
+        """Apply records, then persist records + keys in one atomic rename.
+
+        The rename is the commit point. A crash before it leaves the previous
+        state on disk and the next start converges the processes back to it, so
+        a retried key performs the mutation exactly once from the API's view.
+        """
         if self.broken:
             raise HTTPException(503, "Recovery required; restart service and inspect logs")
         try:
             self.backend.apply(records)
-            atomic_json(self.path, [record.model_dump(mode="json") for record in records])
+            self._write(records, keys)
         except Exception:
             logger.exception("Proxy update failed; restoring previous state")
             try:
                 self.backend.apply(self.records)
-                atomic_json(self.path, [r.model_dump(mode="json") for r in self.records])
+                self._write(self.records, self.keys)
             except Exception:
                 self.broken = True
                 self.backend.close()
                 logger.exception("Rollback failed; service requires recovery")
             raise HTTPException(503, "Proxy update failed; inspect service logs")
-        self.records = records
+        self.records, self.keys = records, keys
 
-    def create(self, request):
-        with self.lock:
-            ports = {record.port for record in self.records}
-            port = request.port
-            if port is None:
-                port = next((p for p in range(self.settings.port_start, self.settings.port_end + 1) if p not in ports), None)
-            if port is None or port in ports:
-                raise HTTPException(409, "Port unavailable")
-            if not self.settings.port_start <= port <= self.settings.port_end:
-                raise HTTPException(422, "Port outside configured range")
-            if request.username and any(r.username == request.username and r.password != request.password for r in self.records):
-                raise HTTPException(409, "Same username must use the same password across proxies")
-            record = ProxyRecord(**request.model_dump(exclude={"port"}), port=port, ipv6=self._address())
-            self._commit([*self.records, record])
-            return record
+    def mutate(self, scope, key, request_fingerprint, plan):
+        """Run one mutation, at most once per (scope, key).
 
-    def get(self, port):
+        plan() returns (records, status, body) without side effects; body is
+        the stored response and never holds passwords. A replay returns the
+        stored response; a key reused for a different request is refused.
+        """
         with self.lock:
-            record = next((r for r in self.records if r.port == port), None)
+            now = time.time()
+            keys = {k: v for k, v in self.keys.items() if now - v["at"] < IDEMPOTENCY_TTL}
+            slot = fingerprint(scope, key)
+            if key is not None and slot in keys:
+                if keys[slot]["request"] != request_fingerprint:
+                    raise HTTPException(422, "Idempotency-Key reused for a different request")
+                return keys[slot]["status"], keys[slot]["body"]
+            records, status, body = plan()
+            if key is not None:
+                keys[slot] = {"request": request_fingerprint, "status": status, "body": body, "at": now}
+                for stale in sorted(keys, key=lambda k: keys[k]["at"])[:max(0, len(keys) - IDEMPOTENCY_MAX)]:
+                    del keys[stale]
+            self._commit(records, keys)
+            return status, body
+
+    def view(self, record):
+        body = record.model_dump(mode="json", exclude={"password"})
+        return {**body, "ipv4": str(self.settings.bind_ipv4)}
+
+    def visible(self, owner):
+        """owner=None is the admin view; any other value sees only its own proxies."""
+        return [r for r in self.records if owner is None or r.owner == owner]
+
+    def plan_create(self, request):
+        ports = {record.port for record in self.records}
+        port = request.port
+        if port is None:
+            port = next((p for p in range(self.settings.port_start, self.settings.port_end + 1) if p not in ports), None)
+        if port is None or port in ports:
+            raise HTTPException(409, "Port unavailable")
+        if not self.settings.port_start <= port <= self.settings.port_end:
+            raise HTTPException(422, "Port outside configured range")
+        record = ProxyRecord(**request.model_dump(exclude={"port"}), port=port, ipv6=self._address())
+        return [*self.records, record], 201, self.view(record)
+
+    def get(self, port, owner=None):
+        with self.lock:
+            # Another owner's proxy answers exactly like a missing one.
+            record = next((r for r in self.visible(owner) if r.port == port), None)
             if record is None:
                 raise HTTPException(404, "Proxy not found")
             return record
 
-    def rotate(self, port):
-        with self.lock:
-            old = self.get(port)
-            new = old.model_copy(update={"ipv6": self._address()})
-            self._commit([new if r.port == port else r for r in self.records])
-            return new
+    def plan_rotate(self, port, owner=None):
+        new = self.get(port, owner).model_copy(update={"ipv6": self._address()})
+        return [new if r.port == port else r for r in self.records], 200, self.view(new)
 
-    def delete(self, port):
-        with self.lock:
-            self.get(port)
-            self._commit([r for r in self.records if r.port != port])
+    def plan_delete(self, port, owner=None):
+        self.get(port, owner)
+        return [r for r in self.records if r.port != port], 204, None
 
     def close(self):
         self.backend.close()

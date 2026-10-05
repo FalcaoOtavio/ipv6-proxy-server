@@ -4,6 +4,8 @@ from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
+OWNER_PATTERN = r"^[A-Za-z0-9._-]{1,64}$"
+
 class ProxyCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -11,6 +13,7 @@ class ProxyCreate(BaseModel):
     protocol: Literal["http", "socks5"] = "http"
     username: Optional[str] = Field(default=None, min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.-]+$")
     password: Optional[str] = Field(default=None, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.!@%+=-]+$")
+    owner: Optional[str] = Field(default=None, pattern=OWNER_PATTERN)
 
     @model_validator(mode="after")
     def credentials_together(self):
@@ -30,3 +33,4 @@ class ProxyView(BaseModel):
     ipv4: IPv4Address
     ipv6: IPv6Address
     username: Optional[str]
+    owner: Optional[str] = None
