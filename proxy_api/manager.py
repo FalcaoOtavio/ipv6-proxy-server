@@ -18,6 +18,9 @@ logger = logging.getLogger(__name__)
 # mutation and its replayable result commit in one atomic rename.
 IDEMPOTENCY_TTL = 24 * 3600
 IDEMPOTENCY_MAX = 10000
+# Pinned keys are never forgotten; past this many, new ones are refused (428)
+# instead of silently dropping an old one.
+PINNED_MAX = 100000
 STATE_VERSION = 2
 
 def fingerprint(*parts):
@@ -48,8 +51,10 @@ class Manager:
             for record in self.records:
                 if record.ipv6 not in settings.subnet or not settings.port_start <= record.port <= settings.port_end:
                     raise ValueError("Persisted proxies do not match configured subnet/port range")
+            if len({r.id for r in self.records}) != len(self.records):
+                raise ValueError("Duplicate persisted proxy ids")
             backend.apply(self.records)
-            if not self.path.exists():
+            if not self.path.exists() or any("id" not in item for item in raw):
                 # Upgrade from the 0.1.0 layout: state.json becomes the source of
                 # truth; proxies.json is kept, renamed, as the rollback copy.
                 self._write(self.records, self.keys)
@@ -135,25 +140,35 @@ class Manager:
     def _serving(self, records):
         return [r for r in records if r.port not in self.broken_ports]
 
-    def mutate(self, scope, key, request_fingerprint, plan):
+    def mutate(self, scope, key, request_fingerprint, plan, pinned=False):
         """Run one mutation, at most once per (scope, key).
 
         plan() returns (records, status, body) without side effects; body is
         the stored response and never holds passwords. A replay returns the
         stored response; a key reused for a different request is refused.
+
+        pinned keys never expire nor get evicted. DELETE without If-Match needs
+        that: once its key is forgotten, a late retry is indistinguishable from
+        a fresh delete of whoever inherited the port. Cost ~200 bytes per
+        delete in state.json, capped by PINNED_MAX; If-Match is the stateless way and the one the
+        Ashford client uses.
         """
         with self.lock:
             now = time.time()
-            keys = {k: v for k, v in self.keys.items() if now - v["at"] < IDEMPOTENCY_TTL}
+            keys = {k: v for k, v in self.keys.items() if v.get("pinned") or now - v["at"] < IDEMPOTENCY_TTL}
             slot = fingerprint(scope, key)
             if key is not None and slot in keys:
                 if keys[slot]["request"] != request_fingerprint:
                     raise HTTPException(422, "Idempotency-Key reused for a different request")
                 return keys[slot]["status"], keys[slot]["body"]
+            if key is not None and pinned and sum(1 for v in keys.values() if v.get("pinned")) >= PINNED_MAX:
+                raise HTTPException(428, "Idempotent DELETE capacity reached; send If-Match")
             records, status, body = plan()
             if key is not None:
-                keys[slot] = {"request": request_fingerprint, "status": status, "body": body, "at": now}
-                for stale in sorted(keys, key=lambda k: keys[k]["at"])[:max(0, len(keys) - IDEMPOTENCY_MAX)]:
+                keys[slot] = {"request": request_fingerprint, "status": status, "body": body, "at": now,
+                              "pinned": pinned}
+                evictable = sorted((k for k in keys if not keys[k].get("pinned")), key=lambda k: keys[k]["at"])
+                for stale in evictable[:max(0, len(evictable) - IDEMPOTENCY_MAX)]:
                     del keys[stale]
             self._commit(records, keys)
             return status, body
@@ -178,20 +193,23 @@ class Manager:
         record = ProxyRecord(**request.model_dump(exclude={"port"}), port=port, ipv6=self._address())
         return [*self.records, record], 201, self.view(record)
 
-    def get(self, port, owner=None):
+    def get(self, port, owner=None, expected_id=None):
         with self.lock:
             # Another owner's proxy answers exactly like a missing one.
             record = next((r for r in self.visible(owner) if r.port == port), None)
             if record is None:
                 raise HTTPException(404, "Proxy not found")
+            if expected_id is not None and record.id != expected_id:
+                # The port now belongs to another proxy (reused after a delete).
+                raise HTTPException(412, "Proxy identity does not match If-Match")
             return record
 
-    def plan_rotate(self, port, owner=None):
-        new = self.get(port, owner).model_copy(update={"ipv6": self._address()})
+    def plan_rotate(self, port, owner=None, expected_id=None):
+        new = self.get(port, owner, expected_id).model_copy(update={"ipv6": self._address()})
         return [new if r.port == port else r for r in self.records], 200, self.view(new)
 
-    def plan_delete(self, port, owner=None):
-        self.get(port, owner)
+    def plan_delete(self, port, owner=None, expected_id=None):
+        self.get(port, owner, expected_id)
         return [r for r in self.records if r.port != port], 204, None
 
     def close(self):

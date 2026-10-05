@@ -160,3 +160,28 @@ def test_exhaustion(settings):
             assert client.post("/proxies", json={}).status_code == 201
         assert client.post("/proxies", json={}).status_code == 409
         assert client.post("/proxies/30000/rotate").status_code == 409
+
+def test_if_match_is_compare_and_delete(client):
+    first = client.post("/proxies", json={"port": 30005}).json()
+    assert len(first["id"]) == 32
+    rotated = client.post(f"/proxies/30005/rotate", headers={"If-Match": f'"{first["id"]}"'})
+    assert rotated.status_code == 200 and rotated.json()["id"] == first["id"]  # rotate keeps identity
+    assert client.delete("/proxies/30005", headers={"If-Match": first["id"]}).status_code == 204
+    heir = client.post("/proxies", json={"port": 30005}).json()
+    assert heir["id"] != first["id"]  # the port is reused, the identity never is
+    for method, path in [("DELETE", "/proxies/30005"), ("POST", "/proxies/30005/rotate")]:
+        late = client.request(method, path, headers={"If-Match": first["id"], "Idempotency-Key": "late"})
+        assert late.status_code == 412
+    assert client.get("/proxies").json() == [heir]
+    assert client.delete("/proxies/30005", headers={"If-Match": "nope"}).status_code == 422
+    assert client.delete("/proxies/30009", headers={"If-Match": first["id"]}).status_code == 404
+
+def test_keyless_precondition_delete_keys_are_pinned(client, monkeypatch):
+    import proxy_api.manager as manager_module
+    monkeypatch.setattr(manager_module, "PINNED_MAX", 1)
+    client.post("/proxies", json={"port": 30006})
+    client.post("/proxies", json={"port": 30007})
+    assert client.delete("/proxies/30006", headers={"Idempotency-Key": "d1"}).status_code == 204
+    # Pinned capacity exhausted: refused rather than forgetting d1.
+    assert client.delete("/proxies/30007", headers={"Idempotency-Key": "d2"}).status_code == 428
+    assert [p["port"] for p in client.get("/proxies").json()] == [30007]

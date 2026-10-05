@@ -128,8 +128,12 @@ def test_legacy_state_migrates_without_loss(settings):
     assert state["version"] == 2 and state["proxies"][0]["password"] == "keep-me"
     assert json.loads((settings.data_dir / "proxies.json.v1-backup").read_text()) == legacy
     assert not (settings.data_dir / "proxies.json").exists()
+    # The upgrade only adds the immutable id, persisted once and kept on restart.
+    born = manager.records[0].id
+    assert json.loads((settings.data_dir / "state.json").read_text())["proxies"][0]["id"] == born
     manager = restart(manager, settings)
-    assert [r.model_dump(mode="json", exclude_none=True) for r in manager.records] == legacy
+    assert manager.records[0].id == born
+    assert [r.model_dump(mode="json", exclude_none=True, exclude={"id"}) for r in manager.records] == legacy
     # Ownerless legacy proxy is invisible and immutable for any owner token.
     assert manager.visible("t") == []
     manager.close()

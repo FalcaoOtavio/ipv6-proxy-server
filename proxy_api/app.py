@@ -12,11 +12,12 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from .backend import LinuxBackend
 from .config import Settings
 from .manager import Manager, fingerprint
-from .models import OWNER_PATTERN, ProxyCreate, ProxyView
+from .models import ID_PATTERN, OWNER_PATTERN, ProxyCreate, ProxyView
 
 SPEC = "ashford.proxy/1"
 # Announce only what tests/test_isolation_3proxy.py proves against real 3proxy.
-CAPABILITIES = ["isolated_mutations", "owner_scoping", "idempotency_keys", "socks5_udp_associate"]
+CAPABILITIES = ["isolated_mutations", "owner_scoping", "idempotency_keys", "conditional_mutations",
+                "socks5_udp_associate"]
 IDEMPOTENCY_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 
 def load_client_tokens(path):
@@ -80,8 +81,17 @@ def create_app(settings=None, backend_factory=LinuxBackend):
             raise HTTPException(422, "Invalid Idempotency-Key")
         return key
 
-    def run(owner, key, request_parts, plan):
-        status, body = app.state.manager.mutate(owner or "", key, fingerprint(*request_parts), plan)
+    def if_match(value: Optional[str] = Header(default=None, alias="If-Match")):
+        """Expected proxy id; quotes (ETag style) are accepted and stripped."""
+        if value is None:
+            return None
+        value = value.strip().removeprefix("W/").strip('"')
+        if not re.fullmatch(ID_PATTERN, value):
+            raise HTTPException(422, "Invalid If-Match")
+        return value
+
+    def run(owner, key, request_parts, plan, pinned=False):
+        status, body = app.state.manager.mutate(owner or "", key, fingerprint(*request_parts), plan, pinned)
         return Response(status_code=status) if body is None else JSONResponse(body, status_code=status)
 
     @app.get("/capabilities")
@@ -109,14 +119,17 @@ def create_app(settings=None, backend_factory=LinuxBackend):
                    lambda: app.state.manager.plan_create(request))
 
     @app.post("/proxies/{port}/rotate", response_model=ProxyView)
-    def rotate_proxy(port: int, owner=Depends(principal), key=Depends(idempotency_key)):
-        return run(owner, key, ["POST", f"/proxies/{port}/rotate"],
-                   lambda: app.state.manager.plan_rotate(port, owner))
+    def rotate_proxy(port: int, owner=Depends(principal), key=Depends(idempotency_key),
+                     expected=Depends(if_match)):
+        return run(owner, key, ["POST", f"/proxies/{port}/rotate", expected],
+                   lambda: app.state.manager.plan_rotate(port, owner, expected))
 
     @app.delete("/proxies/{port}", status_code=204)
-    def delete_proxy(port: int, owner=Depends(principal), key=Depends(idempotency_key)):
-        return run(owner, key, ["DELETE", f"/proxies/{port}"],
-                   lambda: app.state.manager.plan_delete(port, owner))
+    def delete_proxy(port: int, owner=Depends(principal), key=Depends(idempotency_key),
+                     expected=Depends(if_match)):
+        # Keys of keyless-precondition deletes are pinned (see Manager.mutate).
+        return run(owner, key, ["DELETE", f"/proxies/{port}", expected],
+                   lambda: app.state.manager.plan_delete(port, owner, expected), pinned=expected is None)
 
     return app
 

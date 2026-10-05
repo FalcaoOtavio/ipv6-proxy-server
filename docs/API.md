@@ -18,8 +18,12 @@ ou com o servico API parado. O CLI `ipv6-proxy` e um cliente da API, nao o legad
   (testado com 3proxy real em `tests/test_isolation_3proxy.py`). Falha ou morte
   do 3proxy de uma porta nao derruba as outras.
 - `GET /capabilities` devolve `{"spec":"ashford.proxy/1","capabilities":[...]}`
-  com `isolated_mutations`, `owner_scoping`, `idempotency_keys` e
-  `socks5_udp_associate`, cada um coberto por teste com 3proxy real.
+  com `isolated_mutations`, `owner_scoping`, `idempotency_keys`,
+  `conditional_mutations` e `socks5_udp_associate`, cada um coberto por teste.
+- Identidade: cada proxy tem `id` (32 hex) imutavel, gerado no create, mantido
+  no rotate e nunca reaproveitado quando a porta e reutilizada. `If-Match: <id>`
+  em rotate/DELETE e precondicao: id diferente responde 412 sem efeito
+  (compare-and-delete). Proxy migrado do 0.1.0 recebe id no primeiro start.
 - Posse: `PROXY_CLIENT_TOKENS_FILE` aponta para JSON `{"owner":"sha256-hex do
   token"}`. Token de cliente so lista/muda proxies do proprio owner (de outro
   owner responde 404, como inexistente) e nao pode agir por outro owner (403).
@@ -28,11 +32,17 @@ ou com o servico API parado. O CLI `ipv6-proxy` e um cliente da API, nao o legad
 - `Idempotency-Key` (`[A-Za-z0-9._:-]{1,128}`) em POST/rotate/DELETE: repeticao
   devolve o resultado gravado sem repetir a mutacao; mesma chave com outro
   pedido gera 422. Chaves valem 24h por owner e sao gravadas no mesmo
-  `state.json` (rename atomico) que o pool.
+  `state.json` (rename atomico) que o pool. Excecao: DELETE com chave e sem
+  `If-Match` fixa a chave para sempre (um retry tardio nao pode apagar o
+  herdeiro da porta); acima de 100k chaves fixas responde 428 (use If-Match).
 - SOCKS5 aceita UDP ASSOCIATE; o relay UDP sai pelo mesmo IPv6 da porta.
 - Estado persiste em disco; reinicio restaura portas, enderecos e credenciais.
 - API serializa mutacoes, impede portas duplicadas e tenta rollback em falhas.
-  Falha no rollback retorna 503 e bloqueia mutacoes ate recuperacao/reinicio.
+  Falha no rollback do processo retorna 503 e isola so as portas daquela
+  mutacao: elas saem do ar e recusam mutacao (503) ate reinicio; as demais
+  portas seguem servindo e mutando. `GET /proxies` responde 503 so para quem
+  enxerga uma porta morta (o owner dela e o admin). Falha ao regravar o estado
+  em disco bloqueia todas as mutacoes, sem derrubar processos.
 - Nenhuma rotacao automatica ou por requisicao e adicionada.
 
 ## Instalacao: Debian/Ubuntu com systemd

@@ -456,7 +456,7 @@ def test_live_http_cli_share_serialized_state(live_api, env_file):
             if index % 2:
                 response = http.post("/proxies", json={"protocol": "socks5"})
                 assert response.status_code == 201
-                return response.json()
+                return {k: v for k, v in response.json().items() if k != "id"}  # CLI view has no id
             result = process_cli(env_file, url, "create", "--yes", "--output", "json")
             assert result.returncode == 0, result.stderr
             return json.loads(result.stdout)
@@ -465,8 +465,8 @@ def test_live_http_cli_share_serialized_state(live_api, env_file):
             records = list(pool.map(create, range(12)))
         assert len({r["port"] for r in records}) == 12
         assert len({r["ipv6"] for r in records}) == 12
-        # The CLI view keeps its 0.1.0 fields; owner is API-only.
-        listed = [{k: v for k, v in r.items() if k != "owner"} for r in http.get("/proxies").json()]
+        # The CLI view keeps its 0.1.0 fields; owner and id are API-only.
+        listed = [{k: v for k, v in r.items() if k not in ("owner", "id")} for r in http.get("/proxies").json()]
         result = process_cli(env_file, url, "list", "--output", "json")
         assert result.returncode == 0 and json.loads(result.stdout) == listed
         assert {r["port"] for r in listed} == {r["port"] for r in records}
@@ -489,7 +489,7 @@ def test_live_http_cli_share_serialized_state(live_api, env_file):
         with ThreadPoolExecutor(max_workers=12) as pool:
             survivors = [r for r in pool.map(mutate, range(12)) if r]
         listed = http.get("/proxies").json()
-        cli_view = [{k: v for k, v in r.items() if k != "owner"} for r in listed]
+        cli_view = [{k: v for k, v in r.items() if k not in ("owner", "id")} for r in listed]  # CLI keeps 0.1.0 output
         assert sorted(cli_view, key=lambda r: r["port"]) == sorted(survivors, key=lambda r: r["port"])
         persisted = json.loads((settings.data_dir / "state.json").read_text())["proxies"]
         backend = [r.model_dump(mode="json") for r in app.state.manager.backend.records]

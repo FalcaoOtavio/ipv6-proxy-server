@@ -1,3 +1,4 @@
+import secrets
 from ipaddress import IPv4Address, IPv6Address
 from typing import Literal, Optional
 
@@ -22,12 +23,19 @@ class ProxyCreate(BaseModel):
         return self
 
 
+ID_PATTERN = r"^[0-9a-f]{32}$"
+
 class ProxyRecord(ProxyCreate):
     port: int = Field(ge=1024, le=65535)
     ipv6: IPv6Address
+    # Immutable identity of this proxy: born on create, kept by rotate, never
+    # reused when the port is taken again. DELETE/rotate can demand it with
+    # If-Match, so a stale request cannot hit whoever inherited the port.
+    id: str = Field(default_factory=lambda: secrets.token_hex(16), pattern=ID_PATTERN)
 
 
 class ProxyView(BaseModel):
+    id: str
     port: int
     protocol: Literal["http", "socks5"]
     ipv4: IPv4Address

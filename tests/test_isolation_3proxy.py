@@ -187,7 +187,7 @@ def test_capabilities_are_exactly_the_proven_set(env):
     assert call(client, "GET", "/capabilities", TENANT_A).json() == {
         "spec": "ashford.proxy/1", "capabilities": CAPABILITIES}
     assert set(CAPABILITIES) == {"isolated_mutations", "owner_scoping", "idempotency_keys",
-                                 "socks5_udp_associate"}
+                                 "conditional_mutations", "socks5_udp_associate"}
 
 def test_mutating_a_keeps_b_stream_and_process(env):
     client, ports, echo = env
@@ -300,7 +300,11 @@ def test_failures_in_a_never_drop_b(env, monkeypatch):
         # A's 3proxy dies: B keeps flowing; the next mutation of A restarts only A.
         backend.processes[a["port"]][1].kill()
         assert beat.alive_for(0.3)
-        assert call(client, "GET", "/proxies", TENANT_B).status_code == 503  # pool reports degraded
+        # Health is owner-scoped: A sees its dead port, B is untouched, admin sees the pool degraded.
+        assert call(client, "GET", "/proxies", TENANT_A).status_code == 503
+        assert call(client, "GET", "/proxies", TENANT_B).status_code == 200
+        assert call(client, "GET", "/proxies", ADMIN).status_code == 503
+        assert pid(client, b["port"]) == b_pid
         rotated = call(client, "POST", f"/proxies/{a['port']}/rotate", TENANT_A)
         assert rotated.status_code == 200
         assert tunnel({**a, **rotated.json()}, echo)[1] == rotated.json()["ipv6"]
