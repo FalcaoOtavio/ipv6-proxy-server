@@ -1,7 +1,7 @@
 import os
 from ipaddress import IPv4Address, IPv6Network
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -18,6 +18,9 @@ class Settings(BaseModel):
     # JSON {"owner": "sha256 hex of that client's token"}; a client token only
     # sees and mutates proxies of its own owner. Hashes only: no secret at rest.
     client_tokens_file: Optional[Path] = None
+    # systemd: one ipv6-proxy@<port>.service per proxy (production).
+    # local: detached processes with pidfiles, for dev/tests without systemd.
+    supervisor: Literal["systemd", "local"] = "systemd"
 
     @model_validator(mode="after")
     def validate_ranges(self):
@@ -38,6 +41,6 @@ class Settings(BaseModel):
             "interface": "PROXY_INTERFACE", "api_token": "PROXY_API_TOKEN",
             "data_dir": "PROXY_DATA_DIR", "binary": "PROXY_3PROXY_BINARY",
             "port_start": "PROXY_PORT_START", "port_end": "PROXY_PORT_END",
-            "client_tokens_file": "PROXY_CLIENT_TOKENS_FILE",
+            "client_tokens_file": "PROXY_CLIENT_TOKENS_FILE", "supervisor": "PROXY_SUPERVISOR",
         }
         return cls(**{key: os.environ[name] for key, name in names.items() if name in os.environ})

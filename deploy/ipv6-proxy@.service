@@ -1,0 +1,29 @@
+# One 3proxy per proxy port: %i is the port. Managed by ipv6-proxy-api, which
+# only ever starts/stops/restarts the instance it is mutating. Deliberately not
+# PartOf/BindsTo the API: restarting or upgrading the API leaves proxies serving.
+[Unit]
+Description=IPv6 proxy instance on port %i (3proxy)
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/var/lib/ipv6-proxy-api/proxies/%i.cfg
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/3proxy /var/lib/ipv6-proxy-api/proxies/%i.cfg
+Restart=on-failure
+RestartSec=2
+KillMode=control-group
+TimeoutStopSec=15
+UMask=0077
+LimitNOFILE=65536
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadOnlyPaths=/var/lib/ipv6-proxy-api/proxies
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

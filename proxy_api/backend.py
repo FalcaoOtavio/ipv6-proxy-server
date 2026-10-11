@@ -1,8 +1,15 @@
 import json
+import logging
 import os
 import socket
 import subprocess
 import time
+from ipaddress import IPv6Address
+from pathlib import Path
+
+from .supervisor import LocalProcessSupervisor, SystemdSupervisor
+
+logger = logging.getLogger(__name__)
 
 def atomic_json(path, value):
     atomic_write(path, json.dumps(value, indent=2) + "\n")
@@ -36,14 +43,54 @@ def render_config(settings, record):
     lines += [f"{command} -p{record.port} -i{settings.bind_ipv4} -e{record.ipv6}"]
     return "\n".join(lines) + "\n"
 
+def listening_inodes(port):
+    """Socket inodes in LISTEN on this TCP port, from this network namespace."""
+    inodes = set()
+    for table in ("/proc/net/tcp", "/proc/net/tcp6"):
+        try:
+            rows = Path(table).read_text().splitlines()[1:]
+        except FileNotFoundError:
+            continue
+        for row in rows:
+            fields = row.split()
+            if fields[3] == "0A" and int(fields[1].rsplit(":", 1)[1], 16) == port:
+                inodes.add(fields[9])
+    return inodes
+
+def owns_socket(pid, inodes):
+    try:
+        fds = list(Path(f"/proc/{pid}/fd").iterdir())
+    except (FileNotFoundError, PermissionError):
+        return False
+    for fd in fds:
+        try:
+            if os.readlink(fd).removeprefix("socket:[").removesuffix("]") in inodes:
+                return True
+        except OSError:
+            continue
+    return False
+
 class LinuxBackend:
-    def __init__(self, settings):
+    """Per-target operations on independently supervised 3proxy instances.
+
+    provision/replace/deprovision each touch exactly one proxy: its config
+    file, its supervised instance and its own IPv6 address. Nothing here
+    restarts, reloads or stops a proxy that is not the target.
+    """
+    READY_TIMEOUT = 5
+
+    def __init__(self, settings, supervisor=None):
         self.settings = settings
-        self.processes = {}  # port -> (record, Popen)
+        self.config_dir = settings.data_dir / "proxies"
+        self.config_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if supervisor is None:
+            supervisor = (LocalProcessSupervisor(settings.binary, self.config_dir)
+                          if settings.supervisor == "local" else SystemdSupervisor())
+        self.supervisor = supervisor
+        self.serving = {}  # port -> record this backend last brought up or adopted
         self.addresses = set()
         self.journal = settings.data_dir / "owned-addresses.json"
         if self.journal.exists():
-            from ipaddress import IPv6Address
             self.addresses = {str(IPv6Address(ip)) for ip in json.loads(self.journal.read_text())}
             if any(IPv6Address(ip) not in settings.subnet for ip in self.addresses):
                 raise RuntimeError("Owned address journal does not match configured subnet")
@@ -55,78 +102,131 @@ class LinuxBackend:
         data = json.loads(self._ip("-j", "-6", "addr", "show", "dev", self.settings.interface).stdout)
         return {entry["local"] for interface in data for entry in interface.get("addr_info", [])}
 
-    def _config(self, port):
-        return self.settings.data_dir / f"3proxy-{port}.cfg"
+    def config_path(self, port):
+        return self.config_dir / f"{port}.cfg"
 
-    def _stop(self, port):
-        _, process = self.processes.pop(port)
-        if process.poll() is None:
-            process.terminate()
-            try:
-                process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=5)
-
-    def stop(self):
-        for port in list(self.processes):
-            self._stop(port)
-
-    def apply(self, records):
-        """Converge to records touching only ports whose record changed."""
-        desired = {record.port: record for record in records}
-        wanted = {str(record.ipv6) for record in records}
+    # Addresses: only ones recorded in our journal are ever removed.
+    def _claim(self, address):
+        address = str(address)
         existing = self.existing_addresses()
-        foreign = wanted & (existing - self.addresses)
-        if foreign:
-            raise RuntimeError("Generated IPv6 address already belongs to another service")
-        # Persist ownership before touching the interface, so restart can clean partial work.
-        self.addresses |= wanted
-        atomic_json(self.journal, sorted(self.addresses))
-        for port, (record, process) in list(self.processes.items()):
-            if desired.get(port) != record or process.poll() is not None:
-                self._stop(port)
-        for address in wanted - existing:
+        if address in existing and address not in self.addresses:
+            raise RuntimeError(f"IPv6 {address} already belongs to another service")
+        if address not in self.addresses:
+            # Persist ownership before touching the interface, so a restart can clean partial work.
+            self.addresses.add(address)
+            atomic_json(self.journal, sorted(self.addresses))
+        if address not in existing:
             self._ip("-6", "addr", "add", f"{address}/128", "dev", self.settings.interface, "nodad")
-        for address in (self.addresses - wanted) & existing:
+
+    def _release(self, address):
+        address = str(address)
+        if address not in self.addresses:
+            return
+        if address in self.existing_addresses():
             self._ip("-6", "addr", "del", f"{address}/128", "dev", self.settings.interface)
-        self.addresses = wanted
-        atomic_json(self.journal, sorted(wanted))
-        for stale in self.settings.data_dir.glob("3proxy-*.cfg"):
-            if stale.stem.removeprefix("3proxy-") not in {str(port) for port in desired}:
+        self.addresses.discard(address)
+        atomic_json(self.journal, sorted(self.addresses))
+
+    def _refuse_foreign_port(self, port):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                probe.bind((str(self.settings.bind_ipv4), port))
+            except OSError as error:
+                raise RuntimeError(f"Port {port} is in use by another process; it was not touched") from error
+
+    def ready(self, port):
+        """Port accepts connections AND its listening socket belongs to the target instance."""
+        pid = self.supervisor.main_pid(port)
+        if pid is None:
+            return False
+        try:
+            with socket.create_connection((str(self.settings.bind_ipv4), port), timeout=0.2):
+                pass
+        except OSError:
+            return False
+        return owns_socket(pid, listening_inodes(port))
+
+    def _wait_ready(self, port):
+        deadline = time.monotonic() + self.READY_TIMEOUT
+        while time.monotonic() < deadline:
+            if self.ready(port):
+                return
+            if not self.supervisor.is_active(port):
+                break
+            time.sleep(0.05)
+        raise RuntimeError(f"3proxy for port {port} did not become ready; inspect its log "
+                           f"(journalctl -u ipv6-proxy@{port} or {self.config_dir}/{port}.log)")
+
+    def _run(self, record):
+        atomic_write(self.config_path(record.port), render_config(self.settings, record))
+        if self.supervisor.is_active(record.port):
+            self.supervisor.restart(record.port)
+        else:
+            self._refuse_foreign_port(record.port)
+            self.supervisor.start(record.port, self.config_path(record.port))
+        self._wait_ready(record.port)
+        self.serving[record.port] = record
+
+    def provision(self, record):
+        self.serving.pop(record.port, None)
+        self._claim(record.ipv6)
+        self._run(record)
+
+    def replace(self, old, new):
+        """Swap one proxy's config in place: add new address, restart only it, then drop the old address."""
+        if old.port != new.port:
+            self.provision(new)
+            self.deprovision(old)
+            return
+        self.serving.pop(new.port, None)
+        self._claim(new.ipv6)
+        self._run(new)
+        if old.ipv6 != new.ipv6:
+            self._release(old.ipv6)
+
+    def deprovision(self, record):
+        """Stop only this instance; its address goes only after its process is gone."""
+        self.serving.pop(record.port, None)
+        self.supervisor.stop(record.port)
+        self.config_path(record.port).unlink(missing_ok=True)
+        self._release(record.ipv6)
+
+    def reconcile(self, records):
+        """Converge at API start without touching healthy instances.
+
+        Adopts live instances whose config matches; restarts only divergent
+        ones; starts missing ones; stops our orphan instances. Returns the
+        ports that could not be brought up, so the caller fences only them.
+        """
+        failed = set()
+        wanted = {record.port: record for record in records}
+        for port in sorted(self.supervisor.list_managed() - wanted.keys()):
+            self.supervisor.stop(port)
+        for stale in [*self.config_dir.glob("*.cfg"), *self.settings.data_dir.glob("3proxy-*.cfg")]:
+            name = stale.stem.removeprefix("3proxy-")
+            if name.isdigit() and (stale.parent != self.config_dir or int(name) not in wanted):
                 stale.unlink()
-        pending = [record for record in records if record.port not in self.processes]
-        for record in pending:
-            # Refuse occupied ports before launching; readiness must belong to this process.
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-                probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                probe.bind((str(self.settings.bind_ipv4), record.port))
-        for record in pending:
-            config = self._config(record.port)
-            atomic_write(config, render_config(self.settings, record))
-            with (self.settings.data_dir / "3proxy.log").open("ab") as log:
-                process = subprocess.Popen([str(self.settings.binary), str(config)],
-                                           stdin=subprocess.DEVNULL, stdout=log, stderr=log)
-            self.processes[record.port] = (record, process)
-        deadline = time.monotonic() + 5
-        waiting = {record.port for record in pending}
-        while waiting and time.monotonic() < deadline:
-            for port in list(waiting):
-                if self.processes[port][1].poll() is not None:
-                    raise RuntimeError("3proxy exited during startup; inspect 3proxy.log")
-                try:
-                    with socket.create_connection((str(self.settings.bind_ipv4), port), timeout=0.1):
-                        waiting.remove(port)
-                except OSError:
-                    pass
-            if waiting:
-                time.sleep(0.05)
-        if waiting:
-            raise RuntimeError("3proxy did not open all requested ports")
+        for record in records:
+            try:
+                self._claim(record.ipv6)
+                path = self.config_path(record.port)
+                current = path.read_text() if path.exists() else None
+                if current == render_config(self.settings, record) and self.ready(record.port):
+                    self.serving[record.port] = record  # adopted: same PID, sessions intact
+                else:
+                    self._run(record)
+            except Exception:
+                logger.exception("Could not bring up proxy on port %s; fencing it", record.port)
+                failed.add(record.port)
+        for address in sorted(self.addresses - {str(record.ipv6) for record in records}):
+            self._release(address)
+        return failed
 
     def healthy(self, records):
-        return all(record.port in self.processes and self.processes[record.port][0] == record
-                   and self.processes[record.port][1].poll() is None for record in records)
+        active = self.supervisor.list_active() if records else set()
+        return all(self.serving.get(record.port) == record and record.port in active for record in records)
 
     def close(self):
-        self.stop()
+        # Proxies are not children of the API: closing the API leaves them serving.
+        self.serving.clear()

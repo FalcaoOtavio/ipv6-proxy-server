@@ -17,11 +17,26 @@ class FakeBackend:
         self.records = []
         self.failures = 0
 
-    def apply(self, records):
-        self.records = list(records)
+    def _fail(self):
         if self.failures:
             self.failures -= 1
             raise RuntimeError("injected failure after partial apply")
+
+    def reconcile(self, records):
+        self.records = list(records)
+        return set()
+
+    def provision(self, record):
+        self.records = [r for r in self.records if r.port != record.port] + [record]
+        self._fail()
+
+    def replace(self, old, new):
+        self.records = [new if r.port == old.port else r for r in self.records]
+        self._fail()
+
+    def deprovision(self, record):
+        self.records = [r for r in self.records if r.port != record.port]
+        self._fail()
 
     def existing_addresses(self):
         return {str(r.ipv6) for r in self.records}

@@ -53,7 +53,9 @@ class Manager:
                     raise ValueError("Persisted proxies do not match configured subnet/port range")
             if len({r.id for r in self.records}) != len(self.records):
                 raise ValueError("Duplicate persisted proxy ids")
-            backend.apply(self.records)
+            # Adopt healthy instances untouched; a proxy that cannot come up is
+            # fenced alone instead of keeping the whole API down.
+            self.broken_ports = set(backend.reconcile(self.records))
             if not self.path.exists() or any("id" not in item for item in raw):
                 # Upgrade from the 0.1.0 layout: state.json becomes the source of
                 # truth; proxies.json is kept, renamed, as the rollback copy.
@@ -95,7 +97,7 @@ class Manager:
         return IPv6Address(base + candidate)
 
     def _commit(self, records, keys):
-        """Apply records, then persist records + keys in one atomic rename.
+        """Apply only the changed ports, then persist records + keys in one atomic rename.
 
         The rename is the commit point. A crash before it leaves the previous
         state on disk and the next start converges the processes back to it, so
@@ -108,11 +110,14 @@ class Manager:
         changed = {p for p in old.keys() | new.keys() if old.get(p) != new.get(p)}
         if changed & self.broken_ports:
             raise HTTPException(503, "Port requires recovery; restart service and inspect logs")
+        done = []
         try:
-            self.backend.apply(self._serving(records))
+            for port in sorted(changed):
+                done.append(port)
+                self._transition(old.get(port), new.get(port))
             self._write(records, keys)
         except Exception:
-            logger.exception("Proxy update failed; restoring previous state")
+            logger.exception("Proxy update failed for ports %s; restoring them", sorted(changed))
             try:
                 self._write(self.records, self.keys)
             except Exception:
@@ -121,24 +126,31 @@ class Manager:
                 # tenants that were never part of this mutation.
                 self.broken = True
                 logger.exception("State rollback failed; writes blocked until recovery")
-            try:
-                self.backend.apply(self._serving(self.records))
-            except Exception:
-                # Only the ports this mutation touched are uncertain. They are
-                # fenced (no mutations, left out of later applies) until a
-                # restart repairs them; every other port keeps its process.
-                self.broken_ports |= changed
-                logger.exception("Rollback failed for ports %s; they require recovery", sorted(changed))
+            for port in reversed(done):
                 try:
-                    self.backend.apply(self._serving(self.records))
+                    self._transition(new.get(port), old.get(port))
                 except Exception:
-                    self.broken = True
-                    logger.exception("Could not fence failed ports; writes blocked until recovery")
+                    # Only this port is uncertain: fence it (no mutations, no
+                    # process) until a restart repairs it; others are untouched.
+                    self.broken_ports.add(port)
+                    logger.exception("Rollback failed for port %s; it requires recovery", port)
+                    try:
+                        for record in {r.ipv6: r for r in (old.get(port), new.get(port)) if r}.values():
+                            self.backend.deprovision(record)
+                    except Exception:
+                        self.broken = True
+                        logger.exception("Could not fence port %s; writes blocked until recovery", port)
             raise HTTPException(503, "Proxy update failed; inspect service logs")
         self.records, self.keys = records, keys
 
-    def _serving(self, records):
-        return [r for r in records if r.port not in self.broken_ports]
+    def _transition(self, before, after):
+        """Move one port from record `before` to `after` (either may be None)."""
+        if before is None:
+            self.backend.provision(after)
+        elif after is None:
+            self.backend.deprovision(before)
+        else:
+            self.backend.replace(before, after)
 
     def mutate(self, scope, key, request_fingerprint, plan, pinned=False):
         """Run one mutation, at most once per (scope, key).

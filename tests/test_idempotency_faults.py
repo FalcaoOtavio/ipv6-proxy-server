@@ -19,9 +19,22 @@ class CountingBackend:
     def __init__(self):
         self.records, self.applies = [], 0
 
-    def apply(self, records):
+    def reconcile(self, records):
         self.applies += 1
         self.records = list(records)
+        return set()
+
+    def provision(self, record):
+        self.applies += 1
+        self.records = [*self.records, record]
+
+    def replace(self, old, new):
+        self.applies += 1
+        self.records = [new if r == old else r for r in self.records]
+
+    def deprovision(self, record):
+        self.applies += 1
+        self.records = [r for r in self.records if r != record]
 
     def existing_addresses(self):
         return {str(r.ipv6) for r in self.records}

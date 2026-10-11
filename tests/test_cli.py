@@ -391,7 +391,7 @@ def live_api(tmp_path):
             self.records = []
             self.applying = False
 
-        def apply(self, records):
+        def _apply(self, records):
             assert not self.applying, "backend mutations must be serialized"
             self.applying = True
             try:
@@ -399,6 +399,19 @@ def live_api(tmp_path):
                 self.records = list(records)
             finally:
                 self.applying = False
+
+        def reconcile(self, records):
+            self._apply(records)
+            return set()
+
+        def provision(self, record):
+            self._apply([*self.records, record])
+
+        def replace(self, old, new):
+            self._apply([new if r == old else r for r in self.records])
+
+        def deprovision(self, record):
+            self._apply([r for r in self.records if r != record])
 
         def existing_addresses(self):
             return {str(r.ipv6) for r in self.records}
