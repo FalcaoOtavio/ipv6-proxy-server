@@ -1,6 +1,6 @@
 import pytest
 import proxy_api.backend as backend_module
-from test_isolation_3proxy import env, make, call, tunnel, Heartbeat, pid, TENANT_A, TENANT_B
+from test_isolation_3proxy import pytestmark, env, make, call, tunnel, Heartbeat, pid, TENANT_A, TENANT_B
 
 def test_failure_and_rollback_of_a_preserve_b(env, monkeypatch):
     client, ports, echo = env
