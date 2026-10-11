@@ -1,0 +1,37 @@
+name: Tests and installer
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+      - run: bash -n install.sh && bash -n ipv6-proxy-server.sh && shellcheck install.sh
+      - name: Install with systemd on loopback
+        run: sudo bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1
+      - name: Test real 3proxy forwarding
+        run: TEST_3PROXY_BINARY=/usr/local/bin/3proxy python -m pytest -q tests/test_3proxy_integration.py
+      - name: Verify installed CLI lifecycle and CLI-only preservation
+        run: sudo python3 tests/smoke_deployment.py "$PWD/install.sh"
+      - name: Verify restart and preservation
+        run: |
+          sudo systemctl restart ipv6-proxy-api
+          sleep 3
+          sudo systemctl is-active --quiet ipv6-proxy-api
+          sudo ipv6-proxy --help
+          sudo ipv6-proxy list --output json
+          sudo sha256sum /etc/ipv6-proxy-api.env /usr/local/bin/ipv6-proxy > /tmp/env-before
+          if sudo bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1; then
+            echo 'Reinstallation should refuse to overwrite an existing deployment'
+            exit 1
+          fi
+          sudo sha256sum --check /tmp/env-before
+      - name: Service logs on failure
+        if: failure()
+        run: sudo journalctl -u ipv6-proxy-api --no-pager -n 100
