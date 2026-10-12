@@ -82,9 +82,15 @@ def backend(client):
 def state(settings):
     return json.loads((settings.data_dir / "state.json").read_text())
 
-def test_capabilities_add_new_without_removing(client):
+def test_capabilities_add_new_without_removing(client, settings):
+    # Default (block on): UDP ASSOCIATE is denied by render_config, so not announced (ADR 0007).
     body = client.get("/capabilities").json()
-    assert body["capabilities"] == CAPABILITIES
+    assert body["capabilities"] == [name for name in CAPABILITIES if name != "socks5_udp_associate"]
+    open_settings = settings.model_copy(update={"block_private_destinations": False,
+                                                "data_dir": settings.data_dir.parent / "open"})
+    with TestClient(create_app(open_settings, TargetBackend)) as open_client:
+        open_client.headers["Authorization"] = "Bearer " + ADMIN
+        assert open_client.get("/capabilities").json()["capabilities"] == CAPABILITIES
     assert {"isolated_mutations", "owner_scoping", "idempotency_keys", "conditional_mutations",
             "socks5_udp_associate", "edit", "batch", "per_proxy_status"} == set(CAPABILITIES)
 

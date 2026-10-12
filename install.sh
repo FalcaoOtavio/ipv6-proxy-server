@@ -586,7 +586,8 @@ wait_api() {
     # ?include=status answers 200 even with a fenced proxy (plain GET /proxies is
     # 503 then); older versions ignore the parameter. A proxy that is down and
     # unrelated to this update must not fail it.
-    local attempt deadline=${1:-$(api_deadline)}
+    local attempt deadline
+    deadline=$(api_deadline)
     for ((attempt = 0; attempt < deadline; attempt++)); do
         if api --fail --max-time 3 -o /dev/null "$API_URL/proxies?include=status" 2>/dev/null; then return 0; fi
         sleep 1

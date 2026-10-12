@@ -150,6 +150,21 @@ Libere no firewall so as portas dos proxies, para clientes autorizados. A API
 nao altera firewall, rota padrao, sysctl nem ndppd; nao exponha a porta 8000
 sem HTTPS e controle de acesso. Contrato completo em [API.md](API.md).
 
+## Variaveis de ambiente de seguranca
+
+- `PROXY_BLOCK_PRIVATE_DESTINATIONS` (padrao `true`, em `/etc/ipv6-proxy-api.env`):
+  recusa destinos `::/128`, `::1`, `::ffff:0:0/96`, `fe80::/10`, `fc00::/7`,
+  `ff00::/8` e a propria subnet, e recusa SOCKS5 UDP ASSOCIATE (o
+  3proxy nao filtra o destino dos datagramas; ADR 0007). `false` desliga ambos e
+  anuncia `socks5_udp_associate` em `/capabilities`: inseguro, so para testes ou
+  rede controlada. Mudar o valor altera a config de cada proxy; o instalador
+  pede confirmacao e reinicia so os proxies afetados.
+- Defesa em profundidade: `ipv6-proxy@.service` tem `IPAddressDeny=` para
+  `::/128 ::1/128 ::ffff:0:0/96 fe80::/10 fc00::/7 ff00::/8` (TCP e UDP, independente
+  da variavel acima; exige cgroup v2). IPv4 nao e bloqueado, entao clientes na
+  `bind_ipv4` nao sao afetados. A subnet propria nao entra (unidade estatica);
+  a ACL do 3proxy cobre esse caso.
+
 ## Limitacoes
 
 - `PROXY_DATA_DIR` e `PROXY_3PROXY_BINARY` devem ficar nos padroes

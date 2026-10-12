@@ -19,6 +19,14 @@ SPEC = "ashford.proxy/1"
 # Announce only what tests/test_isolation_3proxy.py and test_supervisor_3proxy.py prove against real 3proxy.
 CAPABILITIES = ["isolated_mutations", "owner_scoping", "idempotency_keys", "conditional_mutations",
                 "socks5_udp_associate", "edit", "batch", "per_proxy_status"]
+# UDP ASSOCIATE bypasses 3proxy's destination ACL (ADR 0007), so with the SSRF
+# block on it is denied in render_config and must not be announced.
+UDP_CAPABILITY = "socks5_udp_associate"
+
+def capabilities_for(settings):
+    if settings.block_private_destinations:
+        return [name for name in CAPABILITIES if name != UDP_CAPABILITY]
+    return CAPABILITIES
 IDEMPOTENCY_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 
 def load_client_tokens(path):
@@ -97,7 +105,7 @@ def create_app(settings=None, backend_factory=LinuxBackend):
 
     @app.get("/capabilities")
     def capabilities(owner=Depends(principal)):
-        return {"spec": SPEC, "capabilities": CAPABILITIES}
+        return {"spec": SPEC, "capabilities": capabilities_for(app.state.settings)}
 
     @app.get("/proxies", response_model=list[ProxyStatusView] | list[ProxyView])
     def list_proxies(owner=Depends(principal), include: Optional[Literal["status"]] = None):

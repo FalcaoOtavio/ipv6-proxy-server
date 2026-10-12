@@ -15,7 +15,7 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from proxy_api.app import CAPABILITIES, create_app
+from proxy_api.app import CAPABILITIES, capabilities_for, create_app
 from proxy_api.backend import LinuxBackend
 from proxy_api.config import Settings
 from proxy_api.supervisor import LocalProcessSupervisor
@@ -197,8 +197,12 @@ def pid(client, port):
 def test_capabilities_are_exactly_the_proven_set(env):
     client, _, _ = env
     assert call(client, "GET", "/capabilities", "wrong" * 8).status_code == 401
+    # env runs with the block off: UDP proven below by the UDP egress test.
     assert call(client, "GET", "/capabilities", TENANT_A).json() == {
         "spec": "ashford.proxy/1", "capabilities": CAPABILITIES}
+    # Block on (production default): UDP ASSOCIATE is denied (tests/test_security_udp.py), so not announced.
+    blocked = client.app.state.settings.model_copy(update={"block_private_destinations": True})
+    assert capabilities_for(blocked) == [name for name in CAPABILITIES if name != "socks5_udp_associate"]
     # edit/batch/per_proxy_status: proven in tests/test_supervisor_3proxy.py.
     assert set(CAPABILITIES) == {"isolated_mutations", "owner_scoping", "idempotency_keys",
                                  "conditional_mutations", "socks5_udp_associate",

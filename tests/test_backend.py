@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from proxy_api.backend import LinuxBackend, atomic_json, render_config
+from proxy_api.backend import PRIVATE_DESTINATIONS, LinuxBackend, atomic_json, render_config
 from proxy_api.config import Settings
 from proxy_api.models import ProxyRecord
 from proxy_api.supervisor import SystemdSupervisor
@@ -274,9 +274,21 @@ def test_render_config_denies_private_destinations_before_allow(tmp_path):
         lines = render_config(settings, record(30000, "2001:db8::1", **extra)).splitlines()
         deny = "deny * * ::/128,::1/128,::ffff:0:0/96,fe80::/10,fc00::/7,ff00::/8,2001:db8::/64"
         assert "auth none" not in lines  # it skips ACLs: the deny would be dead
-        assert lines.index(auth) < lines.index(deny) < lines.index(allow)
+        assert lines.index(auth) < lines.index("deny * * * * UDPASSOC") < lines.index(deny) < lines.index(allow)
     open_settings = settings.model_copy(update={"block_private_destinations": False})
     assert not any(line.startswith("deny") for line in render_config(open_settings, record(30000, "2001:db8::1")).splitlines())
+
+def test_instance_unit_denies_internal_ipv6_but_never_ipv4():
+    import configparser
+    from ipaddress import ip_network
+    from pathlib import Path
+    unit = configparser.ConfigParser(strict=False, interpolation=None)
+    unit.optionxform = str
+    unit.read(Path(__file__).parent.parent / "deploy" / "ipv6-proxy@.service")
+    denied = {ip_network(net) for net in unit["Service"]["IPAddressDeny"].split()}
+    assert denied == {ip_network(net) for net in PRIVATE_DESTINATIONS.split(",")}  # same set as the 3proxy ACL
+    assert all(net.version == 6 for net in denied)  # clients reach -i<bind_ipv4> over IPv4
+    assert "IPAddressAllow" not in unit["Service"]
 
 def test_units_start_limit_outlasts_boot_retries():
     import configparser
