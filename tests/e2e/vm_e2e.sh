@@ -34,6 +34,10 @@ E2E_STREAM_SECONDS=${E2E_STREAM_SECONDS:-15}
 # Echo service reached through the proxies over routed IPv6; must answer with the
 # caller's address in the body (e.g. https://api6.ipify.org). Unset => NOT_TESTED.
 E2E_ROUTED_IPV6_TARGET=${E2E_ROUTED_IPV6_TARGET:-}
+# Streams go to [::1] and egress from the ULA lab subnet: both denied by the SSRF block
+# (ACL + IPAddressDeny drop-in). The lab therefore runs with the block OFF (insecure, lab
+# only); set E2E_BLOCK_PRIVATE=true only with a public target and a routed subnet.
+E2E_BLOCK_PRIVATE=${E2E_BLOCK_PRIVATE:-false}
 
 APP_DIR=/opt/ipv6-proxy-server
 ENV_FILE=/etc/ipv6-proxy-api.env
@@ -69,9 +73,9 @@ esac
 [[ $do_reboot == false || $phase == pre-reboot ]] || die '--reboot so vale com --phase pre-reboot'
 
 if $dry_run; then
-    printf 'phase=%s target_ref=%s base=%s subnet=%s interface=%s ipv4=%s state=%s routed_target=%s\n' \
+    printf 'phase=%s target_ref=%s base=%s subnet=%s interface=%s ipv4=%s state=%s routed_target=%s ssrf_block=%s\n' \
         "$phase" "$E2E_TARGET_REF ($E2E_SOURCE)" "$BASE_SHA" "$E2E_SUBNET" "$E2E_INTERFACE" "$E2E_IPV4" "$E2E_STATE_DIR" \
-        "${E2E_ROUTED_IPV6_TARGET:-<unset: NOT_TESTED>}"
+        "${E2E_ROUTED_IPV6_TARGET:-<unset: NOT_TESTED>}" "$E2E_BLOCK_PRIVATE"
     printf 'step %s\n' "${steps[@]}"
     $do_reboot && printf 'step reboot\n'
     exit 0
@@ -189,6 +193,11 @@ step_base_proxies() {
     token_hash >"$E2E_STATE_DIR/base-token.sha256"
 }
 step_update() {
+    # The base release has no such variable; the update keeps the env, so set it first (labeled).
+    if ! grep -q '^PROXY_BLOCK_PRIVATE_DESTINATIONS=' "$ENV_FILE"; then
+        printf '# vm_e2e.sh: loopback lab, SSRF block %s\nPROXY_BLOCK_PRIVATE_DESTINATIONS=%s\n' \
+            "$([[ $E2E_BLOCK_PRIVATE == true ]] && echo ON || echo OFF)" "$E2E_BLOCK_PRIVATE" >>"$ENV_FILE"
+    fi
     # First migration from the single-process layout: one announced interruption, confirmed by --yes.
     # --self-test creates and removes its own proxy without touching the base ones.
     check "install.sh --update --yes --self-test ($E2E_SOURCE $target_sha)" installer --update --yes --self-test || return

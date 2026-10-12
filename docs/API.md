@@ -23,8 +23,10 @@ ou com o servico API parado. O CLI `ipv6-proxy` e um cliente da API, nao o legad
   reinicia-las.
 - `GET /capabilities` devolve `{"spec":"ashford.proxy/1","capabilities":[...]}`
   com `isolated_mutations`, `owner_scoping`, `idempotency_keys`,
-  `conditional_mutations`, `socks5_udp_associate`, `edit`, `batch` e
-  `per_proxy_status`, cada um coberto por teste.
+  `conditional_mutations`, `edit`, `batch` e `per_proxy_status`, cada um
+  coberto por teste. `socks5_udp_associate` so aparece com
+  `PROXY_BLOCK_PRIVATE_DESTINATIONS=false` (ADR 0007); clientes que dependem de
+  UDP devem consultar `/capabilities` antes de usar.
 - Identidade: cada proxy tem `id` (32 hex) imutavel, gerado no create, mantido
   no rotate/PATCH e nunca reaproveitado quando a porta e reutilizada. `If-Match: <id>`
   em rotate/PATCH/DELETE e precondicao: id diferente responde 412 sem efeito
@@ -40,7 +42,11 @@ ou com o servico API parado. O CLI `ipv6-proxy` e um cliente da API, nao o legad
   `state.json` (rename atomico) que o pool. Excecao: DELETE com chave e sem
   `If-Match` fixa a chave para sempre (um retry tardio nao pode apagar o
   herdeiro da porta); acima de 100k chaves fixas responde 428 (use If-Match).
-- SOCKS5 aceita UDP ASSOCIATE; o relay UDP sai pelo mesmo IPv6 da porta.
+- SOCKS5 UDP ASSOCIATE: recusado no padrao (`PROXY_BLOCK_PRIVATE_DESTINATIONS=true`),
+  porque o 3proxy 0.9.4 nao aplica a ACL de destino aos datagramas do relay (SSRF
+  para `[::1]`/ULA). O 3proxy nao envia resposta de erro: o pedido fica sem
+  resposta e a conexao e fechada apos ~30 s, sem relay. Com o bloqueio desligado (inseguro; so ambiente controlado)
+  o relay UDP sai pelo mesmo IPv6 da porta.
 - Estado persiste em disco; reinicio restaura portas, enderecos e credenciais.
 - API serializa mutacoes, impede portas/IPv6/ids duplicados e compensa falhas
   so nos alvos da mutacao. Dupla falha (operacao e compensacao falham) retorna

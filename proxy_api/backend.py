@@ -44,10 +44,13 @@ def render_config(settings, record):
     else:
         lines += ["auth iponly"]  # not "auth none": that one skips every ACL, deny included
     if settings.block_private_destinations:
+        # 3proxy checks UDP ASSOCIATE only against the client-declared address and
+        # relays datagrams unchecked (SSRF to [::1], ADR 0007): refuse it outright.
+        lines += ["deny * * * * UDPASSOC"]
         # Checked after name resolution, so "localhost" is refused too. Must precede allow.
         lines += [f"deny * * {PRIVATE_DESTINATIONS},{settings.subnet}"]
     lines += [f"allow {record.username}" if record.username else "allow *"]
-    # socks also serves UDP ASSOCIATE; the relay egresses from -e like TCP.
+    # socks also serves UDP ASSOCIATE (only with the block off); the relay egresses from -e like TCP.
     command = "proxy -6 -n -a" if record.protocol == "http" else "socks -6 -a"
     lines += [f"{command} -p{record.port} -i{settings.bind_ipv4} -e{record.ipv6}"]
     return "\n".join(lines) + "\n"

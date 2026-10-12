@@ -40,6 +40,8 @@ Opcoes:
   -h, --help        Esta ajuda.
 
 Reexecutar sem mudancas nao altera token, env, estado, unidades nem processos.
+Instalacao nova grava PROXY_BLOCK_PRIVATE_DESTINATIONS do ambiente (padrao true) no env;
+com true instala o drop-in IPAddressDeny (ipv6-proxy@.service.d/50-block-private.conf).
 A subnet deve ser dedicada e roteada pelo provedor. Nao configura NDP/firewall.
 Documentacao: docs/INSTALL.md e docs/MIGRATION.md.
 EOF
@@ -61,6 +63,7 @@ set_paths() {
     unit_dir=$root/etc/systemd/system
     unit_file=$unit_dir/ipv6-proxy-api.service
     template_file=$unit_dir/ipv6-proxy@.service
+    dropin_file=$unit_dir/ipv6-proxy@.service.d/50-block-private.conf
     state_dir=$root/var/lib/ipv6-proxy-api
     backup_root=$root/var/backups/ipv6-proxy
     bin_dir=$root/usr/local/bin
@@ -334,6 +337,7 @@ stage_release() {
     fi
     install -m 0644 "$source_dir/deploy/ipv6-proxy-api.service" "$stage/units/ipv6-proxy-api.service"
     install -m 0644 "$source_dir/deploy/ipv6-proxy@.service" "$stage/units/ipv6-proxy@.service"
+    install -m 0644 "$source_dir/deploy/ipv6-proxy@.service.d/50-block-private.conf" "$stage/units/50-block-private.conf"
     install -m 0755 "$source_dir/ipv6-proxy" "$stage/bin/ipv6-proxy"
     if [[ -f $source_dir/ipv6-proxy-tui ]]; then
         install -m 0755 "$source_dir/ipv6-proxy-tui" "$stage/bin/ipv6-proxy-tui"
@@ -351,8 +355,18 @@ tree_digest() {
 
 file_differs() { ! cmp -s -- "$1" "$2"; }
 
+block_private_enabled() {
+    # Same rule as config_changes: anything but an explicit false keeps the block on.
+    # Before the env exists (fresh install) the value comes from the installer's environment.
+    local value=${PROXY_BLOCK_PRIVATE_DESTINATIONS:-true}
+    if [[ -f $env_file ]]; then value=$(sed -n 's/^PROXY_BLOCK_PRIVATE_DESTINATIONS=//p' "$env_file" | tail -n 1); fi
+    value=${value,,}
+    value=${value//[[:space:]]/}
+    [[ ! $value =~ ^(false|0|no|off|f|n)$ ]]
+}
+
 plan_changes() {
-    # Sets app_changed, api_unit_changed, template_changed, cli_changed, tui_changed, version_changed.
+    # Sets app_changed, api_unit_changed, template_changed, dropin_changed, cli_changed, tui_changed, version_changed.
     local installed_app=$work_dir/installed-app
     rm -rf -- "$installed_app"
     mkdir -p "$installed_app"
@@ -364,6 +378,13 @@ plan_changes() {
     [[ $(tree_digest "$installed_app") == "$(tree_digest "$stage/app")" && -x $app_dir/.venv/bin/python ]] || app_changed=true
     file_differs "$stage/units/ipv6-proxy-api.service" "$unit_file" && api_unit_changed=true
     file_differs "$stage/units/ipv6-proxy@.service" "$template_file" && template_changed=true
+    # IPAddressDeny drop-in (ADR 0007) follows PROXY_BLOCK_PRIVATE_DESTINATIONS: present only while it is on.
+    dropin_changed=false
+    if block_private_enabled; then
+        file_differs "$stage/units/50-block-private.conf" "$dropin_file" && dropin_changed=true
+    elif [[ -e $dropin_file || -L $dropin_file ]]; then
+        dropin_changed=true
+    fi
     file_differs "$stage/bin/ipv6-proxy" "$cli_file" && cli_changed=true
     if [[ -f $stage/bin/ipv6-proxy-tui ]] && file_differs "$stage/bin/ipv6-proxy-tui" "$tui_file"; then
         tui_changed=true
@@ -401,7 +422,7 @@ PY
 }
 
 anything_changes() {
-    [[ $app_changed == true || $api_unit_changed == true || $template_changed == true ||
+    [[ $app_changed == true || $api_unit_changed == true || $template_changed == true || $dropin_changed == true ||
        $cli_changed == true || $tui_changed == true || $version_changed == true ]]
 }
 
@@ -438,6 +459,14 @@ apply_release() {
     fi
     if [[ $api_unit_changed == true ]]; then install -m 0644 "$stage/units/ipv6-proxy-api.service" "$unit_file"; fi
     if [[ $template_changed == true ]]; then install -m 0644 "$stage/units/ipv6-proxy@.service" "$template_file"; fi
+    if [[ $dropin_changed == true ]]; then
+        if block_private_enabled; then
+            install -d -m 0755 "${dropin_file%/*}"
+            install -m 0644 "$stage/units/50-block-private.conf" "$dropin_file"
+        else
+            rm -f -- "$dropin_file"
+        fi
+    fi
     if [[ $cli_changed == true ]]; then install_client "$stage/bin/ipv6-proxy" "$cli_file" ipv6-proxy-api-client; fi
     if [[ $tui_changed == true ]]; then install_client "$stage/bin/ipv6-proxy-tui" "$tui_file" ''; fi
     if [[ $version_changed == true ]]; then
@@ -471,7 +500,7 @@ backup_installation() {
     install -d -m 0700 "$backup_root"
     install -d -m 0700 "$backup_dir"
     local name path
-    for name in app env api-unit template state cli tui 3proxy; do
+    for name in app env api-unit template dropin state cli tui 3proxy; do
         path=$(backup_target "$name")
         if [[ -e $path || -L $path ]]; then
             cp -a -- "$path" "$backup_dir/$name"
@@ -498,6 +527,7 @@ backup_target() {
         env) echo "$env_file" ;;
         api-unit) echo "$unit_file" ;;
         template) echo "$template_file" ;;
+        dropin) echo "$dropin_file" ;;
         state) echo "$state_dir" ;;
         cli) echo "$cli_file" ;;
         tui) echo "$tui_file" ;;
@@ -508,7 +538,7 @@ backup_target() {
 restore_installation() {
     # Restores every item it can; one bad item never stops the others. Returns 1 if any failed.
     local source=$1 name path failed=0
-    for name in app env api-unit template state cli tui 3proxy; do
+    for name in app env api-unit template dropin state cli tui 3proxy; do
         path=$(backup_target "$name")
         if [[ -e $source/$name || -L $source/$name ]]; then
             { rm -rf -- "$path.rollback" && cp -a -- "$source/$name" "$path.rollback" &&
@@ -586,7 +616,8 @@ wait_api() {
     # ?include=status answers 200 even with a fenced proxy (plain GET /proxies is
     # 503 then); older versions ignore the parameter. A proxy that is down and
     # unrelated to this update must not fail it.
-    local attempt deadline=${1:-$(api_deadline)}
+    local attempt deadline
+    deadline=$(api_deadline)
     for ((attempt = 0; attempt < deadline; attempt++)); do
         if api --fail --max-time 3 -o /dev/null "$API_URL/proxies?include=status" 2>/dev/null; then return 0; fi
         sleep 1
@@ -631,7 +662,7 @@ run_self_test() {
 }
 
 reload_if_units_changed() {
-    if [[ $api_unit_changed == true || $template_changed == true ]]; then systemctl daemon-reload; fi
+    if [[ $api_unit_changed == true || $template_changed == true || $dropin_changed == true ]]; then systemctl daemon-reload; fi
 }
 
 # Transaction: between begin_tx and end_tx any non-zero exit of the main shell
@@ -771,15 +802,16 @@ fresh_install() {
     # From here on a failure removes everything this run created.
     local name path
     fresh_created=()
-    for name in app env api-unit template state cli tui 3proxy; do
+    for name in app env api-unit template dropin state cli tui 3proxy; do
         path=$(backup_target "$name")
         [[ -e $path || -L $path ]] || fresh_created+=("$path")
     done
     begin_tx fresh
     apply_release
     install -m 0755 "$work_dir/3proxy/bin/3proxy" "$threeproxy_file"
-    local token
+    local token block_private=true
     token=$(openssl rand -hex 32)
+    block_private_enabled || block_private=false
     cat >"$env_file" <<EOF
 PROXY_IPV6_SUBNET=$subnet
 PROXY_BIND_IPV4=$ipv4
@@ -790,6 +822,7 @@ PROXY_PORT_END=39999
 PROXY_DATA_DIR=/var/lib/ipv6-proxy-api
 PROXY_3PROXY_BINARY=/usr/local/bin/3proxy
 PROXY_SUPERVISOR=systemd
+PROXY_BLOCK_PRIVATE_DESTINATIONS=$block_private
 EOF
     chmod 0600 "$env_file"
     systemctl daemon-reload
@@ -862,8 +895,8 @@ update_install() {
     else
         wait_api || fail_tx 'API nao responde'
     fi
-    if [[ $template_changed == true && $migrating == false ]]; then
-        say 'Nota: ipv6-proxy@.service mudou; cada proxy adota a nova unidade no proximo reinicio dele (editar/rotacionar/reboot). Nenhum proxy foi reiniciado.'
+    if [[ ($template_changed == true || $dropin_changed == true) && $migrating == false ]]; then
+        say 'Nota: ipv6-proxy@.service (ou o drop-in 50-block-private.conf) mudou; cada proxy adota a nova unidade no proximo reinicio dele (editar/rotacionar/reboot). Nenhum proxy foi reiniciado.'
     fi
     end_tx
     prune_backups
