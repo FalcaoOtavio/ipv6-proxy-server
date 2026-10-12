@@ -215,6 +215,12 @@ class Manager:
                 self._undo(reversed(done))
                 raise HTTPException(503, "Proxy update failed; inspect service logs")
             self.records, self.keys = records, keys
+            settle = getattr(self.backend, "settle", None)  # test doubles may lack it
+            if settle:
+                # Outcome is in state.json now; these ports are no longer
+                # candidates for the start-time orphan stop. A fenced port
+                # stays pending: its process may not match state.json.
+                settle(({(after or before).port for before, after in done} | failed) - self.broken_ports)
             return status, (reveal(body) if reveal and body is not None else body)
 
     def view(self, record):

@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from ipaddress import IPv4Address, IPv6Address
+from ipaddress import IPv4Address, IPv6Address, IPv6Network
 from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
@@ -19,6 +19,7 @@ from proxy_api.backend import render_config  # noqa: E402
 ROOT = Path(__file__).parents[1]
 INSTALLER = ROOT / "install.sh"
 TOKEN = "f" * 64
+SUBNET = "2001:db8::/64"
 
 STUBS = r'''
 log() { printf '%s\n' "$*" >>"$T/calls"; }
@@ -115,8 +116,9 @@ def fake_installation(tmp_path, flavor, ports=(30000, 30001)):
         for source in (ROOT / "proxy_api").glob("*.py"):
             (app / "proxy_api" / source.name).write_bytes(source.read_bytes())
             (app / "proxy_api" / source.name).chmod(0o644)
-        (app / "requirements.txt").write_bytes((ROOT / "requirements.txt").read_bytes())
-        (app / "requirements.txt").chmod(0o644)
+        for name in ("requirements.txt", "requirements.lock"):
+            (app / name).write_bytes((ROOT / name).read_bytes())
+            (app / name).chmod(0o644)
     else:
         marker = "SPEC = 'ashford.proxy/1'\n" if flavor == "ashford" else "app = None\n"
         (app / "proxy_api/app.py").write_text(marker)
@@ -129,7 +131,8 @@ def fake_installation(tmp_path, flavor, ports=(30000, 30001)):
     etc = root / "etc"
     (etc / "systemd/system").mkdir(parents=True)
     (etc / "ipv6-proxy-api.env").write_text(
-        f"PROXY_API_TOKEN={TOKEN}\nPROXY_BIND_IPV4=192.0.2.10\nPROXY_DATA_DIR=/var/lib/ipv6-proxy-api\n")
+        f"PROXY_API_TOKEN={TOKEN}\nPROXY_BIND_IPV4=192.0.2.10\nPROXY_IPV6_SUBNET={SUBNET}\n"
+        "PROXY_DATA_DIR=/var/lib/ipv6-proxy-api\n")
     (etc / "ipv6-proxy-api.env").chmod(0o600)
     unit = ROOT / "deploy/ipv6-proxy-api.service"
     (etc / "systemd/system/ipv6-proxy-api.service").write_text(
@@ -165,7 +168,9 @@ def fake_installation(tmp_path, flavor, ports=(30000, 30001)):
 
 def rendered(item):
     record = SimpleNamespace(username=None, password=None, **{**item, "ipv6": IPv6Address(item["ipv6"])})
-    return render_config(SimpleNamespace(bind_ipv4=IPv4Address("192.0.2.10")), record)
+    settings = SimpleNamespace(bind_ipv4=IPv4Address("192.0.2.10"), subnet=IPv6Network(SUBNET),
+                               block_private_destinations=True)
+    return render_config(settings, record)
 
 def stub_source(sha="local"):
     # The worktree is the source; its SHA comes from resolve_source unless pinned here.
@@ -382,6 +387,22 @@ def test_update_restarts_only_the_api(tmp_path):
     assert stat.S_IMODE(backup.stat().st_mode) == 0o700
     assert (backup / "app/proxy_api/app.py").read_text() == "old\n"
 
+def test_changed_lock_reinstalls_with_hashes_and_is_backed_up(tmp_path):
+    root = fake_installation(tmp_path, "independent")
+    app = root / "opt/ipv6-proxy-server"
+    (app / "requirements.lock").write_text("old-lock\n")
+    result = run(tmp_path, stub_source() + "mode=update\nupdate_install independent")
+    assert "Atualizacao concluida" in result.stdout, result.stderr
+    pip = [c for c in calls(tmp_path) if c.startswith("pip ")]
+    assert len(pip) == 1 and pip[0].startswith("pip install --quiet --disable-pip-version-check --require-hashes -r ")
+    assert pip[0].endswith("/stage/app/requirements.lock"), pip
+    assert (app / "requirements.lock").read_bytes() == (ROOT / "requirements.lock").read_bytes()
+    backup = next((root / "var/backups/ipv6-proxy").iterdir())
+    assert (backup / "app/requirements.lock").read_text() == "old-lock\n"
+    (tmp_path / "calls").unlink()
+    run(tmp_path, stub_source() + "mode=update\nupdate_install independent")
+    assert not any(c.startswith("pip ") for c in calls(tmp_path))  # same lock: no pip
+
 def test_update_rolls_back_when_an_unchanged_proxy_restarts(tmp_path):
     root = fake_installation(tmp_path, "independent")
     (root / "opt/ipv6-proxy-server/proxy_api/app.py").write_text("old\n")
@@ -462,7 +483,7 @@ def test_client_only_never_touches_services(tmp_path, which):
     (source / "ipv6-proxy-tui").write_text("#!/bin/sh\n# tui\n")
     (source / "proxy_tui").mkdir()
     (source / "proxy_tui/__init__.py").write_text("")
-    (source / "requirements.txt").write_text("textual==8.2.8\n")
+    (source / "requirements.lock").write_text("textual==8.2.8 --hash=sha256:00\n")
     protected = {k: v for k, v in digest(root).items()
                  if not k.startswith(("usr/local/bin/ipv6-proxy", "opt/ipv6-proxy-server/proxy_tui"))}
     result = run(tmp_path, f'script_dir="{source}"\ninstall_clients_only {which}')
@@ -474,7 +495,8 @@ def test_client_only_never_touches_services(tmp_path, which):
     assert target.read_bytes() == (source / target.name).read_bytes()
     assert stat.S_IMODE(target.stat().st_mode) == 0o755
     if which == "tui":
-        assert "pip install --quiet --disable-pip-version-check textual==8.2.8" in calls(tmp_path)
+        assert (f"pip install --quiet --disable-pip-version-check --require-hashes -r {source}/requirements.lock"
+                in calls(tmp_path))
         assert (root / "opt/ipv6-proxy-server/proxy_tui/__init__.py").exists()
     assert result.stdout.strip().endswith("sudo ipv6-proxy --help" if which == "cli" else "sudo ipv6-proxy-tui")
 

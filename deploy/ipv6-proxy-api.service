@@ -2,6 +2,9 @@
 Description=IPv6 proxy management API
 Wants=network-online.target
 After=network-online.target
+# RestartSec=3: allow ~1 min of retries at boot instead of the 5/10 s default.
+StartLimitIntervalSec=300
+StartLimitBurst=10
 # Proxies run as ipv6-proxy@<port>.service, outside this unit's cgroup; no
 # PartOf/BindsTo either way, so restarting the API never stops them.
 

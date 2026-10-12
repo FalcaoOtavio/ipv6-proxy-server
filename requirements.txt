@@ -1,4 +1,22 @@
-fastapi>=0.115,<0.117
-pydantic>=2.9,<3
-uvicorn>=0.30,<0.36
+# Exact pins, tested together. requirements.lock holds the same set with hashes.
+fastapi==0.133.0
+starlette==1.7.0
+pydantic==2.14.1
+pydantic-core==2.50.1
+annotated-types==0.8.0
+annotated-doc==0.0.5
+typing-inspection==0.4.4
+typing-extensions==4.16.0
+anyio==4.15.1
+idna==3.20
+uvicorn==0.54.0
+click==8.5.0
+h11==0.16.0
 textual==8.2.8
+rich==15.0.0
+markdown-it-py==4.2.0
+mdit-py-plugins==0.6.1
+mdurl==0.1.2
+platformdirs==4.13.0
+Pygments==2.21.0
+linkify-it-py==2.2.0

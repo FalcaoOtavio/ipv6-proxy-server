@@ -159,7 +159,9 @@ def env(tmp_path):
     tokens.write_text(json.dumps({"tenant-a": hashlib.sha256(TENANT_A.encode()).hexdigest(),
                                   "tenant-b": hashlib.sha256(TENANT_B.encode()).hexdigest()}))
     ports = free_ports(6)
+    # loopback-only test harness: targets/egress are loopback, so the SSRF deny is off
     settings = Settings(subnet="::ffff:127.0.0.0/120", bind_ipv4="127.0.0.1", interface="lo",
+                        block_private_destinations=False,
                         api_token=ADMIN, data_dir=tmp_path / "data", binary=BINARY,
                         port_start=min(ports), port_end=max(ports), client_tokens_file=tokens,
                         supervisor="local")

@@ -1,9 +1,8 @@
 """T10 SSRF acceptance: a proxy client must not reach the host's own loopback.
 
-Real 3proxy 0.9.4; needs TEST_3PROXY_BINARY and curl. Today render_config emits
-"auth none"/"allow *" with no destination ACL, so every proxy relays to
-[::1] (and fc00::/7, fe80::/10 ...). xfail(strict) until T18 lands the deny
-ACL; once it does, this test passes and the marker must be removed.
+Real 3proxy 0.9.4; needs TEST_3PROXY_BINARY and curl. render_config denies
+loopback/internal destinations by default (auth iponly/strong + deny before
+allow); the override exists only for loopback tests and must really open it.
 """
 import os
 import shutil
@@ -22,7 +21,6 @@ from proxy_api.models import ProxyRecord
 pytestmark = [
     pytest.mark.skipif(not os.environ.get("TEST_3PROXY_BINARY") or not shutil.which("curl"),
                        reason="Set TEST_3PROXY_BINARY (and install curl) for the real 3proxy SSRF check"),
-    pytest.mark.xfail(strict=True, reason="SSRF to host loopback open until T18 (deny ACL in render_config)"),
 ]
 
 def free_port():
@@ -30,7 +28,8 @@ def free_port():
         probe.bind(("127.0.0.1", 0))
         return probe.getsockname()[1]
 
-def test_proxies_refuse_host_loopback(tmp_path):
+@pytest.mark.parametrize("block", [True, False], ids=["default-blocks", "override-allows"])
+def test_proxies_refuse_host_loopback(tmp_path, block):
     class Server(ThreadingHTTPServer):
         address_family = socket.AF_INET6
 
@@ -47,7 +46,9 @@ def test_proxies_refuse_host_loopback(tmp_path):
     server = Server(("::1", 0), Handler)  # stands in for a loopback-only admin service
     threading.Thread(target=server.serve_forever, daemon=True).start()
     settings = Settings(subnet="2001:db8::/64", bind_ipv4="127.0.0.1", interface="lo",
-                        api_token="x" * 32, data_dir=tmp_path)
+                        api_token="x" * 32, data_dir=tmp_path,
+                        **({} if block else {"block_private_destinations": False}))
+    assert Settings.model_fields["block_private_destinations"].default is True
     # Egress from ::1 so the loopback target is reachable at the socket level:
     # only the proxy's own ACL may refuse it.
     records = [ProxyRecord(port=free_port(), protocol="http", ipv6="::1"),
@@ -69,16 +70,22 @@ def test_proxies_refuse_host_loopback(tmp_path):
                 except OSError:
                     assert time.monotonic() < deadline, f"3proxy on {record.port} did not listen"
                     time.sleep(0.05)
-        leaked = []
+        leaked, codes = [], []
         for record in records:
             scheme = "http" if record.protocol == "http" else "socks5h"
             auth = f"{record.username}:{record.password}@" if record.username else ""
-            result = subprocess.run(["curl", "-s", "-m", "5", "--noproxy", "", "-x",
+            result = subprocess.run(["curl", "-s", "-m", "5", "-w", "\\n%{http_code}", "--noproxy", "", "-x",
                                      f"{scheme}://{auth}127.0.0.1:{record.port}",
                                      f"http://[::1]:{server.server_port}/"], capture_output=True, timeout=10)
-            if result.stdout == b"secret":
+            body, _, code = result.stdout.rpartition(b"\n")
+            codes.append(code.decode())
+            if body == b"secret":
                 leaked.append(f"{record.protocol}{'+auth' if auth else ''}:{record.port}")
-        assert not leaked, f"proxies relayed to host loopback: {leaked}"
+        if block:
+            assert not leaked, f"proxies relayed to host loopback: {leaked}"
+            assert codes[:2] == ["403", "403"], codes  # http proxies answer 403 (deny ACL)
+        else:
+            assert len(leaked) == len(records), f"override did not open loopback: {codes}"
     finally:
         for process in processes:
             process.kill()
