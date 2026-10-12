@@ -96,6 +96,7 @@ async def fill(pilot, app, **values):
     await pilot.pause()
 
 UPDATE_SNAPSHOTS = os.environ.get("UPDATE_SNAPSHOTS") == "1"
+SNAPSHOT_SETTLE_S = 3.0
 # Also eats a trailing ':' left when a narrow column truncates the address.
 IPV6_RE = re.compile(r"\b[0-9a-f]{1,4}(?::[0-9a-f]{0,4}){2,7}", re.IGNORECASE)
 SCROLLBAR_RE = re.compile("[\u2580-\u259f]")
@@ -118,11 +119,18 @@ def normalize(lines):
 async def snapshot(pilot, app, name):
     """Compare the screen with tui_snapshots/<name>.txt; UPDATE_SNAPSHOTS=1 rewrites it and the SVG.
 
-    Waits for pending refreshes first: a screenshot taken mid-layout misses the footer."""
+    Captures until two consecutive screens match: under load a capture can land mid-layout
+    (footer missing, DataTable columns not yet widened). The stable screen is what is compared."""
     await pilot.wait_for_scheduled_animations()
-    await pilot.pause(0.1)
+    deadline = time.monotonic() + SNAPSHOT_SETTLE_S
     svg = app.export_screenshot()
     text = normalize(screen_text(svg))
+    while time.monotonic() < deadline:
+        await pilot.pause(0.1)
+        svg, previous = app.export_screenshot(), text
+        text = normalize(screen_text(svg))
+        if text == previous:
+            break
     reference = SNAPSHOTS / f"{name}.txt"
     if UPDATE_SNAPSHOTS:
         SNAPSHOTS.mkdir(exist_ok=True)
