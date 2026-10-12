@@ -273,6 +273,31 @@ def main():
         r = h.call("GET", "/proxies")
         results["list_200_ms"] = round((time.monotonic() - started) * 1000, 1)
         check(r.status_code == 200 and len(r.json()) == 200, "GET /proxies com 200")
+
+        # 5d. Same 200 with the production default (SSRF block on). Loopback traffic cannot be
+        # measured then (::ffff:127.0.0.1 is a denied destination): prove the refusal instead.
+        for port in [p["port"] for p in r.json()]:
+            h.call("DELETE", f"/proxies/{port}")
+        h.settings.block_private_destinations = True
+        started = time.monotonic()
+        r = h.call("POST", "/proxies/batch", json={"count": 200, "start_port": p0, "protocol": "http",
+                                                  "credentials": "random", "username": "ssrf"})
+        results["batch_200_api_ssrf_on_s"] = round(time.monotonic() - started, 2)
+        created = r.json().get("created", []) if r.status_code in (201, 207) else []
+        check(r.status_code == 201 and len(created) == 200, f"API batch 200 com SSRF ligado -> {r.status_code}")
+        if created:
+            first = created[0]
+            config = h.config(first["port"]).decode()
+            check("deny * * ::/128,::1/128,::ffff:0:0/96" in config, "cfg gerado contem o deny de destinos privados")
+            auth = f"{first['username']}:{first['password']}@"
+            config_in = f'proxy = "http://{auth}127.0.0.1:{first["port"]}"\nurl = "{url}"\n'
+            run = subprocess.run(["curl", "--config", "-", "-s", "-o", "/dev/null", "-w", "%{http_code}",
+                                  "--max-time", "20", "--noproxy", ""], input=config_in,
+                                 capture_output=True, text=True, timeout=30)
+            results["ssrf_on_loopback_http_code"] = run.stdout
+            check(run.stdout == "403", f"SSRF ligado: proxy recusa destino loopback com 403 (obtido {run.stdout})")
+            rss_on = [rss_kb(h.pid(p["port"])) for p in created]
+            results["rss_kb_per_3proxy_ssrf_on_median"] = statistics.median(rss_on)
     finally:
         echo.shutdown()
         h.close()
@@ -292,7 +317,7 @@ def free_port():
 def write_report(path, r):
     res = r.get("resources_200", {})
     lines = [
-        "# Limites medidos (QA T08)", "",
+        "# Limites medidos (QA)", "",
         f"Gerado por `tests/acceptance/measure_limits.py` em {time.strftime('%Y-%m-%d %H:%M:%S %Z')}.",
         f"Escopo de rede: {r['network_scope']}. 3proxy real 0.9.4, supervisor local (um processo por porta),",
         f"API uvicorn real no mesmo processo do script. Host: {r['host']['nproc']} CPUs, load average "
@@ -301,6 +326,8 @@ def write_report(path, r):
         f"| Lote 100 HTTP via CLI (credencial comum, `-f`) | {r.get('batch_100_http_s')} s |",
         f"| Lote 100 SOCKS5 via CLI (`--random`, `-f`) | {r.get('batch_100_socks5_s')} s |",
         f"| Lote 200 SOCKS5 via API (`POST /proxies/batch`) | {r.get('batch_200_api_s')} s |",
+        f"| Lote 200 HTTP via API com SSRF ligado (padrao de producao) | {r.get('batch_200_api_ssrf_on_s')} s |",
+        f"| RSS mediano por 3proxy com SSRF ligado | {r.get('rss_kb_per_3proxy_ssrf_on_median')} KiB |",
         f"| Remover 200 (DELETE sequencial) | {r.get('delete_200_sequential_s')} s |",
         f"| `GET /proxies` com 200 | {r.get('list_200_ms')} ms |",
         f"| curl pelas 200 linhas exportadas (sequencial) | {r.get('curl_200_s')} s |",
@@ -320,6 +347,10 @@ def write_report(path, r):
     lines += ["", "CLI (inclui partida do Python e leitura do env): " +
               ", ".join(f"{k} {v} ms" for k, v in r.get("cli_latency_ms_incl_python_start", {}).items()), "",
               "## Observacoes", "",
+              "- SSRF (`PROXY_BLOCK_PRIVATE_DESTINATIONS`): o harness loopback roda com o bloqueio DESLIGADO,",
+              "  porque o destino de teste (`::ffff:127.0.0.1`) e um destino privado negado. Lote, curl, streams,",
+              "  RSS e latencia acima foram medidos assim. A fase final liga o bloqueio (padrao de producao),",
+              f"  remede o lote de 200 e o RSS e confirma a recusa do loopback (HTTP {r.get('ssrf_on_loopback_http_code')}).",
               "- Cada proxy e um processo 3proxy: memoria e fds escalam linearmente com o numero de proxies.",
               "- Em systemd cada instancia adiciona uma unidade `ipv6-proxy@<porta>`; o custo de `systemctl` nao esta",
               "  incluido aqui (supervisor local). Medir na VM (T14).",
