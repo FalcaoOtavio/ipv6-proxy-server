@@ -48,6 +48,8 @@ E2E_API_WAIT=${E2E_API_WAIT:-60}
 E2E_READY_TIMEOUT=${E2E_READY_TIMEOUT:-}
 # Seconds the TUI gets to render in a pty (importing Textual takes ~30s under QEMU TCG).
 E2E_TUI_SECONDS=${E2E_TUI_SECONDS:-6}
+# Per-request API timeout (a mutation waits for systemd + proxy readiness).
+E2E_HTTP_TIMEOUT=${E2E_HTTP_TIMEOUT:-30}
 
 APP_DIR=/opt/ipv6-proxy-server
 ENV_FILE=/etc/ipv6-proxy-api.env
@@ -126,7 +128,7 @@ token_conf() {
 api() {  # method path [json] -> sets $api_status and $api_body (never a subshell: callers read both)
     local out
     api_status=000 api_body=''
-    out=$(curl --config "$curl_conf" --noproxy '*' --silent --max-time 30 -X "$1" \
+    out=$(curl --config "$curl_conf" --noproxy '*' --silent --max-time "$E2E_HTTP_TIMEOUT" -X "$1" \
         -H 'Content-Type: application/json' ${3:+--data "$3"} -w '\n%{http_code}' "$API$2") || return 1
     api_status=${out##*$'\n'}
     api_body=${out%$'\n'*}
@@ -280,7 +282,7 @@ step_harness_a() {
     api POST /proxies "{\"port\":$PORT_A,\"protocol\":\"http\"}"
     check 'cria A' [ "$api_status" = 201 ]
     id_a=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' <<<"$api_body")
-    curl --config "$curl_conf" --noproxy '*' -s -o /dev/null -w '%{http_code}' -X PATCH -H "If-Match: \"$id_a\"" \
+    curl --config "$curl_conf" --noproxy '*' -s --max-time "$E2E_HTTP_TIMEOUT" -o /dev/null -w '%{http_code}' -X PATCH -H "If-Match: \"$id_a\"" \
         -H 'Content-Type: application/json' --data '{"protocol":"socks5"}' "$API/proxies/$PORT_A" >"$work/patch.code"
     check 'PATCH A' grep -qx 200 "$work/patch.code"
     api POST "/proxies/$PORT_A/rotate"; check 'rotate A' [ "$api_status" = 200 ]
