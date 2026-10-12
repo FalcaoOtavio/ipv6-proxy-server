@@ -44,6 +44,8 @@ E2E_BLOCK_PRIVATE=${E2E_BLOCK_PRIVATE:-false}
 E2E_SELF_TEST=${E2E_SELF_TEST:-true}
 # Seconds to wait for the API after install/restart/boot (emulated hosts need minutes).
 E2E_API_WAIT=${E2E_API_WAIT:-60}
+# Set => written as PROXY_READY_TIMEOUT to the env before the update (labeled; slow hosts).
+E2E_READY_TIMEOUT=${E2E_READY_TIMEOUT:-}
 
 APP_DIR=/opt/ipv6-proxy-server
 ENV_FILE=/etc/ipv6-proxy-api.env
@@ -192,7 +194,7 @@ step_base_install() {
         if grep -q 'API nao iniciou' "$work/base-install.log" && wait_api 600; then
             record "$current" NOT_TESTED "install.sh base ${BASE_SHA:0:7}: espera fixa de 30s pela API estourou (host lento); API respondeu depois"
         else
-            fail "install.sh base ${BASE_SHA:0:7}"; return
+            tail -n 40 "$work/base-install.log"; fail "install.sh base ${BASE_SHA:0:7}"; return
         fi
     fi
     check 'API base respondendo' wait_api
@@ -211,6 +213,10 @@ step_update() {
     if ! grep -q '^PROXY_BLOCK_PRIVATE_DESTINATIONS=' "$ENV_FILE"; then
         printf '# vm_e2e.sh: loopback lab, SSRF block %s\nPROXY_BLOCK_PRIVATE_DESTINATIONS=%s\n' \
             "$([[ $E2E_BLOCK_PRIVATE == true ]] && echo ON || echo OFF)" "$E2E_BLOCK_PRIVATE" >>"$ENV_FILE"
+    fi
+    if [[ -n $E2E_READY_TIMEOUT ]] && ! grep -q '^PROXY_READY_TIMEOUT=' "$ENV_FILE"; then
+        printf '# vm_e2e.sh: slow (emulated) host\nPROXY_READY_TIMEOUT=%s\n' "$E2E_READY_TIMEOUT" >>"$ENV_FILE"
+        record "$current" NOTE "PROXY_READY_TIMEOUT=$E2E_READY_TIMEOUT gravado no env (host lento)"
     fi
     # First migration from the single-process layout: one announced interruption, confirmed by --yes.
     # --self-test creates and removes its own proxy without touching the base ones.
