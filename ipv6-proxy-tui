@@ -1,9 +1,25 @@
 #!/usr/bin/env python3
-"""Entrypoint of the IPv6 Proxy Server TUI (needs the venv with textual)."""
+"""Entrypoint of the IPv6 Proxy Server TUI.
+
+Works from a checkout (proxy_tui/ next to this file) and installed as
+/usr/local/bin/ipv6-proxy-tui, where the app lives in /opt/ipv6-proxy-server
+(found relative to this file, so a staged root prefix works too) and Textual
+only exists in that app's venv: re-exec with the venv interpreter. Never
+depends on the cwd.
+"""
+import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+here = Path(__file__).resolve().parent
+app_dir = here if (here / "proxy_tui").is_dir() else here.parent.parent.parent / "opt" / "ipv6-proxy-server"
+if not (app_dir / "proxy_tui").is_dir():
+    sys.exit(f"ipv6-proxy-tui: pacote proxy_tui nao encontrado em {app_dir}; reinstale com: sudo bash install.sh --tui-only")
+venv_python = app_dir / ".venv" / "bin" / "python"
+if app_dir != here and venv_python.exists() and not os.environ.get("IPV6_PROXY_TUI_VENV"):
+    os.environ["IPV6_PROXY_TUI_VENV"] = "1"  # re-exec once, never loop
+    os.execv(venv_python, [str(venv_python), str(Path(__file__).resolve()), *sys.argv[1:]])
+sys.path.insert(0, str(app_dir))
 
 from proxy_tui.app import main  # noqa: E402
 
