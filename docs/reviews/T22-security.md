@@ -103,3 +103,39 @@ TEST_3PROXY_BINARY=/data/projects/ipv6-proxy-server-independente/.tools/3proxy \
   .venv/bin/python -m pytest -q tests/test_security_ssrf.py tests/test_security_udp.py -rxX   # 2 passed, 2 xfailed
 .venv/bin/pip-audit -r requirements.lock --require-hashes --disable-pip                       # no known vulnerabilities
 ```
+
+## Verificação final (T27, main `6d9bd37` = cp-0021, diff `07fa31d..HEAD`)
+Data: 2026-10-12 · Auditor: agent/sec3 · Somente leitura de produção (nenhum arquivo de produção alterado).
+
+| Item | Veredito | Prova |
+|------|----------|-------|
+| N1 UDP ASSOCIATE com bloqueio ligado | **FECHADO** | `backend.render_config` emite `deny * * * * UDPASSOC` antes do `deny` de redes e do `allow` (só com `block_private_destinations`); `tests/test_security_udp.py` sem xfail, 3proxy 0.9.4 real: ASSOCIATE `2606:4700::1111` e `0.0.0.0` sem REP de sucesso, nenhum datagrama chega ao eco em `[::1]`; ordem garantida em `tests/test_backend.py:277` |
+| `/capabilities` sem `socks5_udp_associate` | **FECHADO** | `app.capabilities_for`: filtra com bloqueio ligado; `tests/test_contracts.py:85-93` (ligado sem UDP, desligado com) e `tests/test_isolation_3proxy.py:205` |
+| Drop-in `IPAddressDeny` condicional | **CORRETO** | `deploy/ipv6-proxy@.service.d/50-block-private.conf`: mesmo conjunto de `PRIVATE_DESTINATIONS`, só redes IPv6 (`tests/test_install.py:798`); unit base sem `IPAddressDeny`. `install.sh:block_private_enabled` usa a mesma regra do pydantic (só falso explícito `false/0/no/off/f/n` desliga; valor inválido mantém ligado no instalador e faz a API falhar ao subir = fail-closed). Fresh/update instalam ou removem o drop-in, com backup/rollback (`dropin`/`dropin.absent`) e só `daemon-reload` (`tests/test_install.py:815-863`) |
+| IPv4 dos clientes | **NÃO AFETADO** | Nenhuma entrada IPv4 no deny; o filtro BPF do systemd casa por família do pacote, então `::ffff:0:0/96` não atinge tráfego IPv4 nativo em `-i<bind_ipv4>`. Sem `IPAddressAllow`/`IPAddressDeny=any` em nenhuma unit |
+| F01 markup/emoji na TUI | **FECHADO** | Células do `DataTable` como `rich.text.Text`; `Static`/`Label` com dados (`#status`, `#empty`, `#error`, título, `ConfirmDialog`, `ExportDialog`, `MessageDialog`) com `markup=False`; `key_bar()` é texto fixo. `tests/test_tui.py:597`: `[bold]u[/bold]`, `:1234:` e `[@click=app.quit]y[/]` vindos da API aparecem literais (sem ação/estilo/emoji) |
+| pytest dev (PYSEC-2026-1845) | **FECHADO** | `requirements-dev.txt`: `pytest==9.0.3`; `pip-audit -r requirements-dev.txt`: *No known vulnerabilities found* |
+
+**Varredura do diff `07fa31d..HEAD` (183 arquivos; maioria evidência/snapshots da TUI):**
+- **Segredos:** gitleaks no histórico inteiro (102 commits) = só o falso positivo I1 (`proxy_api/app.py:19`). Evidências
+  `docs/evidence/tui/*.txt` mostram senhas mascaradas ou credenciais de laboratório (`LotePw1`, `OtherPw9`); o token em
+  `tests/tui_validation.py:35` é fixture de teste, não credencial real. OK.
+- **Permissões:** drop-in instalado `0644` em `ipv6-proxy@.service.d/` (`0755`), igual às units; env reescrito em
+  fresh install continua `chmod 0600`; export da TUI segue `0600` sem sobrescrever (`write_private`). OK.
+- **argv:** sem novos segredos em argv. `tests/tui_validation.py` passa o token por ambiente (`PROXY_API_TOKEN`), não por
+  argumento; `install.sh` lê `PROXY_BLOCK_PRIVATE_DESTINATIONS` do env/arquivo só por `sed`, sem `eval`/`source`. OK.
+- **Bloqueio desligado em CI/lab:** `tests.yml` e `vm_e2e.sh` desligam o bloqueio explicitamente e rotulado (subnet ULA
+  e alvo `[::1]` são exatamente o que ele nega); produção, `.env.example` e `Settings` continuam com padrão `true`. OK.
+- **TUI:** largura de colunas calculada por `cell_len` sem parse de markup; rodapé fixo. Sem nova superfície. OK.
+
+**Residual (BAIXO, não bloqueia):** o efeito real do `IPAddressDeny` (cgroup v2/BPF) não pôde ser exercitado aqui
+(container sem systemd, PID 1 = `tini`); a defesa principal (ACL `UDPASSOC`/`deny` do 3proxy) está provada com 3proxy real.
+Validar no VM e2e com `E2E_BLOCK_PRIVATE=true`, alvo público e subnet roteada.
+
+**Scanners:** gitleaks = I1 (FP); semgrep OK; trivy-fs OK; pip-audit (`requirements.txt`, `requirements.lock --require-hashes`,
+`requirements-dev.txt`) OK.
+
+**Testes:** `TEST_3PROXY_BINARY=.../.tools/3proxy .venv/bin/python -m pytest -q` → **426 passed**, 0 xfail, 3 warnings
+(deprecações de terceiros).
+
+**Veredito final:** sem crítico/alto/médio em aberto ⇒ gate de segurança **passa**.
