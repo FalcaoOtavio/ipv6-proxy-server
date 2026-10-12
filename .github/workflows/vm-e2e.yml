@@ -1,0 +1,45 @@
+name: VM e2e (no reboot)
+# Base aa29685 -> install.sh --update to this commit on a disposable runner with systemd.
+# The real reboot (--phase pre-reboot --reboot / post-reboot) and routed IPv6 traffic
+# need a real VM: see tests/e2e/vm_e2e.sh. Here routed traffic is reported NOT_TESTED.
+on:
+  workflow_dispatch:
+    inputs:
+      routed_ipv6_target:
+        description: 'Echo URL over routed IPv6 (empty = NOT_TESTED; runners have no routed subnet)'
+        required: false
+        default: ''
+permissions:
+  contents: read
+jobs:
+  vm-e2e:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The base revision aa29685 must be reachable from the local clone.
+          fetch-depth: 0
+      - name: Plan
+        run: bash tests/e2e/vm_e2e.sh --dry-run --phase no-reboot
+      - name: Run e2e without reboot
+        env:
+          E2E_TARGET_REF: ${{ github.sha }}
+          E2E_ROUTED_IPV6_TARGET: ${{ inputs.routed_ipv6_target }}
+        run: sudo --preserve-env=E2E_TARGET_REF,E2E_ROUTED_IPV6_TARGET bash tests/e2e/vm_e2e.sh --phase no-reboot
+      - name: Collect evidence
+        if: always()
+        run: |
+          mkdir -p e2e-evidence
+          sudo sh -c 'cp /var/lib/ipv6-proxy-e2e/*.json /var/lib/ipv6-proxy-e2e/*.tsv e2e-evidence/ 2>/dev/null; true'
+          sudo journalctl -u ipv6-proxy-api -u 'ipv6-proxy@*' --no-pager -n 300 > e2e-evidence/journal.txt || true
+          sudo chown -R "$USER" e2e-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vm-e2e-${{ matrix.os }}
+          path: e2e-evidence/
