@@ -191,6 +191,7 @@ def stub_source(sha="local"):
     ("--tui-only", "tui-only|false|false||"),
     ("--ref 0123456789abcdef0123456789abcdef01234567", "install|false|false|0123456789abcdef0123456789abcdef01234567|"),
     ("--update --keep-backups 2", "update|false|false||"),
+    ("--update --api-timeout 600", "update|false|false||"),
 ])
 def test_parse_args_accepts(tmp_path, argv, expected):
     result = run(tmp_path, f'parse_args {argv}\nprintf "%s|%s|%s|%s|%s\\n" "$mode" "$assume_yes" "$self_test" "$ref" "$subnet"')
@@ -202,6 +203,8 @@ def test_parse_args_accepts(tmp_path, argv, expected):
     ("--update --subnet 2001:db8::/64", "nao aceita --subnet"), ("--cli-only --ref main", "nao aceita --ref"),
     ("--tui-only --self-test", "nao aceita --ref nem --self-test"),
     ("--keep-backups 0", "--keep-backups invalido"), ("--keep-backups x", "--keep-backups invalido"),
+    ("--api-timeout 9", "--api-timeout invalido"), ("--api-timeout 3601", "--api-timeout invalido"),
+    ("--api-timeout 0180", "--api-timeout invalido"), ("--api-timeout x", "--api-timeout invalido"),
 ])
 def test_parse_args_rejects(tmp_path, argv, message):
     result = run(tmp_path, f"parse_args {argv}", check=False)
@@ -655,12 +658,31 @@ def test_inactive_proxy_reconciled_does_not_roll_back(tmp_path):
     assert "Atualizacao concluida" in result.stdout, result.stderr
 
 def test_api_deadline_grows_with_proxy_count(tmp_path):
-    # A5: 45s base + 5s per persisted proxy.
+    # A5/T30: 180s base (slow hosts took ~170s to start the API) + 5s per persisted proxy.
     fake_installation(tmp_path, "independent", ports=tuple(range(30000, 30100)))
     (tmp_path / "api-down").touch()
     result = run(tmp_path, 'api_deadline\nwrite_curl_config\nwait_api || echo DOWN')
-    assert result.stdout.split() == ["545", "DOWN"]
-    assert sum(c.startswith("curl") for c in calls(tmp_path)) == 545
+    assert result.stdout.split() == ["680", "DOWN"]
+    assert sum(c.startswith("curl") for c in calls(tmp_path)) == 680
+
+def test_api_timeout_overrides_base_deadline(tmp_path):
+    fake_installation(tmp_path, "independent")
+    result = run(tmp_path, 'parse_args --update --api-timeout 600\napi_deadline')
+    assert result.stdout.split() == ["610"]
+
+@pytest.mark.parametrize("line,expected", [
+    (None, "60"), ("PROXY_READY_TIMEOUT=120", "150"), ("PROXY_READY_TIMEOUT=300", "330"),
+    ("PROXY_READY_TIMEOUT=0", "60"), ("PROXY_READY_TIMEOUT=999", "60"), ("PROXY_READY_TIMEOUT=$(id)", "60"),
+])
+def test_api_max_time_follows_ready_timeout(tmp_path, line, expected):
+    # T30: self-test/healthcheck curl must outlast one proxy's readiness wait inside the API.
+    root = fake_installation(tmp_path, "independent")
+    if line:
+        with (root / "etc/ipv6-proxy-api.env").open("a") as env:
+            env.write(line + "\n")
+    run(tmp_path, 'write_curl_config\nrun_self_test')
+    posts = [c for c in calls(tmp_path) if c.startswith("curl") and "-X POST" in c]
+    assert posts and all(f"--max-time {expected} " in c for c in posts)
 
 def changed_render(root, port=30000):
     (root / f"var/lib/ipv6-proxy-api/proxies/{port}.cfg").write_text("config rendered by the old release\n")

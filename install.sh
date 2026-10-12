@@ -14,8 +14,8 @@ Instala ou atualiza o IPv6 Proxy Server (API, proxies por instancia systemd, CLI
 no Ubuntu 22.04/24.04/26.04 ou Debian 12/13. Fonte: FalcaoOtavio/ipv6-proxy-server.
 
 Uso:
-  sudo bash install.sh [--ref REF] [--subnet CIDR --interface IF --ipv4 IP] [--self-test] [--yes]
-  sudo bash install.sh --update [--ref REF] [--self-test] [--yes] [--keep-backups N]
+  sudo bash install.sh [--ref REF] [--subnet CIDR --interface IF --ipv4 IP] [--self-test] [--yes] [--api-timeout S]
+  sudo bash install.sh --update [--ref REF] [--self-test] [--yes] [--keep-backups N] [--api-timeout S]
   sudo bash install.sh --cli-only | --tui-only
 
 Opcoes:
@@ -33,6 +33,8 @@ Opcoes:
                     configuracao gerada de proxies mudar (anuncia quantos e pede confirmacao).
   --yes             Confirma migracao/reinicio de proxies sem perguntar (obrigatorio sem terminal).
   --keep-backups N  Backups mantidos em /var/backups/ipv6-proxy/ apos atualizar (padrao: 5).
+  --api-timeout S   Espera base pela API apos (re)iniciar, em segundos (padrao: 180; 10..3600);
+                    soma 5 s por proxy persistido. Aumente em hosts lentos.
   --self-test       Ao final, cria um proxy de teste com senha aleatoria, confere e o remove.
                     Nao toca proxies existentes.
   --cli-only        Instala/atualiza so o CLI (checkout completo). Nao reinicia nada.
@@ -74,7 +76,7 @@ set_paths() {
 }
 
 parse_args() {
-    subnet='' interface='' ipv4='' ref='' mode=install assume_yes=false self_test=false keep_backups=5
+    subnet='' interface='' ipv4='' ref='' mode=install assume_yes=false self_test=false keep_backups=5 api_timeout=180
     while (($#)); do
         case "$1" in
             --help|-h) usage; exit 0 ;;
@@ -83,7 +85,7 @@ parse_args() {
                 mode=${1#--}; shift ;;
             --yes) assume_yes=true; shift ;;
             --self-test) self_test=true; shift ;;
-            --subnet|--interface|--ipv4|--ref|--keep-backups)
+            --subnet|--interface|--ipv4|--ref|--keep-backups|--api-timeout)
                 if (($# < 2)) || [[ -z "$2" || "$2" == -* ]]; then
                     die "Falta valor para $1"
                 fi
@@ -93,6 +95,7 @@ parse_args() {
                     --ipv4) ipv4=$2 ;;
                     --ref) ref=$2 ;;
                     --keep-backups) keep_backups=$2 ;;
+                    --api-timeout) api_timeout=$2 ;;
                 esac
                 shift 2 ;;
             *) die "Opcao desconhecida: $1 (use --help)" ;;
@@ -102,6 +105,9 @@ parse_args() {
         die "--ref invalido: use nome de branch/tag ou SHA."
     fi
     [[ $keep_backups =~ ^[1-9][0-9]{0,2}$ ]] || die "--keep-backups invalido: use um inteiro de 1 a 999."
+    if [[ ! $api_timeout =~ ^[1-9][0-9]{1,3}$ ]] || ((api_timeout > 3600)); then
+        die "--api-timeout invalido: use segundos de 10 a 3600."
+    fi
     if [[ $mode != install && -n "$subnet$interface$ipv4" ]]; then
         die "--$mode nao aceita --subnet, --interface ou --ipv4 (a configuracao existente e mantida)."
     fi
@@ -602,14 +608,25 @@ write_curl_config() {
     printf 'header = "Authorization: Bearer %s"\n' "$token" >"$curl_config"
 }
 
+ready_timeout() {
+    # PROXY_READY_TIMEOUT from the env (API default 30): how long the API may
+    # wait for one 3proxy to come up inside a single request.
+    local value=''
+    [[ ! -f $env_file ]] || value=$(sed -n 's/^PROXY_READY_TIMEOUT=//p' "$env_file" | tail -n 1)
+    [[ $value =~ ^[0-9]{1,3}$ ]] && ((value >= 1 && value <= 300)) || value=30
+    echo "$value"
+}
+
 api() {
-    curl --config "$curl_config" --noproxy '*' --silent --show-error --max-time 30 "$@"
+    # A create/replace waits for its proxy to be ready: give curl that plus margin.
+    curl --config "$curl_config" --noproxy '*' --silent --show-error --max-time $(($(ready_timeout) + 30)) "$@"
 }
 
 api_deadline() {
-    # The API reconciles every proxy before answering (up to ~5s each when one
-    # must be (re)started), so the wait grows with the number of proxies.
-    echo $((45 + 5 * $(state_ports 2>/dev/null | wc -l)))
+    # Base (--api-timeout, default 180 s: slow hosts took ~170 s to start the
+    # API) plus 5 s per persisted proxy, since the API reconciles them before
+    # answering; their readiness waits overlap, so 5 s each is enough.
+    echo $((${api_timeout:-180} + 5 * $(state_ports 2>/dev/null | wc -l)))
 }
 
 wait_api() {
