@@ -39,6 +39,9 @@ E2E_ROUTED_IPV6_TARGET=${E2E_ROUTED_IPV6_TARGET:-}
 # (ACL + IPAddressDeny drop-in). The lab therefore runs with the block OFF (insecure, lab
 # only); set E2E_BLOCK_PRIVATE=true only with a public target and a routed subnet.
 E2E_BLOCK_PRIVATE=${E2E_BLOCK_PRIVATE:-false}
+# false skips install.sh --self-test on the update (recorded NOT_TESTED), e.g. while a
+# slow emulated host (QEMU TCG) exceeds the proxy readiness deadline.
+E2E_SELF_TEST=${E2E_SELF_TEST:-true}
 
 APP_DIR=/opt/ipv6-proxy-server
 ENV_FILE=/etc/ipv6-proxy-api.env
@@ -74,9 +77,9 @@ esac
 [[ $do_reboot == false || $phase == pre-reboot ]] || die '--reboot so vale com --phase pre-reboot'
 
 if $dry_run; then
-    printf 'phase=%s target_ref=%s base=%s subnet=%s interface=%s ipv4=%s state=%s routed_target=%s ssrf_block=%s\n' \
+    printf 'phase=%s target_ref=%s base=%s subnet=%s interface=%s ipv4=%s state=%s routed_target=%s ssrf_block=%s self_test=%s\n' \
         "$phase" "$E2E_TARGET_REF ($E2E_SOURCE)" "$BASE_SHA" "$E2E_SUBNET" "$E2E_INTERFACE" "$E2E_IPV4" "$E2E_STATE_DIR" \
-        "${E2E_ROUTED_IPV6_TARGET:-<unset: NOT_TESTED>}" "$E2E_BLOCK_PRIVATE"
+        "${E2E_ROUTED_IPV6_TARGET:-<unset: NOT_TESTED>}" "$E2E_BLOCK_PRIVATE" "$E2E_SELF_TEST"
     printf 'step %s\n' "${steps[@]}"
     $do_reboot && printf 'step reboot\n'
     exit 0
@@ -130,9 +133,9 @@ wait_api() {
     return 1
 }
 token_hash() { sed -n 's/^PROXY_API_TOKEN=//p' "$ENV_FILE" | sha256sum | cut -d' ' -f1; }
-backup_private() {
-    local dirs=(/var/backups/ipv6-proxy-*)
-    [[ -d ${dirs[0]} ]] && [[ $(stat -c %a "${dirs[@]}" | sort -u) == 700 ]]
+backup_private() {  # /var/backups/ipv6-proxy/ and every backup inside it are 0700
+    local dirs=(/var/backups/ipv6-proxy/*/)
+    [[ -d ${dirs[0]} ]] && [[ $(stat -c %a /var/backups/ipv6-proxy "${dirs[@]}" | sort -u) == 700 ]]
 }
 unit_pid() { systemctl show --property=MainPID --value "$1"; }
 pids() {  # stable "unit pid" listing of the API and every proxy instance
@@ -201,9 +204,12 @@ step_update() {
     fi
     # First migration from the single-process layout: one announced interruption, confirmed by --yes.
     # --self-test creates and removes its own proxy without touching the base ones.
-    check "install.sh --update --yes --self-test ($E2E_SOURCE $target_sha)" installer --update --yes --self-test || return
+    local self_test=(--self-test)
+    [[ $E2E_SELF_TEST == true ]] || self_test=()
+    check "install.sh --update --yes ${self_test[*]} ($E2E_SOURCE $target_sha)" installer --update --yes "${self_test[@]}" || return
+    [[ $E2E_SELF_TEST == true ]] || record "$current" NOT_TESTED 'E2E_SELF_TEST=false: install.sh --self-test nao executado'
     check 'API respondendo apos update' wait_api
-    check 'backup 0700 criado em /var/backups/ipv6-proxy-*' backup_private
+    check 'backup 0700 criado em /var/backups/ipv6-proxy/' backup_private
 }
 step_migration() {
     token_conf
