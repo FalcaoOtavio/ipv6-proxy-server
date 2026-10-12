@@ -1,0 +1,20 @@
+ Porta  Status    Proto   Usuário  Senha  IPv6              
+ 44313  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.38 
+ 44315  ● ativo   HTTP    bob      ••••   ::ffff:127.0.0.237
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                           ▏
+ ✓ Porta 44315: novo IPv6 ::ffff:127.0.0.237 (era           
+ ::ffff:127.0.0.24).                                        
+? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exp

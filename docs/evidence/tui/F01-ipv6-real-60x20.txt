@@ -1,0 +1,20 @@
+   Proto  Usuário  Senha  IPv6                              
+o  HTTP   —        —      2001:db8:abcd🔢409:ccc9:9a9d:294f 
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+           ▎                                                
+ ✓ 1 proxy(s).                                              
+? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exp

@@ -1,0 +1,20 @@
+                                                            
+                                                            
+                                                            
+╭──────────────────────────────────────────────────────────╮
+│ Criar proxy                                              │
+│ Porta (vazio = primeira livre)                           │
+│ 80                                                       │
+│ Protocolo                                                │
+│ HTTP                                                  ▼  │
+│ Usuário (vazio = sem autenticação)                       │
+│                                                          │
+│ Senha                                                    │
+│                                                          │
+│ ✕ Porta deve ser um número entre 1024 e 65535.           │
+│    Confirmar         Cancelar                            │
+╰──────────────────────────────────────────────────────────╯
+                                                            
+                                                            
+ ✓ 0 proxy(s).                                              
+? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exp

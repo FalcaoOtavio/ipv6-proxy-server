@@ -1,0 +1,24 @@
+ Porta  Status    Proto   Usuário  Senha  IPv6                                  
+ 41301  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.142                    
+ 41303  ╭──────────────────────────────────────────────────────────────╮        
+        │ Criar lote                                                   │        
+        │ Quantidade                                                   │        
+        │ 0                                                            │        
+        │ Porta inicial (vazio = início da faixa)                      │        
+        │                                                              │        
+        │ Protocolo                                                    │        
+        │ HTTP                                                      ▼  │        
+        │ Credenciais                                                  │        
+        │ Sem autenticação                                          ▼  │        
+        │ Usuário (comum) ou prefixo (aleatória, opcional)             │        
+        │                                                              │        
+        │ Senha (só no modo comum)                                     │        
+        │                                                              │        
+        │ ▐X▌ Parcial: manter os criados se alguma porta falhar        │        
+        │ ✕ Quantidade deve ser um número entre 1 e 1000               │        
+        │ (PROXY_BATCH_MAX).                                           │        
+        │    Confirmar         Cancelar                                │        
+        ╰──────────────────────────────────────────────────────────────╯        
+                                                                                
+ ✓ Proxy da porta 41304 excluído.                                               
+? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exportar s Senha a Reca

@@ -1,0 +1,20 @@
+ Porta  Status    Proto   Usuário  Senha    IPv6            
+ 44313  ● ativo   HTTP    alice    ••••     ::ffff:127.0.0.5
+ 44315  ● ativo   HTTP    bob      ••••     ::ffff:127.0.0.2
+ 44323  ● ativo   HTTP    lote     ••••     ::ffff:127.0.0.1
+ 44325  ● ativo   HTTP    lote     ••••     ::ffff:127.0.0.1
+╭──────────────────────────────────────────────────────────╮
+│ Exportar lista (IPv4:porta:usuário:senha)                │
+│ 1 omitido(s): senha desconhecida (a API não devolve      │
+│ senhas).                                                 │
+│ Arquivo (criado com permissão 0600; não sobrescreve)     │
+│ /tmp/tui-val-60x20-ogfzg2qe/proxies-20261012-040707.txt  │
+│                                                          │
+│    Confirmar         Cancelar                            │
+╰──────────────────────────────────────────────────────────╯
+                                                            
+                                                            
+                                                            
+                                                         ▎  
+ ✓ Senha da porta 44323 oculta.                             
+? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exp

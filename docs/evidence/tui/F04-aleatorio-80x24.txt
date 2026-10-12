@@ -1,0 +1,24 @@
+ Porta  Status    Proto   Usuário  Senha  IPv6                                  
+ 41301  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.142                    
+ 41303  ● ativo   HTTP    bob      ••••   ::ffff:127.0.0.89                     
+ 41311  ● ativo   HTTP    lote     ••••   ::ffff:127.0.0.56                     
+ 41313  ● ativo   HTTP    lote     ••••   ::ffff:127.0.0.20                     
+ 41315  ● ativo   HTTP    u41315   ••••   ::ffff:127.0.0.135                    
+ 41316  ● ativo   HTTP    u41316   ••••   ::ffff:127.0.0.21                     
+                                                                                
+        ╭──────────────────────────────────────────────────────────────╮        
+        │ Resultado do lote                                            │        
+        │ Criados: 2 (portas 41315–41316)                              │        
+        │ Senhas aleatórias ficam só nesta sessão: exporte com x antes │        
+        │ de sair.                                                     │        
+        │   Fechar (Esc)                                               │        
+        ╰──────────────────────────────────────────────────────────────╯        
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+ ✓ Lote concluído: 2 criado(s), 0 falha(s).                                     
+? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exportar s Senha a Reca

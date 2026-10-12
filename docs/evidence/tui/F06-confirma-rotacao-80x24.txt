@@ -1,0 +1,24 @@
+ Porta  Status    Proto   Usuário  Senha  IPv6                                  
+ 41301  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.62                     
+ 41303  ● ativo   HTTP    bob      ••••   ::ffff:127.0.0.191                    
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+        ╭──────────────────────────────────────────────────────────────╮        
+        │ Rotacionar o IPv6 da porta 41303?                            │        
+        │ Só o 3proxy desta porta reinicia; as sessões dela caem.      │        
+        │                                                              │        
+        │    Confirmar         Cancelar                                │        
+        ╰──────────────────────────────────────────────────────────────╯        
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+ ✓ Proxy 41302 atualizado: porta 41303, HTTP.                                   
+? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exportar s Senha a Reca

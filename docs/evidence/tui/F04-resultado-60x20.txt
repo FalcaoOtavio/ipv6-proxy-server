@@ -1,0 +1,20 @@
+ Porta  Status    Proto   Usuário  Senha  IPv6              
+ 44313  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.58 
+ 44315  ● ativo   HTTP    bob      ••••   ::ffff:127.0.0.237
+ 44323  ● ativo   HTTP    lote     ••••   ::ffff:127.0.0.172
+ 44325  ● ativo   HTTP    lote     ••••   ::ffff:127.0.0.169
+                                                            
+╭──────────────────────────────────────────────────────────╮
+│ Resultado do lote                                        │
+│ Criados: 2 (portas 44323–44325)                          │
+│ Falhas: 1 — 44324                                        │
+│ Veja: sudo journalctl -u ipv6-proxy@<porta>              │
+│   Fechar (Esc)                                           │
+╰──────────────────────────────────────────────────────────╯
+                                                            
+                                                            
+                                                            
+                                                            
+                                                           ▏
+ ✓ Lote concluído: 2 criado(s), 1 falha(s).                 
+? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exp

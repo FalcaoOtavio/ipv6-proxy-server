@@ -1,0 +1,24 @@
+ Porta  Status    Proto   Usuário  Senha    IPv6                                
+ 41301  ● ativo   HTTP    alice    ••••     ::ffff:127.0.0.142                  
+ 41303  ● ativo   HTTP    bob      ••••     ::ffff:127.0.0.89                   
+ 41311  ● ativo   HTTP    lote     LotePw1  ::ffff:127.0.0.56                   
+ 41313  ● ativo   HTTP    lote     ••••     ::ffff:127.0.0.20                   
+ 41315  ● ativo   HTTP    u41315   ••••     ::ffff:127.0.0.135                  
+ 41316  ● ativo   HTTP    u41316   ••••     ::ffff:127.0.0.21                   
+ 41321  ● ativo   HTTP    outro    n/d      ::ffff:127.0.0.81                   
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+ ✓ Senha da porta 41311 visível.                                                
+? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exportar s Senha a Reca

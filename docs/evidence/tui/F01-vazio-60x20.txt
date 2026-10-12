@@ -1,0 +1,20 @@
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                  Nenhum proxy cadastrado.                  
+                                                            
+  Pressione c para criar um proxy ou l para criar um lote.  
+                 ? mostra todos os atalhos.                 
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+ ✓ 0 proxy(s).                                              
+? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exp
