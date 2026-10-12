@@ -125,8 +125,8 @@ api() {  # method path [json] -> sets $api_status and $api_body (never a subshel
     api_status=${out##*$'\n'}
     api_body=${out%$'\n'*}
 }
-wait_api() {
-    for _ in $(seq 60); do
+wait_api() {  # [seconds, default 60]
+    for _ in $(seq "${1:-60}"); do
         token_conf && api GET /proxies && [[ $api_status == 200 ]] && return 0
         sleep 1
     done
@@ -183,8 +183,16 @@ export E2E_PASSWORD_30002=base-socks-pw E2E_PASSWORD_30011=bob-pw-1 E2E_PASSWORD
 step_base_install() {
     if [[ -e $ENV_FILE ]]; then fail "host nao esta limpo: $ENV_FILE ja existe"; return; fi
     checkout "$BASE_SHA" "$work/base"
-    check "install.sh base ${BASE_SHA:0:7}" bash "$work/base/install.sh" \
-        --subnet "$E2E_SUBNET" --interface "$E2E_INTERFACE" --ipv4 "$E2E_IPV4" || return
+    if ! bash "$work/base/install.sh" --subnet "$E2E_SUBNET" --interface "$E2E_INTERFACE" --ipv4 "$E2E_IPV4" \
+            2>&1 | tee "$work/base-install.log"; then
+        # The base installers give the API a fixed 30s; slow emulated hosts need longer.
+        # Only that failure is tolerated, and only when the API then answers (labeled).
+        if grep -q 'API nao iniciou' "$work/base-install.log" && wait_api 600; then
+            record "$current" NOT_TESTED "install.sh base ${BASE_SHA:0:7}: espera fixa de 30s pela API estourou (host lento); API respondeu depois"
+        else
+            fail "install.sh base ${BASE_SHA:0:7}"; return
+        fi
+    fi
     check 'API base respondendo' wait_api
 }
 step_base_proxies() {
