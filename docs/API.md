@@ -234,6 +234,13 @@ configuracao), `starting` (subindo ou aguardando `Restart=on-failure`),
 reinicio da API). Responde mesmo com o proxy fora do ar. `GET /proxies`
 continua sem `status` e responde 503 se algum proxy visivel nao esta saudavel.
 
+### GET /proxies?include=status
+
+Opcional: mesma lista, com `status` por item (mesmo calculo de
+`GET /proxies/{port}`, uma leitura do supervisor por chamada, respeita owner).
+Nao responde 503 por proxy fora do ar: o status de cada item informa a falha.
+Sem o parametro, `GET /proxies` segue identico. Usado pela TUI.
+
 ### PATCH /proxies/{port}
 
 Corpo com qualquer combinacao de `protocol`, `port` e o par

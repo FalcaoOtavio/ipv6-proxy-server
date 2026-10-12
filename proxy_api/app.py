@@ -3,7 +3,7 @@ import json
 import re
 import secrets
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
@@ -99,13 +99,17 @@ def create_app(settings=None, backend_factory=LinuxBackend):
     def capabilities(owner=Depends(principal)):
         return {"spec": SPEC, "capabilities": CAPABILITIES}
 
-    @app.get("/proxies", response_model=list[ProxyView])
-    def list_proxies(owner=Depends(principal)):
+    @app.get("/proxies", response_model=list[ProxyStatusView] | list[ProxyView])
+    def list_proxies(owner=Depends(principal), include: Optional[Literal["status"]] = None):
         manager = app.state.manager
         with manager.lock:
             # Health is scoped to what the caller sees: a fenced port of one
             # owner must not turn every other owner's listing into a 503.
             visible = manager.visible(owner)
+            if include == "status":
+                # Per-item status replaces the all-or-503 health gate: it reports the failure itself.
+                statuses = manager.statuses(visible)
+                return [{**manager.view(record), "status": statuses[record.port]} for record in visible]
             if manager.broken or not manager.backend.healthy(visible):
                 raise HTTPException(503, "3proxy unavailable; inspect service logs")
             return [manager.view(record) for record in visible]
