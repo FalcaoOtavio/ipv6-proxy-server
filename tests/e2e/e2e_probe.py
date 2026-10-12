@@ -2,9 +2,9 @@
 """Stdlib-only probes for tests/e2e/vm_e2e.sh (runs on the VM, no venv needed).
 
 streams: local TCP target on [::]:PORT that greets each client with its peer
-         address and then ticks every 0.2 s; one tunnel per proxy in
-         $E2E_PROXIES (JSON list of {name, scheme, port, username, password,
-         ipv6}) held for --seconds. Passwords come from the environment, never argv.
+         address and then ticks every 0.2 s; one tunnel per --proxy
+         name:scheme:port:user:ipv6 held for --seconds. The password of port P
+         comes from $E2E_PASSWORD_P (environment, never argv).
 tui:     run a command in a pseudo-terminal, read its screen for --seconds,
          send 'q' and report whether it rendered and stayed up.
 Both print one JSON object and exit 1 on failure.
@@ -117,7 +117,11 @@ def hold(proxy, target_port, seconds, result):
 
 
 def streams(args):
-    proxies = json.loads(os.environ["E2E_PROXIES"])
+    proxies = []
+    for spec in args.proxy:
+        name, scheme, port, user, ipv6 = spec.split(":", 4)
+        proxies.append({"name": name, "scheme": scheme, "port": int(port), "username": user or None,
+                        "password": os.environ.get(f"E2E_PASSWORD_{port}"), "ipv6": ipv6 or None})
     stop = threading.Event()
     threading.Thread(target=serve, args=(args.target_port, stop), daemon=True).start()
     time.sleep(0.3)
@@ -176,6 +180,7 @@ def main(argv=None):
     s.add_argument("--target-port", type=int, default=18080)
     s.add_argument("--seconds", type=float, default=15)
     s.add_argument("--ready-file")
+    s.add_argument("--proxy", action="append", required=True, help="name:http|socks5:port:user:ipv6")
     t = sub.add_parser("tui")
     t.add_argument("--seconds", type=float, default=5)
     t.add_argument("--expect", action="append", default=[])

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2317  # step_* functions are invoked indirectly via "step_$current"
 # VM end-to-end: base aa29685 -> install.sh --update to the target SHA on a clean,
 # disposable Linux host with systemd. DESTRUCTIVE for that host's ipv6-proxy setup:
 # never run it on a production VPS.
@@ -18,11 +19,16 @@ BASE_SHA=aa2968556f861f56c7e5d37c70a859797a8d8772
 FORK_URL=https://github.com/FalcaoOtavio/ipv6-proxy-server
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 repo=$(cd -- "$here/../.." && pwd)
+# Root reads a checkout owned by another user (CI runner, sudo): trust only this one.
+export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=$repo
 
 E2E_SUBNET=${E2E_SUBNET:-fd00:1234::/64}
 E2E_INTERFACE=${E2E_INTERFACE:-lo}
 E2E_IPV4=${E2E_IPV4:-127.0.0.1}
 E2E_TARGET_REF=${E2E_TARGET_REF:-HEAD}
+# checkout: run install.sh from a local checkout of the target SHA (works before any push);
+# fork: pass --ref so install.sh clones FalcaoOtavio/ipv6-proxy-server itself (SHA must be published).
+E2E_SOURCE=${E2E_SOURCE:-checkout}
 E2E_STATE_DIR=${E2E_STATE_DIR:-/var/lib/ipv6-proxy-e2e}
 E2E_STREAM_SECONDS=${E2E_STREAM_SECONDS:-15}
 # Echo service reached through the proxies over routed IPv6; must answer with the
@@ -38,7 +44,7 @@ API=http://127.0.0.1:8000
 # Base proxies (created on aa29685) and the harness A/B/C (created after the update).
 BASE_HTTP=30001 BASE_SOCKS=30002 PORT_A=30010 PORT_B=30011 PORT_C=30012
 
-usage() { sed -n '2,13p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '3,14p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 die() { printf 'vm_e2e: %s\n' "$*" >&2; exit 2; }
 
 phase='' dry_run=false do_reboot=false
@@ -53,6 +59,7 @@ while (($#)); do
         *) die "Opcao desconhecida: $1 (use --help)" ;;
     esac
 done
+[[ $E2E_SOURCE == checkout || $E2E_SOURCE == fork ]] || die 'E2E_SOURCE deve ser checkout ou fork'
 case "$phase" in
     pre-reboot) steps=(base_install base_proxies update migration idempotency harness_a clients traffic snapshot) ;;
     post-reboot) steps=(post_reboot traffic_post) ;;
@@ -63,7 +70,7 @@ esac
 
 if $dry_run; then
     printf 'phase=%s target_ref=%s base=%s subnet=%s interface=%s ipv4=%s state=%s routed_target=%s\n' \
-        "$phase" "$E2E_TARGET_REF" "$BASE_SHA" "$E2E_SUBNET" "$E2E_INTERFACE" "$E2E_IPV4" "$E2E_STATE_DIR" \
+        "$phase" "$E2E_TARGET_REF ($E2E_SOURCE)" "$BASE_SHA" "$E2E_SUBNET" "$E2E_INTERFACE" "$E2E_IPV4" "$E2E_STATE_DIR" \
         "${E2E_ROUTED_IPV6_TARGET:-<unset: NOT_TESTED>}"
     printf 'step %s\n' "${steps[@]}"
     $do_reboot && printf 'step reboot\n'
@@ -102,20 +109,25 @@ token_conf() {
     [[ -n $token ]] || return 1
     printf 'header = "Authorization: Bearer %s"\n' "$token" >"$curl_conf"
 }
-api() {  # method path [json] -> body on stdout, status in $api_status
+api() {  # method path [json] -> sets $api_status and $api_body (never a subshell: callers read both)
     local out
+    api_status=000 api_body=''
     out=$(curl --config "$curl_conf" --noproxy '*' --silent --max-time 30 -X "$1" \
         -H 'Content-Type: application/json' ${3:+--data "$3"} -w '\n%{http_code}' "$API$2") || return 1
     api_status=${out##*$'\n'}
-    printf '%s' "${out%$'\n'*}"
+    api_body=${out%$'\n'*}
 }
 wait_api() {
-    local i
-    for i in $(seq 60); do
-        token_conf && api GET /proxies >/dev/null && [[ $api_status == 200 ]] && return 0
+    for _ in $(seq 60); do
+        token_conf && api GET /proxies && [[ $api_status == 200 ]] && return 0
         sleep 1
     done
     return 1
+}
+token_hash() { sed -n 's/^PROXY_API_TOKEN=//p' "$ENV_FILE" | sha256sum | cut -d' ' -f1; }
+backup_private() {
+    local dirs=(/var/backups/ipv6-proxy-*)
+    [[ -d ${dirs[0]} ]] && [[ $(stat -c %a "${dirs[@]}" | sort -u) == 700 ]]
 }
 unit_pid() { systemctl show --property=MainPID --value "$1"; }
 pids() {  # stable "unit pid" listing of the API and every proxy instance
@@ -131,7 +143,8 @@ hashes() {
         "${DATA_DIR#/}"/proxies/*.cfg 2>&1)
 }
 proxy_field() {  # port field (from GET /proxies/{port})
-    api GET "/proxies/$1" | python3 -c 'import json,sys; print(json.load(sys.stdin)[sys.argv[1]])' "$2"
+    api GET "/proxies/$1" || return 1
+    python3 <<<"$api_body" -c 'import json,sys; print(json.load(sys.stdin)[sys.argv[1]])' "$2"
 }
 checkout() {  # sha dir: full git checkout so install.sh records the SHA it runs from
     git clone --quiet --no-hardlinks "$repo" "$2" 2>/dev/null || git clone --quiet "$FORK_URL" "$2"
@@ -139,24 +152,25 @@ checkout() {  # sha dir: full git checkout so install.sh records the SHA it runs
         git -C "$2" fetch --quiet "$FORK_URL" "$1" && git -C "$2" checkout --quiet --detach FETCH_HEAD
     }
 }
-streams() {  # name:scheme:port:user ...  passwords from $E2E_PASSWORDS_<port>
-    local spec json='[' sep='' name scheme port user pw_var ipv6
+streams() {  # [probe options] name:scheme:port:user ...; passwords from $E2E_PASSWORD_<port>
+    local spec port args=()
+    while [[ $1 == --* ]]; do args+=("$1" "$2"); shift 2; done
     for spec in "$@"; do
-        IFS=: read -r name scheme port user <<<"$spec"
-        pw_var=E2E_PASSWORD_$port
-        ipv6=$(proxy_field "$port" ipv6)
-        json+=$(python3 -c 'import json,sys,os; print(json.dumps({"name":sys.argv[1],"scheme":sys.argv[2],
-            "port":int(sys.argv[3]),"username":sys.argv[4] or None,"password":os.environ.get(sys.argv[5]),
-            "ipv6":sys.argv[6]}))' "$sep$name" "$scheme" "$port" "$user" "$pw_var" "$ipv6" | sed 's/"name": ","/"name": "/')
-        sep=,
+        port=$(cut -d: -f3 <<<"$spec")
+        args+=(--proxy "$spec:$(proxy_field "$port" ipv6)")
     done
-    E2E_PROXIES="$json]" python3 "$here/e2e_probe.py" streams --seconds "$E2E_STREAM_SECONDS" "${probe_args[@]}"
+    python3 "$here/e2e_probe.py" streams --seconds "$E2E_STREAM_SECONDS" "${args[@]}"
+}
+installer() {  # target install.sh [--ref SHA when E2E_SOURCE=fork; clients always use the checkout]
+    local ref=()
+    [[ $E2E_SOURCE == fork && $1 != --cli-only && $1 != --tui-only ]] && ref=(--ref "$target_sha")
+    [[ -f $work/target/install.sh ]] || checkout "$target_sha" "$work/target"
+    bash "$work/target/install.sh" "$@" "${ref[@]}"
 }
 
 target_sha=$(git -C "$repo" rev-parse --verify "$E2E_TARGET_REF^{commit}" 2>/dev/null || printf '%s' "$E2E_TARGET_REF")
 # Fixed test credentials for a disposable VM; exported only to children that need them.
 export E2E_PASSWORD_30002=base-socks-pw E2E_PASSWORD_30011=bob-pw-1 E2E_PASSWORD_30012=carol-pw-1
-probe_args=()
 
 step_base_install() {
     if [[ -e $ENV_FILE ]]; then fail "host nao esta limpo: $ENV_FILE ja existe"; return; fi
@@ -170,28 +184,27 @@ step_base_proxies() {
     check 'CLI base cria proxy HTTP' "$CLI" create --port "$BASE_HTTP" --protocol http --yes --output json >/dev/null
     check 'CLI base cria proxy SOCKS5 com senha via stdin' "$CLI" create --port "$BASE_SOCKS" --protocol socks5 \
         --username base --password-stdin --yes --output json <<<"$E2E_PASSWORD_30002" >/dev/null || return
-    api GET /proxies >"$E2E_STATE_DIR/base-proxies.json"
+    api GET /proxies && printf '%s' "$api_body" >"$E2E_STATE_DIR/base-proxies.json"
     sha256sum "$ENV_FILE" | awk '{print $1}' >"$E2E_STATE_DIR/base-env.sha256"
-    sed -n 's/^PROXY_API_TOKEN=//p' "$ENV_FILE" | sha256sum | awk '{print $1}' >"$E2E_STATE_DIR/base-token.sha256"
+    token_hash >"$E2E_STATE_DIR/base-token.sha256"
 }
 step_update() {
-    checkout "$target_sha" "$work/target"
     # First migration from the single-process layout: one announced interruption, confirmed by --yes.
-    check "install.sh --update --yes para $target_sha" bash "$work/target/install.sh" --update --yes --ref "$target_sha" || return
+    # --self-test creates and removes its own proxy without touching the base ones.
+    check "install.sh --update --yes --self-test ($E2E_SOURCE $target_sha)" installer --update --yes --self-test || return
     check 'API respondendo apos update' wait_api
+    check 'backup 0700 criado em /var/backups/ipv6-proxy-*' backup_private
 }
 step_migration() {
     token_conf
-    check 'VERSION registra o SHA alvo' grep -q "$target_sha" "$APP_DIR/VERSION"
-    check 'token preservado' bash -c '[[ $(sed -n "s/^PROXY_API_TOKEN=//p" "$1" | sha256sum | cut -d" " -f1) == $(cat "$2") ]]' \
-        _ "$ENV_FILE" "$E2E_STATE_DIR/base-token.sha256"
+    check 'VERSION registra o SHA alvo' grep -qx "sha=$target_sha" "$APP_DIR/VERSION"
+    check 'token preservado' [ "$(token_hash)" = "$(cat "$E2E_STATE_DIR/base-token.sha256")" ]
     check 'state.json v2 contem os proxies base com mesmo IPv6' python3 - "$DATA_DIR/state.json" \
         "$E2E_STATE_DIR/base-proxies.json" <<'EOF'
 import ipaddress, json, sys
 state, base = json.load(open(sys.argv[1])), json.load(open(sys.argv[2]))
 assert state["version"] == 2, state.get("version")
-records = state["proxies"] if isinstance(state["proxies"], list) else list(state["proxies"].values())
-now = {r["port"]: r for r in records}
+now = {r["port"]: r for r in state["proxies"]}
 for b in base:
     r = now[b["port"]]
     assert ipaddress.ip_address(r["ipv6"]) == ipaddress.ip_address(b["ipv6"]), (b, r)
@@ -203,48 +216,46 @@ EOF
         check "ipv6-proxy@$port ativo e habilitado" systemctl is-active --quiet "ipv6-proxy@$port"
         check "ipv6-proxy@$port enabled" systemctl is-enabled --quiet "ipv6-proxy@$port"
     done
-    check 'API nao roda 3proxy proprio (sem 3proxy fora das unidades)' bash -c \
-        '[[ -z $(systemctl show -p ControlGroup --value ipv6-proxy-api) ]] || ! systemd-cgls --no-pager -u ipv6-proxy-api | grep -q 3proxy'
+    check 'API nao tem 3proxy filho (cada proxy em sua unidade)' bash -c \
+        '! systemd-cgls --no-pager -u ipv6-proxy-api.service 2>/dev/null | grep -q 3proxy'
+    check '3proxy.cfg monolitico removido' test ! -e "$DATA_DIR/3proxy.cfg"
 }
 step_idempotency() {
     token_conf
     hashes >"$work/hashes.before"; pids >"$work/pids.before"
-    check 'install.sh --update (2a vez, sem mudancas)' bash "$work/target/install.sh" --update --yes --ref "$target_sha" \
-        2>/dev/null || [[ -d $work/target ]] || { checkout "$target_sha" "$work/target"
-        check 'install.sh --update (2a vez)' bash "$work/target/install.sh" --update --yes --ref "$target_sha"; }
-    wait_api || true
+    installer --update --yes >"$work/second.log" 2>&1 || { cat "$work/second.log"; fail '2a execucao de --update falhou'; return; }
+    check '2a execucao reporta nada a atualizar' grep -q 'Nada a atualizar' "$work/second.log"
     hashes >"$work/hashes.after"; pids >"$work/pids.after"
     check 'hashes de env/state/unidades/cfg inalterados' diff -u "$work/hashes.before" "$work/hashes.after"
     check 'PIDs da API e de ipv6-proxy@* inalterados' diff -u "$work/pids.before" "$work/pids.after"
 }
 step_harness_a() {
     token_conf
-    local body pid_b pid_c id_a
-    api POST /proxies "{\"port\":$PORT_B,\"protocol\":\"http\",\"username\":\"bob\",\"password\":\"$E2E_PASSWORD_30011\"}" >/dev/null
+    local pid_b pid_c id_a
+    api POST /proxies "{\"port\":$PORT_B,\"protocol\":\"http\",\"username\":\"bob\",\"password\":\"$E2E_PASSWORD_30011\"}"
     check 'cria B (HTTP)' [ "$api_status" = 201 ]
-    api POST /proxies "{\"port\":$PORT_C,\"protocol\":\"socks5\",\"username\":\"carol\",\"password\":\"$E2E_PASSWORD_30012\"}" >/dev/null
+    api POST /proxies "{\"port\":$PORT_C,\"protocol\":\"socks5\",\"username\":\"carol\",\"password\":\"$E2E_PASSWORD_30012\"}"
     check 'cria C (SOCKS5)' [ "$api_status" = 201 ] || return
     pid_b=$(unit_pid "ipv6-proxy@$PORT_B"); pid_c=$(unit_pid "ipv6-proxy@$PORT_C")
-    check 'B/C com MainPID' [ "$pid_b" -gt 0 ] && [ "$pid_c" -gt 0 ]
-    probe_args=(--ready-file "$work/streams.ready")
-    streams "B-http:http:$PORT_B:bob" "C-socks5:socks5:$PORT_C:carol" >"$work/streams.json" &
+    check 'B com MainPID' [ "$pid_b" -gt 0 ]
+    check 'C com MainPID' [ "$pid_c" -gt 0 ] || return
+    streams --ready-file "$work/streams.ready" "B-http:http:$PORT_B:bob" "C-socks5:socks5:$PORT_C:carol" >"$work/streams.json" &
     local streams_pid=$!
     for _ in $(seq 50); do [[ -e $work/streams.ready ]] && break; sleep 0.1; done
     # Mutate only A (create/patch/rotate/delete) and restart the API while B/C stream.
-    body=$(api POST /proxies "{\"port\":$PORT_A,\"protocol\":\"http\"}")
+    api POST /proxies "{\"port\":$PORT_A,\"protocol\":\"http\"}"
     check 'cria A' [ "$api_status" = 201 ]
-    id_a=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' <<<"$body")
+    id_a=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' <<<"$api_body")
     curl --config "$curl_conf" --noproxy '*' -s -o /dev/null -w '%{http_code}' -X PATCH -H "If-Match: \"$id_a\"" \
         -H 'Content-Type: application/json' --data '{"protocol":"socks5"}' "$API/proxies/$PORT_A" >"$work/patch.code"
     check 'PATCH A' grep -qx 200 "$work/patch.code"
-    api POST "/proxies/$PORT_A/rotate" >/dev/null; check 'rotate A' [ "$api_status" = 200 ]
+    api POST "/proxies/$PORT_A/rotate"; check 'rotate A' [ "$api_status" = 200 ]
     check 'restart da API' systemctl restart ipv6-proxy-api
     check 'API volta' wait_api
-    api DELETE "/proxies/$PORT_A" >/dev/null; check 'delete A' [ "$api_status" = 204 ]
+    api DELETE "/proxies/$PORT_A"; check 'delete A' [ "$api_status" = 204 ]
     check 'unidade de A removida' bash -c "! systemctl is-active --quiet ipv6-proxy@$PORT_A"
     check 'streams B/C sem queda (gap < 1s, egress = IPv6 do proxy)' wait "$streams_pid"
     cat "$work/streams.json" >"$E2E_STATE_DIR/harness-a-streams.json"
-    probe_args=()
     check 'PID de ipv6-proxy@B inalterado' [ "$(unit_pid "ipv6-proxy@$PORT_B")" = "$pid_b" ]
     check 'PID de ipv6-proxy@C inalterado' [ "$(unit_pid "ipv6-proxy@$PORT_C")" = "$pid_c" ]
 }
@@ -252,21 +263,31 @@ step_clients() {
     token_conf
     pids >"$work/pids.before"
     check 'CLI list --output json lista B/C' bash -c "'$CLI' list --output json | python3 -c 'import json,sys; ports={p[\"port\"] for p in json.load(sys.stdin)}; assert {$PORT_B,$PORT_C} <= ports, ports'"
-    check 'install.sh --cli-only' bash "$work/target/install.sh" --cli-only --ref "$target_sha"
-    check 'install.sh --tui-only' bash "$work/target/install.sh" --tui-only --ref "$target_sha"
-    pids >"$work/pids.after"
+    hashes >"$work/hashes.before"
+    check 'install.sh --cli-only' installer --cli-only
+    local tui=true
+    if [[ -f $work/target/ipv6-proxy-tui ]]; then
+        check 'install.sh --tui-only' installer --tui-only
+    else
+        tui=false
+    fi
+    pids >"$work/pids.after"; hashes >"$work/hashes.after"
     check '--cli-only/--tui-only nao reiniciam API nem proxies' diff -u "$work/pids.before" "$work/pids.after"
-    check 'TUI renderiza em pty e lista B' python3 "$here/e2e_probe.py" tui --seconds 6 --expect "$PORT_B" -- "$TUI"
-    api GET /capabilities >/dev/null; check 'API /capabilities' [ "$api_status" = 200 ]
+    check '--cli-only/--tui-only nao tocam env/state/unidades' diff -u "$work/hashes.before" "$work/hashes.after"
+    if $tui; then
+        check 'TUI renderiza em pty e lista B' python3 "$here/e2e_probe.py" tui --seconds 6 --expect "$PORT_B" -- "$TUI"
+    fi
+    api GET /capabilities; check 'API /capabilities' [ "$api_status" = 200 ]
     check 'API status de B = running' [ "$(proxy_field "$PORT_B" status)" = running ]
     check 'API sem token = 401' [ "$(curl -s -o /dev/null -w '%{http_code}' "$API/proxies")" = 401 ]
+    $tui || record "$current" NOT_TESTED "SHA $target_sha nao tem ipv6-proxy-tui: TUI nao verificada"
 }
 routed_traffic() {
     if [[ -z $E2E_ROUTED_IPV6_TARGET ]]; then
         record "$current" NOT_TESTED 'E2E_ROUTED_IPV6_TARGET nao definido: trafego IPv6 roteado nao verificado'
         return
     fi
-    local port scheme user pw expected got
+    local spec port scheme user pw_var pw expected got
     for spec in "$PORT_B:http:bob" "$PORT_C:socks5h:carol"; do
         IFS=: read -r port scheme user <<<"$spec"
         pw_var=E2E_PASSWORD_$port; pw=${!pw_var}
@@ -282,21 +303,23 @@ routed_traffic() {
 step_traffic() { routed_traffic; }
 step_snapshot() {
     token_conf
-    api GET /proxies >"$E2E_STATE_DIR/pre-reboot-proxies.json"
+    api GET /proxies && printf '%s' "$api_body" >"$E2E_STATE_DIR/pre-reboot-proxies.json"
     pids >"$E2E_STATE_DIR/pre-reboot-pids.txt"
     hashes >"$E2E_STATE_DIR/pre-reboot-hashes.txt"
     cat /proc/sys/kernel/random/boot_id >"$E2E_STATE_DIR/pre-reboot-boot_id"
 }
 step_post_reboot() {
-    check 'houve reboot real (boot_id mudou)' bash -c '[[ $(cat /proc/sys/kernel/random/boot_id) != $(cat "$1") ]]' \
-        _ "$E2E_STATE_DIR/pre-reboot-boot_id" || return
+    check 'houve reboot real (boot_id mudou)' \
+        [ "$(cat /proc/sys/kernel/random/boot_id)" != "$(cat "$E2E_STATE_DIR/pre-reboot-boot_id")" ] || return
     check 'API sobe sozinha apos reboot' wait_api || return
     hashes >"$work/hashes.after"
     check 'env/state/unidades/cfg identicos ao pre-reboot' diff -u "$E2E_STATE_DIR/pre-reboot-hashes.txt" "$work/hashes.after"
-    check 'mesmos proxies (porta, IPv6, id) apos reboot' python3 - "$E2E_STATE_DIR/pre-reboot-proxies.json" <<<"$(api GET /proxies)" <<'EOF'
+    api GET /proxies && printf '%s' "$api_body" >"$work/post-reboot-proxies.json"
+    check 'mesmos proxies (porta, IPv6, id) apos reboot' python3 - "$E2E_STATE_DIR/pre-reboot-proxies.json" \
+        "$work/post-reboot-proxies.json" <<'EOF'
 import json, sys
 before = {p["port"]: p for p in json.load(open(sys.argv[1]))}
-after = {p["port"]: p for p in json.loads(sys.stdin.read())}
+after = {p["port"]: p for p in json.load(open(sys.argv[2]))}
 assert before == after, (before, after)
 EOF
     local port ipv6
@@ -310,9 +333,8 @@ EOF
 }
 step_traffic_post() {
     token_conf
-    check 'streams B/C locais apos reboot' bash -c 'true' && \
-        { streams "B-http:http:$PORT_B:bob" "C-socks5:socks5:$PORT_C:carol" >"$E2E_STATE_DIR/post-reboot-streams.json" \
-            || fail 'streams B/C apos reboot'; }
+    check 'streams B/C locais apos reboot' streams "B-http:http:$PORT_B:bob" "C-socks5:socks5:$PORT_C:carol" \
+        >"$E2E_STATE_DIR/post-reboot-streams.json"
     routed_traffic
 }
 
@@ -322,7 +344,8 @@ for current in "${steps[@]}"; do
     if [[ -e $marker ]]; then log "SKIP $current (ja concluido; apague $marker para repetir)"; continue; fi
     log "== $current"
     failed=false
-    "step_$current"
+    # errexit is off inside a step (|| context): check() records FAIL instead of aborting.
+    "step_$current" || true
     if $failed; then overall=1; break; fi
     grep -q "^$current	NOT_TESTED" "$results" 2>/dev/null || record "$current" PASS
     touch "$marker"
