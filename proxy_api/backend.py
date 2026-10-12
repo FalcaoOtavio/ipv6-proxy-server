@@ -181,10 +181,12 @@ class LinuxBackend:
         """Wait up to ready_timeout counted from `since` (this proxy's own launch)."""
         timeout = self.settings.ready_timeout
         deadline = (time.monotonic() if since is None else since) + timeout
-        while time.monotonic() < deadline:
+        # Probe before checking the deadline: in a long reconcile a proxy's own
+        # deadline may already be past when its turn comes, yet it is up.
+        while True:
             if self.ready(port):
                 return
-            if not self.supervisor.is_active(port):
+            if not self.supervisor.is_active(port) or time.monotonic() >= deadline:
                 break
             time.sleep(0.05)
         raise RuntimeError(f"3proxy for port {port} did not become ready in {timeout}s "

@@ -339,7 +339,9 @@ def test_reconcile_deadline_counts_from_each_launch(tmp_path, monkeypatch):
     backend, clock = slow_backend(tmp_path, monkeypatch, 30, 1021.0)
     backend._wait_ready(30000, since=clock.now)
     backend._wait_ready(30001, since=1000.0)  # launched at t=1000: already ready, no extra wait
+    backend._wait_ready(30001, since=900.0)  # deadline long past but up: probed once, accepted
     assert clock.now < 1022
+    backend.ready = lambda port: False
     with pytest.raises(RuntimeError):
-        backend._wait_ready(30001, since=980.0)  # its own 30 s already elapsed
+        backend._wait_ready(30001, since=980.0)  # its own 30 s already elapsed: no extra wait
     assert clock.now < 1022
