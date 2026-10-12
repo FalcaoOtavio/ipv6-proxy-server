@@ -51,7 +51,7 @@ ou com o servico API parado. O CLI `ipv6-proxy` e um cliente da API, nao o legad
 - API serializa mutacoes, impede portas/IPv6/ids duplicados e compensa falhas
   so nos alvos da mutacao. Dupla falha (operacao e compensacao falham) retorna
   503 e isola so a porta afetada: ela sai do ar, fica com `status: fenced` e
-  recusa mutacao (503) ate reinicio; o estado em disco fica no ultimo commit e
+  recusa mutacao (503) ate `POST /proxies/{port}/recover` (admin) ou reinicio; o estado em disco fica no ultimo commit e
   as demais portas seguem servindo e mutando. `GET /proxies` responde 503 so para quem
   enxerga uma porta morta (o owner dela e o admin). Falha ao regravar o estado
   em disco bloqueia todas as mutacoes, sem derrubar processos.
@@ -236,9 +236,23 @@ Exemplo de resposta (IPv4/IPv6 de documentacao):
 
 Mesma view do list, mais `status`: `running` (instancia ativa e servindo esta
 configuracao), `starting` (subindo ou aguardando `Restart=on-failure`),
-`failed` (instancia parada/morta) ou `fenced` (isolada apos dupla falha; exige
-reinicio da API). Responde mesmo com o proxy fora do ar. `GET /proxies`
-continua sem `status` e responde 503 se algum proxy visivel nao esta saudavel.
+`failed` (instancia parada/morta) ou `fenced` (isolada apos dupla falha ou
+falha no reconcile; ver `POST /proxies/{port}/recover`). Responde mesmo com o
+proxy fora do ar. `GET /proxies` continua sem `status` e responde 503 se algum
+proxy visivel nao esta saudavel; com porta cercada, a mensagem cita a(s)
+porta(s) e o caminho de recuperacao.
+
+### POST /proxies/{port}/recover
+
+Somente admin (token admin sem `X-Proxy-Owner`; senao 403). Reavalia uma porta
+`fenced` sem reiniciar a API e sem tocar outras portas: se a instancia ja serve
+a configuracao gravada (ativa, PID dono do socket), e adotada com o mesmo PID;
+senao e (re)iniciada a partir de `state.json` e aguarda `PROXY_READY_TIMEOUT`.
+Porta cercada no meio de um create (fora de `state.json`) e parada e seu IPv6
+liberado (204). Respostas: 200 com a view + `status`; 404 porta desconhecida;
+412 `If-Match` (id) divergente; 503 se continua cercada (corrija pelo log e
+repita). Idempotente por natureza: porta ja saudavel nao e tocada e devolve seu
+status; `Idempotency-Key` e aceito (validado) mas nao armazenado.
 
 ### GET /proxies?include=status
 

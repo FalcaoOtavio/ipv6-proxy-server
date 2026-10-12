@@ -43,9 +43,13 @@ class Supervisor(Protocol):
     def list_active(self) -> set: ...
     def list_states(self) -> dict: ...
 
-def run_command(argv, check=True):
+def command_timeout(ready_timeout):
+    """systemctl budget: a start job may legitimately take the whole readiness window."""
+    return max(30, ready_timeout + 15)
+
+def run_command(argv, check=True, timeout=30):
     try:
-        return subprocess.run(argv, check=check, capture_output=True, text=True, timeout=30)
+        return subprocess.run(argv, check=check, capture_output=True, text=True, timeout=timeout)
     except subprocess.CalledProcessError as error:
         raise RuntimeError(f"{' '.join(argv)} failed ({error.returncode}): {error.stderr.strip()}") from error
 
@@ -71,7 +75,16 @@ class SystemdSupervisor:
         # every unit, which per proxy would make reconciling N proxies O(N^2).
         if not self.is_enabled(port):
             self._systemctl("enable", "--no-reload", self.unit(port))
-        self._systemctl("start", self.unit(port))
+        self._job("start", port)
+
+    def _job(self, verb, port):
+        # A start/restart job outliving the systemctl call is not a failure: the
+        # unit may come up right after (E2E #2). The caller's readiness check,
+        # not this timeout, decides whether the port is fenced.
+        try:
+            self._systemctl(verb, self.unit(port))
+        except subprocess.TimeoutExpired:
+            logger.warning("systemctl %s %s timed out; judging it by readiness", verb, self.unit(port))
 
     def stop(self, port):
         self._systemctl("stop", self.unit(port))
@@ -82,10 +95,13 @@ class SystemdSupervisor:
         return self._systemctl("is-enabled", "--quiet", self.unit(port), check=False).returncode == 0
 
     def restart(self, port):
-        self._systemctl("restart", self.unit(port))
+        self._job("restart", port)
 
     def is_active(self, port):
-        return self._systemctl("is-active", "--quiet", self.unit(port), check=False).returncode == 0
+        # activating/reloading count: a unit still in ExecStartPre or in its
+        # start job must be waited for, not given up on.
+        state = self._systemctl("is-active", self.unit(port), check=False).stdout.strip()
+        return state in ("active", "activating", "reloading")
 
     def main_pid(self, port):
         if not self.is_active(port):

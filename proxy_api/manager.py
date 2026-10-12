@@ -111,7 +111,9 @@ class Manager:
         new = {r.port: r for r in records}
         changed = {p for p in old.keys() | new.keys() if old.get(p) != new.get(p)}
         if changed & self.broken_ports:
-            raise HTTPException(503, "Port requires recovery; restart service and inspect logs")
+            ports = ", ".join(str(p) for p in sorted(changed & self.broken_ports))
+            raise HTTPException(503, f"Port {ports} is fenced; recover it with POST /proxies/{{port}}/recover "
+                                     "(admin) and inspect logs")
         done, failed = [], set()
         for port in sorted(changed, key=lambda p: (p not in new, p)):
             step = (old.get(port), new.get(port))
@@ -222,6 +224,32 @@ class Manager:
                 # stays pending: its process may not match state.json.
                 settle(({(after or before).port for before, after in done} | failed) - self.broken_ports)
             return status, (reveal(body) if reveal and body is not None else body)
+
+    def recover(self, port, expected_id=None):
+        """Re-evaluate one fenced port without restarting the API or touching others.
+
+        Up with its committed config: adopted and unfenced. Otherwise it is
+        brought up from state.json; if that fails it stays fenced (503).
+        """
+        with self.lock:
+            if self.broken:
+                raise HTTPException(503, "Recovery required; restart service and inspect logs")
+            record = next((r for r in self.records if r.port == port), None)
+            if record is None and port not in self.broken_ports:
+                raise HTTPException(404, "Proxy not found")
+            if expected_id is not None and (record is None or record.id != expected_id):
+                raise HTTPException(412, "Proxy identity does not match If-Match")
+            if port in self.broken_ports:
+                try:
+                    self.backend.recover(port, record)
+                except Exception:
+                    logger.exception("Recovery of port %s failed; it stays fenced", port)
+                    raise HTTPException(503, f"Port {port} is still fenced; inspect its log and retry")
+                self.broken_ports.discard(port)
+                logger.info("Port %s recovered", port)
+            if record is None:
+                return 204, None
+            return 200, {**self.view(record), "status": self.statuses([record])[port]}
 
     def view(self, record):
         body = record.model_dump(mode="json", exclude={"password"})

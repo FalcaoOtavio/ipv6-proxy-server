@@ -70,6 +70,28 @@ def test_each_proxy_is_independent_and_adopted_on_api_restart(setup):
     finally:
         manager.close()
 
+def test_fenced_port_recovers_alone_without_api_restart(setup):
+    settings, manager, ports = setup
+    a, b, c = ports[:3]
+    for port in (a, b, c):
+        create(manager, port)
+    before = pids(manager, (a, b, c))
+    # Fence A as a failed operation+compensation would: its process gone, port fenced.
+    os.kill(before[a], signal.SIGKILL)
+    time.sleep(0.2)
+    manager.broken_ports.add(a)
+    record = next(r for r in manager.records if r.port == a)
+    status, body = manager.recover(a, record.id)
+    assert status == 200 and body["status"] == "running" and a not in manager.broken_ports
+    assert serves(a) and pids(manager, (a,))[a] not in (None, before[a])
+    assert pids(manager, (b, c)) == {b: before[b], c: before[c]}
+    # Fenced while still up with its committed config (the E2E #2 case): adopted, same PID.
+    up = pids(manager, (b,))[b]
+    manager.broken_ports.add(b)
+    manager.backend.serving.pop(b)
+    assert manager.recover(b)[1]["status"] == "running"
+    assert pids(manager, (b, c)) == {b: up, c: before[c]} and manager.backend.healthy(manager.records)
+
 def test_readiness_rejects_a_port_owned_by_another_process(setup):
     settings, manager, ports = setup
     squatter = socket.socket()

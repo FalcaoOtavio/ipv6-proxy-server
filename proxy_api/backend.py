@@ -4,11 +4,12 @@ import os
 import socket
 import subprocess
 import time
+from functools import partial
 from ipaddress import IPv6Address
 from pathlib import Path
 
 from .instance_address import address_path
-from .supervisor import LocalProcessSupervisor, SystemdSupervisor
+from .supervisor import LocalProcessSupervisor, SystemdSupervisor, command_timeout, run_command
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +96,8 @@ class LinuxBackend:
         self.config_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         if supervisor is None:
             supervisor = (LocalProcessSupervisor(settings.binary, self.config_dir)
-                          if settings.supervisor == "local" else SystemdSupervisor())
+                          if settings.supervisor == "local"
+                          else SystemdSupervisor(run=partial(run_command, timeout=command_timeout(settings.ready_timeout))))
         self.supervisor = supervisor
         self.serving = {}  # port -> record this backend last brought up or adopted
         self.addresses = set()
@@ -283,16 +285,9 @@ class LinuxBackend:
         launched = []
         for record in records:
             try:
-                self._claim(record.ipv6, existing)
-                existing.add(str(record.ipv6))
-                self._write_address(record)
-                path = self.config_path(record.port)
-                current = path.read_text() if path.exists() else None
-                if current == render_config(self.settings, record) and self.ready(record.port):
-                    self.serving[record.port] = record  # adopted: same PID, sessions intact
-                else:
-                    self._launch(record)
-                    launched.append((record, time.monotonic()))
+                since = self._bring_up(record, existing)
+                if since is not None:
+                    launched.append((record, since))
             except Exception:
                 logger.exception("Could not bring up proxy on port %s; fencing it", record.port)
                 failed.add(record.port)
@@ -310,6 +305,46 @@ class LinuxBackend:
             self._release(address)
         self.settle()
         return failed
+
+    def _bring_up(self, record, existing):
+        """Adopt this instance if it already serves its config, else (re)launch it.
+
+        Returns None when adopted, else the launch time its readiness counts from.
+        """
+        self._claim(record.ipv6, existing)
+        existing.add(str(record.ipv6))
+        self._write_address(record)
+        path = self.config_path(record.port)
+        current = path.read_text() if path.exists() else None
+        if current == render_config(self.settings, record) and self.ready(record.port):
+            self.serving[record.port] = record  # adopted: same PID, sessions intact
+            return None
+        self._launch(record)
+        return time.monotonic()  # after the call: a slow systemctl does not eat the readiness budget
+
+    def recover(self, port, record=None):
+        """Re-evaluate one fenced port; touches no other instance.
+
+        With its record: adopt it if already up with its config, else bring it
+        up. Without (fenced mid-create): make sure nothing serves on it.
+        """
+        self.serving.pop(port, None)
+        if record is None:
+            self.supervisor.stop(port)
+            try:
+                address = json.loads(address_path(self.config_dir, port).read_text())["ipv6"]
+            except (OSError, ValueError, KeyError, TypeError):
+                address = None
+            self.config_path(port).unlink(missing_ok=True)
+            address_path(self.config_dir, port).unlink(missing_ok=True)
+            if address is not None:
+                self._release(address)  # only if it is in our journal and unused
+        else:
+            since = self._bring_up(record, self.existing_addresses())
+            if since is not None:
+                self._wait_ready(port, since)
+                self.serving[port] = record
+        self.settle([port])
 
     def _orphan_addresses(self):
         found = set()

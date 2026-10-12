@@ -118,7 +118,13 @@ def create_app(settings=None, backend_factory=LinuxBackend):
                 # Per-item status replaces the all-or-503 health gate: it reports the failure itself.
                 statuses = manager.statuses(visible)
                 return [{**manager.view(record), "status": statuses[record.port]} for record in visible]
-            if manager.broken or not manager.backend.healthy(visible):
+            if manager.broken:
+                raise HTTPException(503, "3proxy unavailable; inspect service logs")
+            fenced = sorted(r.port for r in visible if r.port in manager.broken_ports)
+            if fenced:
+                raise HTTPException(503, f"Fenced port(s) {', '.join(map(str, fenced))}; see "
+                                         "GET /proxies?include=status and POST /proxies/{port}/recover (admin)")
+            if not manager.backend.healthy(visible):
                 raise HTTPException(503, "3proxy unavailable; inspect service logs")
             return [manager.view(record) for record in visible]
 
@@ -157,6 +163,18 @@ def create_app(settings=None, backend_factory=LinuxBackend):
                      expected=Depends(if_match)):
         return run(owner, key, ["POST", f"/proxies/{port}/rotate", expected],
                    lambda: app.state.manager.plan_rotate(port, owner, expected))
+
+    @app.post("/proxies/{port}/recover", response_model=Optional[ProxyStatusView])
+    def recover_proxy(port: int, owner=Depends(principal), key=Depends(idempotency_key),
+                      expected=Depends(if_match)):
+        """Admin: re-evaluate one fenced port (adopt if up, else bring it up).
+
+        Idempotent by nature: a port that is not fenced is left untouched and
+        its status returned, so Idempotency-Key is only validated, not stored."""
+        if owner is not None:  # None only for the admin token without X-Proxy-Owner
+            raise HTTPException(403, "Admin token required (without X-Proxy-Owner)")
+        status, body = app.state.manager.recover(port, expected)
+        return Response(status_code=status) if body is None else JSONResponse(body, status_code=status)
 
     @app.delete("/proxies/{port}", status_code=204)
     def delete_proxy(port: int, owner=Depends(principal), key=Depends(idempotency_key),
