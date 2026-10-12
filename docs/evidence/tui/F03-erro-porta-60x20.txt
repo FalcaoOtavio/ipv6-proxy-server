@@ -15,6 +15,6 @@
 │    Confirmar         Cancelar                            │
 ╰──────────────────────────────────────────────────────────╯
                                                             
-                                                            
  ✓ 0 proxy(s).                                              
-? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exp
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            

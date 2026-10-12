@@ -3,7 +3,7 @@
 │ Quantidade                                               │
 │ 3                                                        │
 │ Porta inicial (vazio = início da faixa)                  │
-│ 44323                                                    │
+│ 55228                                                    │
 │ Protocolo                                                │
 │ HTTP                                                  ▼  │
 │ Credenciais                                              │
@@ -17,4 +17,4 @@
 │ (PROXY_BATCH_MAX).                                       │
 │    Confirmar         Cancelar                            │
 ╰──────────────────────────────────────────────────────────╯
-? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exp
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            

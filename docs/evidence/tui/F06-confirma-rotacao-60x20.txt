@@ -1,12 +1,12 @@
- Porta  Status    Proto   Usuário  Senha  IPv6              
- 44313  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.38 
- 44315  ● ativo   HTTP    bob      ••••   ::ffff:127.0.0.24 
+ Porta  Status   Proto  Usuário  Senha  IPv6                
+ 55218  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.94   
+ 55220  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.45   
                                                             
                                                             
                                                             
                                                             
 ╭──────────────────────────────────────────────────────────╮
-│ Rotacionar o IPv6 da porta 44315?                        │
+│ Rotacionar o IPv6 da porta 55220?                        │
 │ Só o 3proxy desta porta reinicia; as sessões dela caem.  │
 │                                                          │
 │    Confirmar         Cancelar                            │
@@ -15,6 +15,6 @@
                                                             
                                                             
                                                             
-                                                            
- ✓ Proxy 44314 atualizado: porta 44315, HTTP.               
-? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exp
+ ✓ Proxy 55219 atualizado: porta 55220, HTTP.               
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            

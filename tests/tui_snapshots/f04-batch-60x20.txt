@@ -18,4 +18,4 @@ IPv6 Proxy Server
 │✕ Usuário: 1-64 caracteres entre letras, números, _ . -│
 │ Confirmar Cancelar │
 ╰──────────────────────────────────────────────────────────╯
-? Ajudac Criarl Lotee Editarr Rotacionard Excluirx Exp
+? Ajuda c Criar a Recarregar s Senha q Sair

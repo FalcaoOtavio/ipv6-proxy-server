@@ -19,6 +19,6 @@
         │                                                              │        
         │ Cada alteração reinicia só o 3proxy da porta afetada e       │        
         │ derruba as sessões dela; as demais portas não são tocadas.   │        
-        │ O alvo é fixado ao abrir a ação: mudar a seleção depois      │        
- ✓ 0 pro│ não muda o proxy afetado.                                 ▇▇ │        
-? Ajuda ╰──────────────────────────────────────────────────────────────╯a a Reca
+ ✓ 0 pro│ O alvo é fixado ao abrir a ação: mudar a seleção depois      │        
+ l Lote │ não muda o proxy afetado.                                 ▇▇ │        
+ ? Ajuda╰──────────────────────────────────────────────────────────────╯        

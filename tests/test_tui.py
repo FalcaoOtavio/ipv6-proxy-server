@@ -95,6 +95,14 @@ async def fill(pilot, app, **values):
         app.screen.query_one(f"#{name}").value = value
     await pilot.pause()
 
+async def click_ok(pilot, app):
+    """Button ignores clicks for 0.2 s after a press (-active): a fast second submit was dropped."""
+    deadline = time.monotonic() + 2
+    while app.screen.query_one("#ok").has_class("-active"):
+        assert time.monotonic() < deadline, "#ok stayed pressed"
+        await pilot.pause(0.02)
+    await pilot.click("#ok")
+
 UPDATE_SNAPSHOTS = os.environ.get("UPDATE_SNAPSHOTS") == "1"
 SNAPSHOT_SETTLE_S = 3.0
 # Also eats a trailing ':' left when a narrow column truncates the address.
@@ -210,16 +218,16 @@ async def test_f03_create_with_inline_validation(api, size):
         await pilot.pause()
         assert app.screen.query_one("#password", Input).password
         await fill(pilot, app, port="80", username="alice", password="s3cret")
-        await pilot.click("#ok")
+        await click_ok(pilot, app)
         await pilot.pause()
         assert "Porta deve ser" in str(app.screen.query_one("#error", Static).render())
         await fill(pilot, app, port="30002", username="bad user")
-        await pilot.click("#ok")
+        await click_ok(pilot, app)
         await pilot.pause()
         assert "Usuário" in str(app.screen.query_one("#error", Static).render())
         await fill(pilot, app, username="alice", protocol="socks5")
         await snapshot(pilot, app, f"f03-create-{size[0]}x{size[1]}")
-        await pilot.click("#ok")
+        await click_ok(pilot, app)
         await settle(pilot, app, lambda: rows(app))
         assert "Proxy criado na porta 30002" in status(app)
         assert rows(app)[0][:3] == ["30002", "● ativo", "SOCKS5"]
@@ -236,16 +244,16 @@ async def test_f04_batch_random_and_conflict(api, size):
         await pilot.press("l")
         await pilot.pause()
         await fill(pilot, app, count="0")
-        await pilot.click("#ok")
+        await click_ok(pilot, app)
         await pilot.pause()
         assert "Quantidade" in str(app.screen.query_one("#error", Static).render())
         await fill(pilot, app, count="3", start="30010", mode="common", username="", password="")
-        await pilot.click("#ok")
+        await click_ok(pilot, app)
         await pilot.pause()
         assert "Usuário" in str(app.screen.query_one("#error", Static).render())
         await fill(pilot, app, mode="random", username="cli", protocol="socks5")
         await snapshot(pilot, app, f"f04-batch-{size[0]}x{size[1]}")
-        await pilot.click("#ok")
+        await click_ok(pilot, app)
         await settle(pilot, app, lambda: len(rows(app)) == 4)
         result = str(app.screen.query(Static)[1].render())
         assert "Criados: 3 (portas 30010–30013)" in result and "exporte" in result
@@ -256,7 +264,7 @@ async def test_f04_batch_random_and_conflict(api, size):
         await pilot.press("l")
         await pilot.pause()
         await fill(pilot, app, count="200")
-        await pilot.click("#ok")
+        await click_ok(pilot, app)
         await settle(pilot, app)
         assert "Conflito" in status(app)
         assert len(api.records()) == 4
@@ -273,7 +281,7 @@ async def test_f05_edit_and_port_conflict(api, size):
         await pilot.press("e")
         await pilot.pause()
         await fill(pilot, app, port="30021")
-        await pilot.click("#ok")
+        await click_ok(pilot, app)
         await settle(pilot, app)
         assert "Conflito" in status(app)
         assert api.records()[30020].username == "bob" and api.records()[30021] == before
@@ -281,7 +289,7 @@ async def test_f05_edit_and_port_conflict(api, size):
         await pilot.pause()
         await fill(pilot, app, port="30030", protocol="socks5", username="carol", password="new2")
         await snapshot(pilot, app, f"f05-edit-{size[0]}x{size[1]}")
-        await pilot.click("#ok")
+        await click_ok(pilot, app)
         await settle(pilot, app, lambda: "atualizado" in status(app))
         moved = api.records()[30030]
         assert (moved.protocol, moved.username, moved.password) == ("socks5", "carol", "new2")
@@ -305,14 +313,14 @@ async def test_f06_rotate_and_delete_with_typed_confirmation(api, size):
         assert api.records()[30040].ipv6 == old
         await pilot.press("r")
         await pilot.pause()
-        await pilot.click("#ok")
+        await click_ok(pilot, app)
         await settle(pilot, app, lambda: "novo IPv6" in status(app))
         assert api.records()[30040].ipv6 != old and api.records()[30041] == other
         assert str(api.records()[30040].ipv6) in status(app)
         await pilot.press("d")
         await pilot.pause()
         await fill(pilot, app, confirm="30041")
-        await pilot.click("#ok")
+        await click_ok(pilot, app)
         await pilot.pause()
         assert "Digite exatamente 30040" in str(app.screen.query_one("#error", Static).render())
         await snapshot(pilot, app, f"f06-delete-{size[0]}x{size[1]}")
@@ -322,7 +330,7 @@ async def test_f06_rotate_and_delete_with_typed_confirmation(api, size):
         await pilot.press("d")
         await pilot.pause()
         await fill(pilot, app, confirm="30040")
-        await pilot.click("#ok")
+        await click_ok(pilot, app)
         await settle(pilot, app, lambda: len(rows(app)) == 1)
         assert set(api.records()) == {30041} and api.records()[30041] == other
 
@@ -338,7 +346,7 @@ async def test_f06_race_rotate_pins_target_while_selection_moves(api):
         api.backend.entered.clear()
         await pilot.press("r")
         await pilot.pause()
-        await pilot.click("#ok")
+        await click_ok(pilot, app)
         for _ in range(100):
             if api.backend.entered.is_set():
                 break
@@ -368,7 +376,7 @@ async def test_f06_stale_target_is_rejected_by_if_match(api):
         api.client.create({"port": 30060})
         heir = api.records()[30060]
         await fill(pilot, app, confirm="30060")
-        await pilot.click("#ok")
+        await click_ok(pilot, app)
         await settle(pilot, app)
         assert "mudou desde a seleção" in status(app)
         assert api.records()[30060] == heir
@@ -384,13 +392,13 @@ async def test_f07_reveal_and_export(api, size, tmp_path, monkeypatch):
         await pilot.press("c")
         await pilot.pause()
         await fill(pilot, app, port="30071", username="dora", password="Secr3t")
-        await pilot.click("#ok")
+        await click_ok(pilot, app)
         await pilot.press("c")
         await settle(pilot, app, lambda: len(rows(app)) == 2)
         await pilot.press("c")
         await pilot.pause()
         await fill(pilot, app, port="30072")
-        await pilot.click("#ok")
+        await click_ok(pilot, app)
         await settle(pilot, app, lambda: len(rows(app)) == 3)
         assert [r[4] for r in rows(app)] == ["n/d", "••••", "—"]
         await pilot.press("home", "s")
@@ -409,7 +417,7 @@ async def test_f07_reveal_and_export(api, size, tmp_path, monkeypatch):
         target = tmp_path / f"out-{size[0]}.txt"
         await fill(pilot, app, path=str(target))
         await snapshot(pilot, app, f"f07-export-{size[0]}x{size[1]}")
-        await pilot.click("#ok")
+        await click_ok(pilot, app)
         await settle(pilot, app)
         assert str(target) in status(app)
         assert target.read_text() == "127.0.0.1:30071:dora:Secr3t\n127.0.0.1:30072\n"
@@ -417,7 +425,7 @@ async def test_f07_reveal_and_export(api, size, tmp_path, monkeypatch):
         await pilot.press("x")
         await pilot.pause()
         await fill(pilot, app, path=str(target))
-        await pilot.click("#ok")
+        await click_ok(pilot, app)
         await settle(pilot, app)
         assert "já existe" in status(app)
 
@@ -463,12 +471,12 @@ async def test_a6_export_to_unknown_user_home_shows_generic_error(api, tmp_path)
         await pilot.press("c")
         await pilot.pause()
         await fill(pilot, app, port="30090", username="eve", password="TopS3cretPw")
-        await pilot.click("#ok")
+        await click_ok(pilot, app)
         await settle(pilot, app, lambda: rows(app))
         await pilot.press("x")
         await pilot.pause()
         await fill(pilot, app, path="~usuarioinexistente/x")
-        await pilot.click("#ok")
+        await click_ok(pilot, app)
         await settle(pilot, app)
         assert app.is_running and app.screen is app.screen_stack[0]
         assert "caminho inválido" in status(app) and "TopS3cretPw" not in status(app)
@@ -485,7 +493,7 @@ async def test_a6_unexpected_exception_in_action_is_generic(api, monkeypatch):
         await pilot.press("c")
         await pilot.pause()
         await fill(pilot, app, username="eve", password="TopS3cretPw")
-        await pilot.click("#ok")
+        await click_ok(pilot, app)
         await settle(pilot, app)
         assert app.is_running and "Erro inesperado" in status(app)
         assert "TopS3cretPw" not in status(app)
@@ -520,17 +528,17 @@ async def test_batch_limit_follows_api_and_partial_is_sent(tmp_path):
             await pilot.press("l")
             await pilot.pause()
             await fill(pilot, app, count="6")
-            await pilot.click("#ok")
+            await click_ok(pilot, app)
             await settle(pilot, app)
             assert "limite da API (5" in status(app) and app.batch_max == 5
             await pilot.press("l")
             await pilot.pause()
             await fill(pilot, app, count="6")
-            await pilot.click("#ok")
+            await click_ok(pilot, app)
             await pilot.pause()
             assert "entre 1 e 5" in str(app.screen.query_one("#error", Static).render())
             await fill(pilot, app, count="3", partial=True)
-            await pilot.click("#ok")
+            await click_ok(pilot, app)
             await settle(pilot, app, lambda: len(rows(app)) == 2)
             result = str(app.screen.query(Static)[1].render())
             assert "Falhas: 1 — 30001" in result
@@ -548,7 +556,7 @@ async def test_reload_is_blocked_during_mutation(api):
         api.backend.entered.clear()
         await pilot.press("r")
         await pilot.pause()
-        await pilot.click("#ok")
+        await click_ok(pilot, app)
         for _ in range(100):
             if api.backend.entered.is_set():
                 break
@@ -558,3 +566,50 @@ async def test_reload_is_blocked_during_mutation(api):
         assert "Aguarde" in status(app) and not any(w.group == "refresh" and w.is_running for w in app.workers)
         api.backend.gate.set()
         await settle(pilot, app, lambda: "novo IPv6" in status(app))
+
+def visible(app):
+    return "\n".join(screen_text(app.export_screenshot()))
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("size", SIZES)
+async def test_f02_footer_shows_essential_keys(api, size):
+    app = tui(api)
+    async with app.run_test(size=size) as pilot:
+        await settle(pilot, app)
+        bottom = "\n".join(visible(app).splitlines()[-2:])
+        for key in ("? Ajuda", "c Criar", "l Lote", "e Editar", "r Rotacionar", "d Excluir", "x Exportar",
+                    "s Senha", "a Recarregar", "q Sair"):
+            assert key in bottom, f"{key!r} missing from footer at {size}: {bottom!r}"
+
+class LiteralClient:
+    """Data that looks like Rich markup/emoji codes must reach the screen verbatim."""
+    IPV6 = "2001:db8:abcd:1234::1"
+
+    def list_with_status(self):
+        return [{"id": "p1", "port": 30001, "protocol": "http", "username": "[bold]u[/bold]",
+                 "ipv6": self.IPV6, "ipv4": "127.0.0.1", "status": "running"}]
+
+    def delete(self, target):
+        from proxy_tui.client import ApiError
+        raise ApiError("falhou [bold]x[/bold] :1234: [@click=app.quit]y[/]")
+
+@pytest.mark.asyncio
+async def test_f01_data_is_never_parsed_as_markup_or_emoji():
+    app = ProxyTui(LiteralClient(), refresh_seconds=0)
+    async with app.run_test(size=(100, 24)) as pilot:
+        await settle(pilot, app)
+        assert rows(app)[0][3] == "[bold]u[/bold]" and rows(app)[0][5] == LiteralClient.IPV6
+        screen = visible(app)
+        assert LiteralClient.IPV6 in screen and "[bold]u[/bold]" in screen
+        await pilot.press("d")
+        await pilot.pause()
+        await fill(pilot, app, confirm="999")
+        await click_ok(pilot, app)
+        await pilot.pause()
+        assert "Digite exatamente 30001" in str(app.screen.query_one("#error", Static).render())
+        await fill(pilot, app, confirm="30001")
+        await click_ok(pilot, app)
+        await settle(pilot, app, lambda: "falhou" in status(app))
+        assert "falhou [bold]x[/bold] :1234: [@click=app.quit]y[/]" in status(app)
+        assert "falhou [bold]x[/bold] :1234:" in visible(app)
+        assert app.is_running

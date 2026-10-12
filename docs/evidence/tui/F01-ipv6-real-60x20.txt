@@ -1,5 +1,5 @@
-   Proto  Usuário  Senha  IPv6                              
-o  HTTP   —        —      2001:db8:abcd🔢409:ccc9:9a9d:294f 
+oto  Usuário  Senha  IPv6                                   
+TP   —        —      2001:db8:abcd:1234:7f92:3171:a769:61ef 
                                                             
                                                             
                                                             
@@ -14,7 +14,7 @@ o  HTTP   —        —      2001:db8:abcd🔢409:ccc9:9a9d:294f
                                                             
                                                             
                                                             
-                                                            
-           ▎                                                
+              ▍                                             
  ✓ 1 proxy(s).                                              
-? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exp
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            

@@ -12,4 +12,5 @@ IPv6 Proxy Server
 ╰──────────────────────────────────────────────────────────────╯
 ✓ Porta 30040: novo IPv6 <ipv6> (era
 <ipv6>).
-? Ajudac Criarl Lotee Editarr Rotacionard Excluirx Exportars Senhaa Reca
+l Lote e Editar r Rotacionar d Excluir x Exportar
+? Ajuda c Criar a Recarregar s Senha q Sair

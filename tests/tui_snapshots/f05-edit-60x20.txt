@@ -16,6 +16,6 @@ IPv6 Proxy Server
 ││
 │ Confirmar Cancelar │
 ╰──────────────────────────────────────────────────────────╯
-✕ Conflito: porta já em uso ou faixa de portas esgotada.
 Nada foi alterado.
-? Ajudac Criarl Lotee Editarr Rotacionard Excluirx Exp
+l Lote e Editar r Rotacionar d Excluir x Exportar
+? Ajuda c Criar a Recarregar s Senha q Sair

@@ -4,4 +4,5 @@ IPv6 Proxy Server
  30071 ● ativo HTTP dora Secr3t <ipv6>
  30072 ● ativo HTTP — — <ipv6>
 ✓ Senha da porta 30071 visível.
-? Ajudac Criarl Lotee Editarr Rotacionard Excluirx Exp
+l Lote e Editar r Rotacionar d Excluir x Exportar
+? Ajuda c Criar a Recarregar s Senha q Sair
