@@ -12,12 +12,13 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from .backend import LinuxBackend
 from .config import Settings
 from .manager import Manager, fingerprint
-from .models import ID_PATTERN, OWNER_PATTERN, ProxyCreate, ProxyView
+from .models import (ID_PATTERN, OWNER_PATTERN, BatchCreate, ProxyCreate, ProxyStatusView, ProxyUpdate,
+                     ProxyView)
 
 SPEC = "ashford.proxy/1"
-# Announce only what tests/test_isolation_3proxy.py proves against real 3proxy.
+# Announce only what tests/test_isolation_3proxy.py and test_supervisor_3proxy.py prove against real 3proxy.
 CAPABILITIES = ["isolated_mutations", "owner_scoping", "idempotency_keys", "conditional_mutations",
-                "socks5_udp_associate"]
+                "socks5_udp_associate", "edit", "batch", "per_proxy_status"]
 IDEMPOTENCY_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 
 def load_client_tokens(path):
@@ -90,8 +91,8 @@ def create_app(settings=None, backend_factory=LinuxBackend):
             raise HTTPException(422, "Invalid If-Match")
         return value
 
-    def run(owner, key, request_parts, plan, pinned=False):
-        status, body = app.state.manager.mutate(owner or "", key, fingerprint(*request_parts), plan, pinned)
+    def run(owner, key, request_parts, plan, pinned=False, partial=False):
+        status, body = app.state.manager.mutate(owner or "", key, fingerprint(*request_parts), plan, pinned, partial)
         return Response(status_code=status) if body is None else JSONResponse(body, status_code=status)
 
     @app.get("/capabilities")
@@ -108,6 +109,27 @@ def create_app(settings=None, backend_factory=LinuxBackend):
             if manager.broken or not manager.backend.healthy(visible):
                 raise HTTPException(503, "3proxy unavailable; inspect service logs")
             return [manager.view(record) for record in visible]
+
+    @app.get("/proxies/{port}", response_model=ProxyStatusView)
+    def get_proxy(port: int, owner=Depends(principal)):
+        """One proxy with its status; answers even when that proxy is down."""
+        manager = app.state.manager
+        with manager.lock:
+            record = manager.get(port, owner)
+            return {**manager.view(record), "status": manager.statuses([record])[port]}
+
+    @app.post("/proxies/batch", status_code=201)
+    def create_batch(request: BatchCreate, owner=Depends(principal), key=Depends(idempotency_key)):
+        if owner is not None and request.owner not in (None, owner):
+            raise HTTPException(403, "Token cannot create proxies for another owner")
+        return run(owner, key, ["POST", "/proxies/batch", request.model_dump(mode="json")],
+                   lambda: app.state.manager.plan_batch(request, owner), partial=request.partial)
+
+    @app.patch("/proxies/{port}", response_model=ProxyView)
+    def update_proxy(port: int, request: ProxyUpdate, owner=Depends(principal), key=Depends(idempotency_key),
+                     expected=Depends(if_match)):
+        parts = ["PATCH", f"/proxies/{port}", expected, request.model_dump(mode="json", include=request.model_fields_set)]
+        return run(owner, key, parts, lambda: app.state.manager.plan_update(port, request, owner, expected))
 
     @app.post("/proxies", response_model=ProxyView, status_code=201)
     def create_proxy(request: ProxyCreate, owner=Depends(principal), key=Depends(idempotency_key)):

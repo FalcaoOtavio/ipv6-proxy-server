@@ -21,6 +21,7 @@ class Settings(BaseModel):
     # systemd: one ipv6-proxy@<port>.service per proxy (production).
     # local: detached processes with pidfiles, for dev/tests without systemd.
     supervisor: Literal["systemd", "local"] = "systemd"
+    batch_max: int = Field(default=1000, ge=1, le=10000)
 
     @model_validator(mode="after")
     def validate_ranges(self):
@@ -42,5 +43,6 @@ class Settings(BaseModel):
             "data_dir": "PROXY_DATA_DIR", "binary": "PROXY_3PROXY_BINARY",
             "port_start": "PROXY_PORT_START", "port_end": "PROXY_PORT_END",
             "client_tokens_file": "PROXY_CLIENT_TOKENS_FILE", "supervisor": "PROXY_SUPERVISOR",
+            "batch_max": "PROXY_BATCH_MAX",
         }
         return cls(**{key: os.environ[name] for key, name in names.items() if name in os.environ})

@@ -24,7 +24,8 @@ logger = logging.getLogger(__name__)
 
 # Fixed by deploy/ipv6-proxy@.service (ExecStart reads %i.cfg from here).
 SYSTEMD_CONFIG_DIR = Path("/var/lib/ipv6-proxy-api/proxies")
-UNIT_PATTERN = re.compile(r"^ipv6-proxy@(\d+)\.service\b", re.MULTILINE)
+STOP_TIMEOUT = 2  # seconds before SIGKILL; matches TimeoutStopSec= intent for a stateless proxy
+UNIT_PATTERN = re.compile(r"^ipv6-proxy@(\d+)\.service\s+\S+\s+(\S+)\s+(\S+)", re.MULTILINE)
 
 def _port(port):
     port = int(port)
@@ -40,6 +41,7 @@ class Supervisor(Protocol):
     def is_active(self, port: int) -> bool: ...
     def list_managed(self) -> set: ...
     def list_active(self) -> set: ...
+    def list_states(self) -> dict: ...
 
 def run_command(argv, check=True):
     try:
@@ -82,17 +84,19 @@ class SystemdSupervisor:
         value = self._systemctl("show", "--property=MainPID", "--value", self.unit(port)).stdout.strip()
         return int(value or 0) or None
 
-    def _list(self, *state):
+    def list_states(self):
+        """port -> active | activating | failed | ...; one read for the whole pool (read-only)."""
         out = self._systemctl("list-units", "--all", "--plain", "--no-legend", "--type=service",
-                              *state, "ipv6-proxy@*.service").stdout
-        return {int(port) for port in UNIT_PATTERN.findall(out)}
+                              "ipv6-proxy@*.service").stdout
+        # A unit waiting for Restart=on-failure is "activating", sub "auto-restart".
+        return {int(port): "activating" if sub == "auto-restart" else active
+                for port, active, sub in UNIT_PATTERN.findall(out)}
 
     def list_managed(self):
-        return self._list()
+        return set(self.list_states())
 
     def list_active(self):
-        # One read for the whole pool, so health checks stay O(1) commands.
-        return self._list("--state=active")
+        return {port for port, state in self.list_states().items() if state == "active"}
 
 def _starttime(pid):
     """Kernel start time of a live (non-zombie) pid; None otherwise. Guards against pid reuse."""
@@ -152,12 +156,14 @@ class LocalProcessSupervisor:
     def stop(self, port):
         pid = self.main_pid(port)
         if pid is not None:
-            os.kill(pid, signal.SIGTERM)
-            deadline = time.monotonic() + 10
+            # Same as KillSignal= of the unit: 3proxy exits at once on SIGINT
+            # (default action), while SIGTERM takes ~5 s in its own loop.
+            os.kill(pid, signal.SIGINT)
+            deadline = time.monotonic() + STOP_TIMEOUT
             while self.main_pid(port) is not None and time.monotonic() < deadline:
                 time.sleep(0.02)
             if self.main_pid(port) is not None:
-                logger.warning("proxy %s ignored SIGTERM; killing pid %s", port, pid)
+                logger.warning("proxy %s ignored SIGINT; killing pid %s", port, pid)
                 os.kill(pid, signal.SIGKILL)
                 while self.main_pid(port) is not None:
                     time.sleep(0.02)
@@ -173,3 +179,6 @@ class LocalProcessSupervisor:
 
     def list_active(self):
         return {port for port in self.list_managed() if self.is_active(port)}
+
+    def list_states(self):
+        return {port: "active" if self.is_active(port) else "failed" for port in self.list_managed()}

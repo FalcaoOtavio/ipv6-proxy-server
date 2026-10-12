@@ -88,3 +88,53 @@ def test_readiness_rejects_a_port_owned_by_another_process(setup):
         assert ports[0] not in {r.port for r in manager.records}
     finally:
         squatter.close()
+
+def test_edit_batch_and_status_against_real_3proxy(tmp_path):
+    from fastapi.testclient import TestClient
+    from proxy_api.app import create_app
+    from proxy_api.config import Settings
+    from test_isolation_3proxy import EchoServer, tunnel, Heartbeat
+    ports = sorted(free_ports(6))
+    settings = Settings(subnet="::ffff:127.0.0.0/120", bind_ipv4="127.0.0.1", interface="lo", api_token=ADMIN,
+                        data_dir=tmp_path, binary=BINARY, port_start=ports[0], port_end=ports[-1], supervisor="local")
+    echo = EchoServer()
+    try:
+        with TestClient(create_app(settings, LoopbackBackend)) as client:
+            client.headers["Authorization"] = "Bearer " + ADMIN
+            b = client.post("/proxies", json={"port": ports[0], "protocol": "socks5",
+                                              "username": "bob", "password": "bob-pw"}).json()
+            stream, _ = tunnel({**b, "password": "bob-pw"}, echo)
+            beat = Heartbeat(stream)
+            beat.start()
+            supervisor = client.app.state.manager.backend.supervisor
+            b_pid = supervisor.main_pid(b["port"])
+            try:
+                made = client.post("/proxies/batch", json={"count": 2, "start_port": ports[1],
+                                                           "credentials": "random", "username": "r"})
+                assert made.status_code == 201, made.text
+                created = made.json()["created"]
+                for item in created:
+                    sock, egress = tunnel(item, echo)
+                    sock.close()
+                    assert egress == item["ipv6"]
+                a = created[0]
+                # Port move: new instance up, old one gone, same id/ipv6; B untouched.
+                moved = client.patch(f"/proxies/{a['port']}", json={"port": ports[4], "protocol": "http"})
+                assert moved.status_code == 200, moved.text
+                assert (moved.json()["id"], moved.json()["ipv6"]) == (a["id"], a["ipv6"])
+                assert not serves(a["port"])
+                sock, egress = tunnel({**moved.json(), "password": a["password"]}, echo)
+                sock.close()
+                assert egress == a["ipv6"]
+                assert client.get(f"/proxies/{ports[4]}").json()["status"] == "running"
+                os.kill(supervisor.main_pid(ports[4]), signal.SIGKILL)
+                time.sleep(0.2)
+                assert client.get(f"/proxies/{ports[4]}").json()["status"] == "failed"
+                assert client.get(f"/proxies/{b['port']}").json()["status"] == "running"
+                assert beat.alive_for(0.3) and supervisor.main_pid(b["port"]) == b_pid
+            finally:
+                beat.halt.set()
+                stream.close()
+    finally:
+        echo.close()
+        stop_all(settings)

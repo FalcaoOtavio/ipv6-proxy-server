@@ -10,7 +10,7 @@ from threading import RLock
 from fastapi import HTTPException
 
 from .backend import atomic_json
-from .models import ProxyRecord
+from .models import ProxyRecord, ProxyUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -82,8 +82,8 @@ class Manager:
                                 "proxies": [record.model_dump(mode="json") for record in records],
                                 "idempotency": keys})
 
-    def _address(self):
-        used = {int(r.ipv6) for r in self.records}
+    def _address(self, taken=()):
+        used = {int(r.ipv6) for r in self.records} | {int(ip) for ip in taken}
         used |= {int(IPv6Address(ip)) for ip in self.backend.existing_addresses()}
         network = self.settings.subnet
         base = int(network.network_address)
@@ -96,12 +96,14 @@ class Manager:
             candidate = candidate % capacity + 1
         return IPv6Address(base + candidate)
 
-    def _commit(self, records, keys):
-        """Apply only the changed ports, then persist records + keys in one atomic rename.
+    def _commit(self, records, partial=False):
+        """Bring the backend from self.records to records, touching only changed ports.
 
-        The rename is the commit point. A crash before it leaves the previous
-        state on disk and the next start converges the processes back to it, so
-        a retried key performs the mutation exactly once from the API's view.
+        New/edited ports go first and removals last, so a port move starts the
+        new instance before stopping the old one. Without partial, any failure
+        undoes the ports already done and raises 503. With partial, a failed
+        port is undone alone and the rest stays. Returns (done, failed): done
+        is the list of (before, after) transitions now live.
         """
         if self.broken:
             raise HTTPException(503, "Recovery required; restart service and inspect logs")
@@ -110,38 +112,37 @@ class Manager:
         changed = {p for p in old.keys() | new.keys() if old.get(p) != new.get(p)}
         if changed & self.broken_ports:
             raise HTTPException(503, "Port requires recovery; restart service and inspect logs")
-        done = []
-        try:
-            for port in sorted(changed):
-                done.append(port)
-                self._transition(old.get(port), new.get(port))
-            self._write(records, keys)
-        except Exception:
-            logger.exception("Proxy update failed for ports %s; restoring them", sorted(changed))
+        done, failed = [], set()
+        for port in sorted(changed, key=lambda p: (p not in new, p)):
+            step = (old.get(port), new.get(port))
             try:
-                self._write(self.records, self.keys)
+                self._transition(*step)
+                done.append(step)
             except Exception:
-                # Disk no longer trusted: refuse every write, but keep the
-                # running ports serving. Closing the backend here would drop
-                # tenants that were never part of this mutation.
-                self.broken = True
-                logger.exception("State rollback failed; writes blocked until recovery")
-            for port in reversed(done):
+                logger.exception("Proxy update failed for port %s", port)
+                self._undo([step])
+                failed.add(port)
+                if not partial:
+                    self._undo(reversed(done))
+                    raise HTTPException(503, "Proxy update failed; inspect service logs")
+        return done, failed
+
+    def _undo(self, steps):
+        for before, after in steps:
+            port = (after or before).port
+            try:
+                self._transition(after, before)
+            except Exception:
+                # Only this port is uncertain: fence it (no mutations, no
+                # process) until a restart repairs it; others are untouched.
+                self.broken_ports.add(port)
+                logger.exception("Rollback failed for port %s; it requires recovery", port)
                 try:
-                    self._transition(new.get(port), old.get(port))
+                    for record in {r.ipv6: r for r in (before, after) if r}.values():
+                        self.backend.deprovision(record)
                 except Exception:
-                    # Only this port is uncertain: fence it (no mutations, no
-                    # process) until a restart repairs it; others are untouched.
-                    self.broken_ports.add(port)
-                    logger.exception("Rollback failed for port %s; it requires recovery", port)
-                    try:
-                        for record in {r.ipv6: r for r in (old.get(port), new.get(port)) if r}.values():
-                            self.backend.deprovision(record)
-                    except Exception:
-                        self.broken = True
-                        logger.exception("Could not fence port %s; writes blocked until recovery", port)
-            raise HTTPException(503, "Proxy update failed; inspect service logs")
-        self.records, self.keys = records, keys
+                    self.broken = True
+                    logger.exception("Could not fence port %s; writes blocked until recovery", port)
 
     def _transition(self, before, after):
         """Move one port from record `before` to `after` (either may be None)."""
@@ -152,12 +153,21 @@ class Manager:
         else:
             self.backend.replace(before, after)
 
-    def mutate(self, scope, key, request_fingerprint, plan, pinned=False):
+    def mutate(self, scope, key, request_fingerprint, plan, pinned=False, partial=False):
         """Run one mutation, at most once per (scope, key).
 
-        plan() returns (records, status, body) without side effects; body is
-        the stored response and never holds passwords. A replay returns the
-        stored response; a key reused for a different request is refused.
+        plan() returns (records, status, body[, reveal]) without side effects;
+        body is the stored response and never holds passwords. body may
+        instead be a function settle(failed_ports) -> (status, body), used by
+        batches whose response depends on what came up. reveal(body) adds
+        one-time secrets to the first response only; replays never carry them.
+        A replay returns the stored response; a key reused for a different
+        request is refused.
+
+        Persisting records + keys in one atomic rename is the commit point. A
+        crash before it leaves the previous state on disk and the next start
+        converges the processes back to it, so a retried key performs the
+        mutation exactly once from the API's view.
 
         pinned keys never expire nor get evicted. DELETE without If-Match needs
         that: once its key is forgotten, a late retry is indistinguishable from
@@ -175,15 +185,37 @@ class Manager:
                 return keys[slot]["status"], keys[slot]["body"]
             if key is not None and pinned and sum(1 for v in keys.values() if v.get("pinned")) >= PINNED_MAX:
                 raise HTTPException(428, "Idempotent DELETE capacity reached; send If-Match")
-            records, status, body = plan()
+            records, status, body, *extra = plan()
+            reveal = extra[0] if extra else None
+            done, failed = self._commit(records, partial)
+            if failed:
+                previous = {r.port: r for r in self.records}
+                records = [r for r in records if r.port not in failed]
+                records += [previous[p] for p in failed if p in previous]
+            if callable(body):
+                status, body = body(failed)
             if key is not None:
                 keys[slot] = {"request": request_fingerprint, "status": status, "body": body, "at": now,
                               "pinned": pinned}
                 evictable = sorted((k for k in keys if not keys[k].get("pinned")), key=lambda k: keys[k]["at"])
                 for stale in evictable[:max(0, len(evictable) - IDEMPOTENCY_MAX)]:
                     del keys[stale]
-            self._commit(records, keys)
-            return status, body
+            try:
+                self._write(records, keys)
+            except Exception:
+                logger.exception("Persisting state failed; restoring changed ports")
+                try:
+                    self._write(self.records, self.keys)
+                except Exception:
+                    # Disk no longer trusted: refuse every write, but keep the
+                    # running ports serving. Closing the backend here would drop
+                    # tenants that were never part of this mutation.
+                    self.broken = True
+                    logger.exception("State rollback failed; writes blocked until recovery")
+                self._undo(reversed(done))
+                raise HTTPException(503, "Proxy update failed; inspect service logs")
+            self.records, self.keys = records, keys
+            return status, (reveal(body) if reveal and body is not None else body)
 
     def view(self, record):
         body = record.model_dump(mode="json", exclude={"password"})
@@ -192,6 +224,15 @@ class Manager:
     def visible(self, owner):
         """owner=None is the admin view; any other value sees only its own proxies."""
         return [r for r in self.records if owner is None or r.owner == owner]
+
+    def statuses(self, records):
+        states = self.backend.statuses([r for r in records if r.port not in self.broken_ports])
+        return {r.port: "fenced" if r.port in self.broken_ports else states[r.port] for r in records}
+
+    def _free_ports(self, start, ports):
+        if not self.settings.port_start <= start <= self.settings.port_end:
+            raise HTTPException(422, "Port outside configured range")
+        return (p for p in range(start, self.settings.port_end + 1) if p not in ports)
 
     def plan_create(self, request):
         ports = {record.port for record in self.records}
@@ -219,6 +260,63 @@ class Manager:
     def plan_rotate(self, port, owner=None, expected_id=None):
         new = self.get(port, owner, expected_id).model_copy(update={"ipv6": self._address()})
         return [new if r.port == port else r for r in self.records], 200, self.view(new)
+
+    def plan_update(self, port, update: ProxyUpdate, owner=None, expected_id=None):
+        """Edit credentials/protocol/port; id, owner and ipv6 are kept.
+
+        A port move is one transaction: the instance on the new port comes up
+        before the old one stops, so only this proxy's sessions drop.
+        """
+        current = self.get(port, owner, expected_id)
+        changes = update.model_dump(include=update.model_fields_set)
+        if changes.get("port", port) != port:
+            if changes["port"] in {r.port for r in self.records}:
+                raise HTTPException(409, "Port unavailable")
+            if not self.settings.port_start <= changes["port"] <= self.settings.port_end:
+                raise HTTPException(422, "Port outside configured range")
+        new = ProxyRecord.model_validate({**current.model_dump(), **changes})
+        records = [r for r in self.records if r.port != port] + [new]
+        return records, 200, self.view(new)
+
+    def plan_batch(self, request, owner=None):
+        """count new proxies on the next free ports from start_port, ascending.
+
+        Ports need not be contiguous: occupied ones are skipped. Everything is
+        validated (ports, unique IPv6s) before any process starts.
+        """
+        if request.count > self.settings.batch_max:
+            raise HTTPException(422, f"count above the configured limit ({self.settings.batch_max})")
+        ports = {r.port for r in self.records}
+        free = self._free_ports(request.start_port or self.settings.port_start, ports)
+        chosen = [p for _, p in zip(range(request.count), free)]
+        if len(chosen) < request.count:
+            raise HTTPException(409, "Not enough free ports in the configured range")
+        created, secrets_by_port, taken = [], {}, []
+        for port in chosen:
+            username = password = None
+            if request.credentials == "common":
+                username, password = request.username, request.password
+            elif request.credentials == "random":
+                username = f"{request.username or 'u'}{port}"
+                password = secrets.token_urlsafe(18).replace("-", "A").replace("_", "B")
+                secrets_by_port[port] = password
+            address = self._address(taken)
+            taken.append(address)
+            created.append(ProxyRecord(port=port, ipv6=address, protocol=request.protocol, username=username,
+                                       password=password, owner=owner or request.owner))
+
+        def settle(failed):
+            body = {"created": [self.view(r) for r in created if r.port not in failed],
+                    "failed": [{"port": p, "error": "proxy did not start; inspect its log"} for p in sorted(failed)]}
+            return (201 if not failed else 207), body
+
+        def reveal(body):
+            # Random passwords exist only in this first response (and the 0600 state).
+            return {**body, "created": [{**item, "password": secrets_by_port[item["port"]]}
+                                        if item["port"] in secrets_by_port else item for item in body["created"]],
+                    "failed": body["failed"]}
+
+        return [*self.records, *created], None, settle, reveal if secrets_by_port else None
 
     def plan_delete(self, port, owner=None, expected_id=None):
         self.get(port, owner, expected_id)
