@@ -1,77 +1,248 @@
 # IPv6 Proxy Server API
 
-API para criar, listar, remover e rotacionar proxies HTTP/SOCKS5, com um IPv6
-fixo por porta IPv4. Extensao FastAPI baseada no projeto de
-[Temporalitas](https://github.com/Temporalitas/ipv6-proxy-server), sob licenca MIT.
+API, CLI e TUI para criar, listar, editar, rotacionar e remover proxies HTTP e
+SOCKS5, cada um com um IPv6 de saída fixo por porta IPv4. Extensão FastAPI do
+projeto de [Temporalitas](https://github.com/Temporalitas/ipv6-proxy-server),
+sob licença MIT.
 
-## Instalacao facil
+> **Estado de validação:** testado localmente com 3proxy 0.9.4 real em
+> loopback. **Ainda não executado em Linux limpo com systemd, nem com reboot
+> real, nem com IPv6 roteado pelo provedor** (gate T14). Veja
+> [Limitações e gates](#limitações-e-gates) antes de usar em produção.
 
-Na VPS **Ubuntu 22.04/24.04/26.04 ou Debian 12/13**, com systemd e uma subnet IPv6
-dedicada roteada pelo provedor:
+## Arquitetura
 
-```bash
-curl -fsSLo install-ipv6-proxy.sh https://raw.githubusercontent.com/FalcaoOtavio/ipv6-proxy-server/main/install.sh
-sudo bash install-ipv6-proxy.sh
+```
+cliente ──IPv4:porta──▶ ipv6-proxy@<porta>.service (3proxy próprio, cfg 0600)
+                                   │ sai por um IPv6 /128 fixo da subnet
+                                   ▼
+                               destino IPv6
+
+ipv6-proxy-api.service (FastAPI, 127.0.0.1:8000) ──systemctl──▶ só a unidade alvo
+  ▲            ▲            ▲
+ CLI       TUI        curl/Swagger      (mesmo token, mesmo estado, mesma fila)
 ```
 
-Informe a subnet; o instalador sugere interface e IPv4 local, instala o 3proxy
-a API e o CLI `ipv6-proxy`, gera o token e inicia o servico automaticamente no boot.
+- **Um processo 3proxy por proxy**, cada um na unidade systemd
+  `ipv6-proxy@<porta>.service`, fora do cgroup da API
+  ([ADR-0002](#decisões)). Logs, readiness e `Restart=on-failure` são por porta.
+- A API serializa as mutações, grava o estado em
+  `/var/lib/ipv6-proxy-api/state.json` (rename atômico) e só chama `systemctl`
+  na instância alvo.
+- No boot, cada unidade habilitada recoloca **somente o próprio IPv6** antes de
+  subir (`ExecStartPre`), sem depender da API; endereço fora do journal
+  `owned-addresses.json` é recusado (ADR-0005).
+- Na partida, a API **adota** instâncias saudáveis sem reiniciá-las. Instâncias
+  desconhecidas só são paradas se havia intenção registrada em
+  `pending-ports.json`; as demais ficam servindo e são listadas como órfãs
+  (ADR-0006).
+- CLI (`ipv6-proxy`) e TUI (`ipv6-proxy-tui`) são clientes HTTP da mesma API,
+  não gerenciadores paralelos.
 
-- [Guia do autoinstalador e acesso pelo navegador](docs/INSTALL.md)
-- [Endpoints, exemplos e validacao dos proxies](docs/API.md)
-- API: `http://127.0.0.1:8000/docs` (use tunel SSH para acesso remoto).
-- Token: `sudo cat /etc/ipv6-proxy-api.env` na VPS.
-- Status: `sudo systemctl status ipv6-proxy-api`.
+## Sessões ativas por operação
 
-O instalador nao configura roteamento/NDP ou firewall e preserva instalacoes
-existentes. Configure credenciais ao criar proxies e libere suas portas apenas
-para clientes autorizados. Publicar este repositorio no GitHub disponibiliza o
-codigo; os proxies devem rodar na sua VPS.
+Medido com 3proxy real e supervisor local (`tests/test_isolation_3proxy.py`,
+`tests/test_supervisor_3proxy.py`, `tests/acceptance/test_criteria_ab.py`:
+streams HTTP CONNECT e SOCKS5 vivos em outras portas, mesmo PID antes/depois).
 
-## CLI e API no mesmo pool
+| Operação | Porta afetada | Outras portas |
+|---|---|---|
+| `create` / `batch` | porta nova sobe | intactas |
+| `edit` / `rotate` | sessões da porta caem (reinício do 3proxy dela) | intactas |
+| `delete` | sessões da porta caem | intactas |
+| Falha/morte do 3proxy de uma porta | fica `failed`/`fenced` | intactas |
+| Reiniciar/atualizar a API sem mudar a config gerada | nenhuma | intactas |
+| Atualização que muda a config gerada (ex.: nova ACL) | cada porta afetada reinicia **uma vez, uma por vez**, após confirmação | intactas |
+| Migração da versão base (aa29685/bdfe9c7) | **todas caem uma única vez** | — |
+| Reboot | todas (não validado em host real: T14) | — |
 
-O CLI e cliente do **mesmo servico HTTP local**, nao um segundo gerenciador.
-Pode ser usado junto com Swagger/curl: todas as alteracoes passam pela mesma
-serializacao e pelo mesmo estado da API. Portas duplicadas retornam conflito.
+Não existe mais reinício coletivo em mutações: o aviso antigo ("toda mutação
+reinicia todos os proxies") valia para a versão base com um 3proxy único.
 
-Na VPS:
+## Instalação
+
+VPS **Ubuntu 22.04/24.04/26.04 ou Debian 12/13** com systemd, sudo, IPv4 e uma
+**subnet IPv6 dedicada roteada pelo provedor**. Fixe a revisão com `--ref`
+(branch, tag ou SHA; o instalador grava o SHA resolvido em
+`/opt/ipv6-proxy-server/VERSION`):
+
+```bash
+REF=<sha-ou-tag-aprovado>
+curl -fsSLo install-ipv6-proxy.sh "https://raw.githubusercontent.com/FalcaoOtavio/ipv6-proxy-server/$REF/install.sh"
+sudo bash install-ipv6-proxy.sh --ref "$REF" --self-test
+```
+
+Sem terminal: `--subnet 2001:db8:1234::/64 --interface eth0 --ipv4 192.0.2.10`.
+O instalador compila o 3proxy 0.9.4 fixado, instala API, unidades, CLI e TUI,
+gera o token em `/etc/ipv6-proxy-api.env` (root, 0600) e roda o healthcheck.
+Detalhes: [docs/INSTALL.md](docs/INSTALL.md).
+
+### Atualizar
+
+```bash
+curl -fsSLo install-ipv6-proxy.sh "https://raw.githubusercontent.com/FalcaoOtavio/ipv6-proxy-server/$REF/install.sh"
+sudo bash install-ipv6-proxy.sh --update --ref "$REF" --self-test
+```
+
+- Backup em `/var/backups/ipv6-proxy/<data>-<pid>/` antes de mudar algo;
+  rollback automático em qualquer falha.
+- Reinicia **somente a API**; proxies saudáveis são adotados (mesmo PID).
+- Se a nova revisão muda a configuração gerada de proxies, o instalador
+  anuncia quantos serão reiniciados (um por vez) e exige digitar `REINICIAR`
+  ou passar `--yes`. Sem confirmação, nada muda.
+- Sem mudanças: imprime `Nada a atualizar` e não reinicia nada.
+
+### Migração da versão base
+
+Instalações `aa29685` (main antigo) ou `bdfe9c7` (`ashford/isolated-mutations`)
+rodam os 3proxy dentro da API. O `--update` migra cada proxy para sua unidade,
+preservando portas, IPv6, credenciais, owners e token, com **uma interrupção
+única de todos os proxies**. Exige digitar `MIGRAR` ou `--yes`. Ver
+[docs/MIGRATION.md](docs/MIGRATION.md).
+
+## Uso
 
 ```bash
 sudo ipv6-proxy list
-sudo ipv6-proxy create --port 30000 --protocol http --username cliente
-# A senha e solicitada sem eco, nunca como argumento.
+sudo ipv6-proxy create --port 30000 --protocol http --username cliente   # senha sem eco
 sudo ipv6-proxy rotate 30000
 sudo ipv6-proxy delete 30000
-sudo ipv6-proxy list --output json
+sudo ipv6-proxy-tui
 ```
 
-**Toda mutacao (create/rotate/delete), pela API ou CLI, reinicia todos os
-proxies da API e desconecta todas as sessoes ativas**, mesmo de outras portas.
-O CLI pede confirmacao; `--yes` confirma explicitamente em automacao.
-Nao ha retry automatico. Apos falha de comunicacao, consulte `list` antes de repetir.
+### 100 HTTP e 100 SOCKS5 com export
 
-O cliente usa Python 3 padrao, le o token do arquivo root `0600`
-`/etc/ipv6-proxy-api.env` sem executar shell, ignora proxies de ambiente e nao
-segue redirecionamentos. Nao altera arquivos de estado, interfaces ou servicos.
-Para SSH interativo: `ssh -t usuario@IP_PUBLICO 'sudo ipv6-proxy list'`.
+```bash
+# 100 HTTP, senha comum (lida de arquivo, nunca em argv), lista em arquivo 0600
+sudo ipv6-proxy batch -c 100 --start-port 30000 -t http -u equipe \
+  --password-stdin --yes -f /root/http.list < /root/senha-comum.txt
 
-API ja instalada? Use `sudo bash install.sh --cli-only` a partir de um **checkout
-completo atualizado**; nao use apenas o instalador baixado com curl nesse modo.
-O comando adiciona/atualiza somente `/usr/local/bin/ipv6-proxy`, sem reiniciar
-servico nem trocar token/estado. Veja [instalacao existente](docs/INSTALL.md#instalar-ou-atualizar-somente-o-cli).
-Detalhes de senha via stdin, saida e erros em [API.md](docs/API.md#cliente-cli).
+# 100 SOCKS5, senha aleatória por proxy (usuário socks<porta>)
+sudo ipv6-proxy batch -c 100 --start-port 31000 -t socks5 --random -u socks \
+  --yes -f /root/socks5.list
+
+# Formato: IPv4:porta:usuario:senha. Teste uma linha:
+IFS=: read -r ip port user pass < /root/socks5.list
+curl --proxy "socks5h://$ip:$port" --proxy-user "$user:$pass" https://api64.ipify.org
+
+# Exportar o pool existente (sem senhas: a API nunca devolve senhas)
+sudo ipv6-proxy export --format json
+```
+
+As senhas só aparecem na criação; guarde a saída do `batch` (`-f`). Com
+`--random`, um replay idempotente após timeout não devolve as senhas: redefina
+com `ipv6-proxy edit <porta> -u <usuario>`. Referência completa:
+[docs/CLI.md](docs/CLI.md), [docs/TUI.md](docs/TUI.md), [docs/API.md](docs/API.md).
+
+Swagger: `ssh -L 8000:127.0.0.1:8000 usuario@IP` e abra
+<http://127.0.0.1:8000/docs> com o token de `sudo cat /etc/ipv6-proxy-api.env`.
+Não exponha a porta 8000; libere no firewall só as portas dos proxies, para
+clientes autorizados.
+
+## Proteção anti-SSRF e UDP
+
+`PROXY_BLOCK_PRIVATE_DESTINATIONS=true` (padrão, em `/etc/ipv6-proxy-api.env`)
+nega destinos em loopback, `::ffff:0:0/96`, `fe80::/10`, `fc00::/7`,
+`ff00::/8` e a própria subnet dos proxies: o cliente recebe HTTP 403 (HTTP) ou
+recusa (SOCKS5). Mantenha ligado em produção.
+
+Com o bloqueio ligado, **SOCKS5 UDP ASSOCIATE é negado** e `GET /capabilities`
+**não** anuncia `socks5_udp_associate` (ADR-0007): a ACL do 3proxy só verifica o
+endereço declarado no ASSOCIATE, e o relay poderia entregar datagramas ao
+loopback do host. UDP só funciona com o bloqueio desligado, o que é inseguro.
+Clientes que dependem de UDP devem consultar `/capabilities`.
+
+> A implementação do bloqueio de UDP (T23) está em andamento; até ela entrar no
+> main, a auditoria T22 (achado N1) segue **aberta**.
+
+## Configuração IPv6 (rota, NDP, ndppd)
+
+A API adiciona cada IPv6 como `/128` na interface (com `nodad`) e **não altera**
+rota padrão, firewall, sysctl nem ndppd. O provedor precisa entregar a subnet:
+
+- **Subnet roteada** para o IPv6 da VPS: nada a fazer além de informá-la.
+- **Subnet "on-link"** (provedor faz NDP para cada endereço): os `/128`
+  adicionados respondem por si; não use ndppd.
+- **Provedor só faz NDP para o IPv6 principal**: é preciso um proxy NDP
+  (ex.: `ndppd` com `rule <subnet> { static }` na interface externa) ou pedir
+  ao provedor a subnet roteada. Configure fora deste projeto.
+
+Diagnóstico rápido em [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#ipv6-de-saída-não-funciona).
+
+## Limites medidos
+
+Fonte: [docs/evidence/limits.md](docs/evidence/limits.md) (3proxy 0.9.4 real,
+supervisor local, loopback v4-mapped, host compartilhado com load ~20: tempos
+são limite superior, não benchmark; custo de `systemctl` não incluído).
+
+| Medida | Valor |
+|---|---|
+| Lote 100 HTTP via CLI | 26,6 s |
+| Lote 100 SOCKS5 via CLI (`--random`) | 39,5 s |
+| Lote 200 via API (bloqueio SSRF ligado / desligado) | 48,4 s / 46,3 s |
+| Remover 200 (DELETE sequencial) | 41,4 s |
+| `GET /proxies` com 200 | 134 ms |
+| RSS por 3proxy (mediana) | ≈ 4,7 MiB; 200 proxies ≈ 930 MiB |
+| fds por 3proxy ocioso | 4 |
+| p50 API com 200 vivos: create / edit / rotate / delete | 417 / 283 / 549 / 267 ms |
+
+Memória e fds crescem linearmente com o número de proxies. Máximo por lote:
+`PROXY_BATCH_MAX` (padrão 1000).
+
+## Testes e evidências
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+.venv/bin/python -m pytest -q                                         # sem 3proxy
+TEST_3PROXY_BINARY=/usr/local/bin/3proxy .venv/bin/python -m pytest -q # 3proxy real, loopback
+.venv/bin/python -m pytest -q tests/acceptance                        # critérios A/B
+sudo tests/e2e/vm_e2e.sh --dry-run --phase pre-reboot                 # plano do E2E em VM
+```
+
+- [docs/evidence/qa-final.md](docs/evidence/qa-final.md): re-QA final (409
+  testes com 3proxy real, 3 execuções; aceite A/B 5x; pip-audit limpo).
+- [docs/evidence/limits.md](docs/evidence/limits.md): limites medidos.
+- [docs/reviews/T22-security.md](docs/reviews/T22-security.md): reauditoria de
+  segurança (N1 UDP ASSOCIATE).
+
+## Limitações e gates
+
+Este projeto **não** está declarado 100% funcional. Pendências conhecidas:
+
+- **Sem execução em Linux limpo com systemd**: instalador, unidades
+  `ipv6-proxy@`, upgrade e rollback foram testados com stubs e supervisor
+  local. O E2E em VM (`tests/e2e/vm_e2e.sh`) existe mas não rodou (T14).
+- **Sem reboot real**: a recolocação do IPv6 por instância no boot não foi
+  observada em host real (T14).
+- **Sem IPv6 roteado**: toda a evidência usa loopback/`::1`/v4-mapped. NDP,
+  rota do provedor e saída externa não foram comprovados (T14).
+- **Push/PR não autorizados** (pergunta #152, ADR-0004): o código fica em
+  branch local; o CI do GitHub não rodou. O passo de lint do CI usa
+  shellcheck 0.9 e acusa `SC2119/SC2120` em `install.sh` (qa-final Q1).
+- **UDP ASSOCIATE**: ver [Proteção anti-SSRF e UDP](#proteção-anti-ssrf-e-udp)
+  (N1 aberto até T23).
+- `PROXY_DATA_DIR` e `PROXY_3PROXY_BINARY` precisam ficar nos padrões; subnet e
+  interface não mudam com proxies existentes.
+- Sem rotação periódica automática nem por requisição (IPv6 fixo por contrato).
+- Legado (`ipv6-proxy-server.sh`) e API não podem coexistir na mesma VPS.
+
+## Decisões
+
+ADRs 0001–0007 (fora do repositório, em `docs/adr/` do projeto): base de código
+(0001), supervisão por unidade systemd (0002), TUI Textual (0003), sem push
+público (0004), IPv6 por instância no boot (0005), órfãos só param com intenção
+registrada (0006), UDP ASSOCIATE bloqueado com anti-SSRF (0007).
 
 ## Projeto original (modo legado)
 
-As instrucoes abaixo sao referencia historica do script original, **nao sao o
-CLI da API**. Legado e API nao podem coexistir nesta VPS, nem com portas
+As instruções abaixo são referência histórica do script original, **não são o
+CLI da API**. Legado e API não podem coexistir nesta VPS, nem com portas
 separadas ou API parada: o legado pode encerrar processos e alterar rede fora
-do seu pool. Use `ipv6-proxy`, nao `ipv6-proxy-server.sh`, para controlar a API.
-Esta copia do legado e os futuros scripts de startup gerados por ela recusam
-execucao quando detectam arquivos/diretorios da instalacao API. Copias upstream
-e startups antigos nao possuem essa protecao. Antes de instalar API, desative
-cron/startup legado, pare seu processo especifico e retire a instalacao antiga.
-Nao execute o desinstalador legado depois de instalar a API.
+do seu pool. Use `ipv6-proxy`, não `ipv6-proxy-server.sh`, para controlar a API.
+Esta cópia do legado e os scripts de startup gerados por ela recusam execução
+quando detectam a instalação API; cópias upstream e startups antigos não.
+Antes de instalar a API, desative cron/startup legado, pare o processo legado e
+retire a instalação antiga. Não execute o desinstalador legado depois.
 
 ## IPv6 Proxy Server [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
