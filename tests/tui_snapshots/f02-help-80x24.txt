@@ -1,0 +1,25 @@
+╭──────────────────────────────────────────────────────────────╮
+IPv6 Proxy Server
+│Atalhos│
+│ ↑ ↓ mover seleção a recarregar lista│
+│ c criar proxy l criar lote│
+│ e editar selecionado r rotacionar IPv6│
+│ d excluir (confirma) s ver/ocultar senha│
+│ x exportar lista ? esta ajuda│
+│ Esc fechar diálogo q sair│
+││
+│Status│
+│ ● ativo ◐ subindo ✕ falhou│
+│ ■ isolado (reinicie a API)│
+││
+│Senhas│
+│A API nunca devolve senhas. A TUI conhece só as senhas│
+│definidas nesta sessão (criar, editar, lote aleatório) e│
+│as guarda apenas em memória. Coluna Senha: •••• oculta,│
+│n/d desconhecida, — sem autenticação.│
+││
+│Cada alteração reinicia só o 3proxy da porta afetada e│
+│derruba as sessões dela; as demais portas não são tocadas.│
+│O alvo é fixado ao abrir a ação: mudar a seleção depois│
+✓ 0 pro│não muda o proxy afetado.│
+? Ajuda╰──────────────────────────────────────────────────────────────╯aa Reca

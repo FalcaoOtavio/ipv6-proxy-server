@@ -311,7 +311,9 @@ def test_b_concurrent_api_and_cli(harness, tmp_path):
         assert h.config(port).decode() == render_config(h.settings, model)
     managed = h.supervisor.list_managed()
     assert managed == set(ports), (managed, ports)
-    evidence = s.verify(max(3, time.time() - started), set(pool))
+    # Batches skip occupied ports, so one started near the end of the pool spills past
+    # it: any port above B/C/A's block is reachable. B/C stay forbidden in verify().
+    evidence = s.verify(max(3, time.time() - started), set(h.ports[4:]))
     write_evidence("criterion_b_concurrency", {"outcomes": dict(outcomes), "errors": errors,
                                                "final_ports": ports, **evidence}, h.passwords)
     assert not errors, errors

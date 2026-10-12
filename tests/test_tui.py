@@ -1,6 +1,10 @@
 """TUI flows F01-F08 with Textual Pilot against the real API (uvicorn in-process, fake backend)."""
+import html
+import os
+import re
 import socket
 import stat
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -91,13 +95,51 @@ async def fill(pilot, app, **values):
         app.screen.query_one(f"#{name}").value = value
     await pilot.pause()
 
-def snapshot(app, name):
-    SNAPSHOTS.mkdir(exist_ok=True)
-    app.save_screenshot(filename=f"{name}.svg", path=str(SNAPSHOTS))
+UPDATE_SNAPSHOTS = os.environ.get("UPDATE_SNAPSHOTS") == "1"
+# Also eats a trailing ':' left when a narrow column truncates the address.
+IPV6_RE = re.compile(r"\b[0-9a-f]{1,4}(?::[0-9a-f]{0,4}){2,7}", re.IGNORECASE)
+SCROLLBAR_RE = re.compile("[\u2580-\u259f]")
+
+def screen_text(svg):
+    """Visible text of an exported screenshot, row by row (public export_screenshot API)."""
+    rows = {}
+    for x, y, text in re.findall(r'<text[^>]*? x="([\d.]+)" y="([\d.]+)"[^>]*>(.*?)</text>', svg):
+        rows.setdefault(float(y), []).append((float(x), html.unescape(text).replace("\xa0", " ")))
+    return ["".join(t for _, t in sorted(cells)) for _, cells in sorted(rows.items())]
+
+def normalize(lines):
+    """IPv6s are random by design and size their column: mask them, collapse padding and drop
+    scrollbar glyphs (a scrollbar shows up or not depending on that random width)."""
+    out = [re.sub(r" {2,}", " ", re.sub(r"pytest-\d+", "pytest-N", IPV6_RE.sub("<ipv6>", line))).rstrip()
+           for line in lines]
+    out = [line for line in (SCROLLBAR_RE.sub("", line).rstrip() for line in out) if line]
+    return "\n".join(out).rstrip("\n") + "\n"
+
+async def snapshot(pilot, app, name):
+    """Compare the screen with tui_snapshots/<name>.txt; UPDATE_SNAPSHOTS=1 rewrites it and the SVG.
+
+    Waits for pending refreshes first: a screenshot taken mid-layout misses the footer."""
+    await pilot.wait_for_scheduled_animations()
+    await pilot.pause(0.1)
+    svg = app.export_screenshot()
+    text = normalize(screen_text(svg))
+    reference = SNAPSHOTS / f"{name}.txt"
+    if UPDATE_SNAPSHOTS:
+        SNAPSHOTS.mkdir(exist_ok=True)
+        reference.write_text(text)
+        (SNAPSHOTS / f"{name}.svg").write_text(svg)
+        return
+    assert reference.exists(), f"Missing {reference}; run with UPDATE_SNAPSHOTS=1 and review the diff"
+    if text != reference.read_text():
+        actual = Path(tempfile.gettempdir()) / "tui-snapshot-diff" / f"{name}.txt"
+        actual.parent.mkdir(exist_ok=True)
+        actual.write_text(text)
+        raise AssertionError(f"Screen differs from {reference}: diff -u {reference} {actual} "
+                             "(UPDATE_SNAPSHOTS=1 to accept)")
 
 SIZES = [(80, 24), (60, 20)]
-pytestmark = pytest.mark.asyncio
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("size", SIZES)
 async def test_f01_empty_list_and_reload(api, size):
     app = tui(api)
@@ -105,7 +147,7 @@ async def test_f01_empty_list_and_reload(api, size):
         await settle(pilot, app)
         empty = str(app.query_one("#empty", Static).render())
         assert "Nenhum proxy" in empty and "c para criar" in empty
-        snapshot(app, f"f01-empty-{size[0]}x{size[1]}")
+        await snapshot(pilot, app, f"f01-empty-{size[0]}x{size[1]}")
         api.client.create({"port": 30005, "protocol": "socks5"})
         await pilot.press("a")
         await settle(pilot, app, lambda: rows(app))
@@ -116,8 +158,9 @@ async def test_f01_empty_list_and_reload(api, size):
         await pilot.press("a")
         await settle(pilot, app, lambda: rows(app)[0][1] == "✕ falhou")
         assert "fora do ar" in status(app)
-        snapshot(app, f"f01-list-{size[0]}x{size[1]}")
+        await snapshot(pilot, app, f"f01-list-{size[0]}x{size[1]}")
 
+@pytest.mark.asyncio
 async def test_f01_periodic_refresh(api):
     app = ProxyTui(api.client, refresh_seconds=0.1)
     async with app.run_test(size=(80, 24)) as pilot:
@@ -125,6 +168,7 @@ async def test_f01_periodic_refresh(api):
         api.client.create({"port": 30001})
         await settle(pilot, app, lambda: len(rows(app)) == 1)
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("size", SIZES)
 async def test_f02_help_footer_and_escape(api, size):
     app = tui(api)
@@ -138,7 +182,7 @@ async def test_f02_help_footer_and_escape(api, size):
         help_text = str(app.screen.query(Static).first().render())
         for word in ("criar proxy", "rotacionar", "excluir", "exportar", "recarregar", "Esc"):
             assert word in help_text
-        snapshot(app, f"f02-help-{size[0]}x{size[1]}")
+        await snapshot(pilot, app, f"f02-help-{size[0]}x{size[1]}")
         await pilot.press("escape")
         await pilot.press("c")
         await pilot.pause()
@@ -148,6 +192,7 @@ async def test_f02_help_footer_and_escape(api, size):
         assert app.screen is app.screen_stack[0]
         assert api.records() == {}
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("size", SIZES)
 async def test_f03_create_with_inline_validation(api, size):
     app = tui(api)
@@ -165,7 +210,7 @@ async def test_f03_create_with_inline_validation(api, size):
         await pilot.pause()
         assert "Usuário" in str(app.screen.query_one("#error", Static).render())
         await fill(pilot, app, username="alice", protocol="socks5")
-        snapshot(app, f"f03-create-{size[0]}x{size[1]}")
+        await snapshot(pilot, app, f"f03-create-{size[0]}x{size[1]}")
         await pilot.click("#ok")
         await settle(pilot, app, lambda: rows(app))
         assert "Proxy criado na porta 30002" in status(app)
@@ -173,6 +218,7 @@ async def test_f03_create_with_inline_validation(api, size):
         assert rows(app)[0][4] == "••••"
         assert api.records()[30002].password == "s3cret"
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("size", SIZES)
 async def test_f04_batch_random_and_conflict(api, size):
     api.client.create({"port": 30011})
@@ -190,12 +236,12 @@ async def test_f04_batch_random_and_conflict(api, size):
         await pilot.pause()
         assert "Usuário" in str(app.screen.query_one("#error", Static).render())
         await fill(pilot, app, mode="random", username="cli", protocol="socks5")
-        snapshot(app, f"f04-batch-{size[0]}x{size[1]}")
+        await snapshot(pilot, app, f"f04-batch-{size[0]}x{size[1]}")
         await pilot.click("#ok")
         await settle(pilot, app, lambda: len(rows(app)) == 4)
         result = str(app.screen.query(Static)[1].render())
         assert "Criados: 3 (portas 30010–30013)" in result and "exporte" in result
-        snapshot(app, f"f04-result-{size[0]}x{size[1]}")
+        await snapshot(pilot, app, f"f04-result-{size[0]}x{size[1]}")
         await pilot.press("escape")
         assert {30010, 30012, 30013} <= set(api.records())
         assert all(app.passwords[api.records()[p].id] == api.records()[p].password for p in (30010, 30012, 30013))
@@ -207,6 +253,7 @@ async def test_f04_batch_random_and_conflict(api, size):
         assert "Conflito" in status(app)
         assert len(api.records()) == 4
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("size", SIZES)
 async def test_f05_edit_and_port_conflict(api, size):
     api.client.create({"port": 30020, "username": "bob", "password": "old1"})
@@ -225,7 +272,7 @@ async def test_f05_edit_and_port_conflict(api, size):
         await pilot.press("e")
         await pilot.pause()
         await fill(pilot, app, port="30030", protocol="socks5", username="carol", password="new2")
-        snapshot(app, f"f05-edit-{size[0]}x{size[1]}")
+        await snapshot(pilot, app, f"f05-edit-{size[0]}x{size[1]}")
         await pilot.click("#ok")
         await settle(pilot, app, lambda: "atualizado" in status(app))
         moved = api.records()[30030]
@@ -233,6 +280,7 @@ async def test_f05_edit_and_port_conflict(api, size):
         assert 30020 not in api.records() and api.records()[30021] == before
         assert app.passwords[moved.id] == "new2"
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("size", SIZES)
 async def test_f06_rotate_and_delete_with_typed_confirmation(api, size):
     for port in (30040, 30041):
@@ -259,7 +307,7 @@ async def test_f06_rotate_and_delete_with_typed_confirmation(api, size):
         await pilot.click("#ok")
         await pilot.pause()
         assert "Digite exatamente 30040" in str(app.screen.query_one("#error", Static).render())
-        snapshot(app, f"f06-delete-{size[0]}x{size[1]}")
+        await snapshot(pilot, app, f"f06-delete-{size[0]}x{size[1]}")
         await pilot.press("escape")
         await settle(pilot, app)
         assert set(api.records()) == {30040, 30041}
@@ -270,6 +318,7 @@ async def test_f06_rotate_and_delete_with_typed_confirmation(api, size):
         await settle(pilot, app, lambda: len(rows(app)) == 1)
         assert set(api.records()) == {30041} and api.records()[30041] == other
 
+@pytest.mark.asyncio
 async def test_f06_race_rotate_pins_target_while_selection_moves(api):
     for port in (30050, 30051):
         api.client.create({"port": port})
@@ -298,6 +347,7 @@ async def test_f06_race_rotate_pins_target_while_selection_moves(api):
         assert api.records()[30050].ipv6 != a.ipv6 and api.records()[30050].id == a.id
         assert api.records()[30051] == b
 
+@pytest.mark.asyncio
 async def test_f06_stale_target_is_rejected_by_if_match(api):
     api.client.create({"port": 30060})
     app = tui(api)
@@ -315,6 +365,7 @@ async def test_f06_stale_target_is_rejected_by_if_match(api):
         assert "mudou desde a seleção" in status(app)
         assert api.records()[30060] == heir
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("size", SIZES)
 async def test_f07_reveal_and_export(api, size, tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
@@ -340,7 +391,7 @@ async def test_f07_reveal_and_export(api, size, tmp_path, monkeypatch):
         await pilot.press("down", "s")
         await pilot.pause()
         assert rows(app)[1][4] == "Secr3t"
-        snapshot(app, f"f07-revealed-{size[0]}x{size[1]}")
+        await snapshot(pilot, app, f"f07-revealed-{size[0]}x{size[1]}")
         await pilot.press("s")
         await pilot.pause()
         assert rows(app)[1][4] == "••••"
@@ -349,7 +400,7 @@ async def test_f07_reveal_and_export(api, size, tmp_path, monkeypatch):
         assert "1 omitido(s): senha desconhecida" in str(app.screen.query(Static)[1].render())
         target = tmp_path / f"out-{size[0]}.txt"
         await fill(pilot, app, path=str(target))
-        snapshot(app, f"f07-export-{size[0]}x{size[1]}")
+        await snapshot(pilot, app, f"f07-export-{size[0]}x{size[1]}")
         await pilot.click("#ok")
         await settle(pilot, app)
         assert str(target) in status(app)
@@ -362,13 +413,14 @@ async def test_f07_reveal_and_export(api, size, tmp_path, monkeypatch):
         await settle(pilot, app)
         assert "já existe" in status(app)
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("size", SIZES)
 async def test_f08_api_down_and_bad_token(api, size):
     app = ProxyTui(Client("http://127.0.0.1:9", TOKEN), refresh_seconds=0)
     async with app.run_test(size=size) as pilot:
         await settle(pilot, app)
         assert "API indisponível" in status(app) and "systemctl status ipv6-proxy-api" in status(app)
-        snapshot(app, f"f08-down-{size[0]}x{size[1]}")
+        await snapshot(pilot, app, f"f08-down-{size[0]}x{size[1]}")
         await pilot.press("r", "d", "e", "x")
         await pilot.pause()
         assert app.screen is app.screen_stack[0]
@@ -382,6 +434,7 @@ async def test_f08_api_down_and_bad_token(api, size):
         await pilot.pause()
         assert "sudo" in status(app) and app.screen is app.screen_stack[0]
 
+@pytest.mark.asyncio
 async def test_f08_small_terminal_with_many_rows(api):
     api.client.batch({"count": 40, "credentials": "random"})
     app = tui(api)

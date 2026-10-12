@@ -1,0 +1,15 @@
+ Porta Status Proto Usuário Senha IPv6
+IPv6 Proxy Server
+ 30040 ● ativo HTTP — — <ipv6>
+ 30041 ● ativo HTTP — — <ipv6>
+╭──────────────────────────────────────────────────────────╮
+│Excluir o proxy da porta 30040?│
+│Só o 3proxy desta porta reinicia; as sessões dela caem.│
+│Digite 30040 para confirmar│
+│30041│
+│✕ Digite exatamente 30040; nada foi alterado.│
+│ Confirmar Cancelar │
+╰──────────────────────────────────────────────────────────╯
+✓ Porta 30040: novo IPv6 <ipv6>
+(era <ipv6>).
+? Ajudac Criarl Lotee Editarr Rotacionard Excluirx Exp

@@ -1,0 +1,20 @@
+ Porta Status Proto Usuário Senha IPv6
+IPv6 Proxy Server
+ 30020 ● ativo HTTP bob n/d <ipv6>
+ 30021 ● ativo HTTP — — <ipv6>
+╭──────────────────────────────────────────────────────────────╮
+│Editar proxy da porta 30020│
+│Porta│
+│30030│
+│Protocolo│
+│SOCKS5▼│
+│Usuário│
+│carol│
+│Nova senha (vazio = manter credenciais)│
+│••••│
+│X Remover autenticação │
+││
+│ Confirmar Cancelar │
+╰──────────────────────────────────────────────────────────────╯
+✕ Conflito: porta já em uso ou faixa de portas esgotada. Nada foi alterado.
+? Ajudac Criarl Lotee Editarr Rotacionard Excluirx Exportars Senhaa Reca

@@ -1,0 +1,7 @@
+ Porta Status Proto Usuário Senha IPv6
+IPv6 Proxy Server
+ 30070 ● ativo HTTP known n/d <ipv6>
+ 30071 ● ativo HTTP dora Secr3t <ipv6>
+ 30072 ● ativo HTTP — — <ipv6>
+✓ Senha da porta 30071 visível.
+? Ajudac Criarl Lotee Editarr Rotacionard Excluirx Exportars Senhaa Reca
