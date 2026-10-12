@@ -46,6 +46,8 @@ E2E_SELF_TEST=${E2E_SELF_TEST:-true}
 E2E_API_WAIT=${E2E_API_WAIT:-60}
 # Set => written as PROXY_READY_TIMEOUT to the env before the update (labeled; slow hosts).
 E2E_READY_TIMEOUT=${E2E_READY_TIMEOUT:-}
+# Seconds the TUI gets to render in a pty (importing Textual takes ~30s under QEMU TCG).
+E2E_TUI_SECONDS=${E2E_TUI_SECONDS:-6}
 
 APP_DIR=/opt/ipv6-proxy-server
 ENV_FILE=/etc/ipv6-proxy-api.env
@@ -307,7 +309,7 @@ step_clients() {
     check '--cli-only/--tui-only nao reiniciam API nem proxies' diff -u "$work/pids.before" "$work/pids.after"
     check '--cli-only/--tui-only nao tocam env/state/unidades' diff -u "$work/hashes.before" "$work/hashes.after"
     if $tui; then
-        check 'TUI renderiza em pty e lista B' python3 "$here/e2e_probe.py" tui --seconds 6 --expect "$PORT_B" -- "$TUI"
+        check 'TUI renderiza em pty e lista B' python3 "$here/e2e_probe.py" tui --seconds "$E2E_TUI_SECONDS" --expect "$PORT_B" -- "$TUI"
     fi
     api GET /capabilities; check 'API /capabilities' [ "$api_status" = 200 ]
     check 'API status de B = running' [ "$(proxy_field "$PORT_B" status)" = running ]
