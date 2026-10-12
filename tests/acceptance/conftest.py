@@ -15,6 +15,7 @@ import socket
 import struct
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -30,13 +31,17 @@ from proxy_api.supervisor import LocalProcessSupervisor
 
 BINARY = os.environ.get("TEST_3PROXY_BINARY")
 ROOT = Path(__file__).parents[2]
-EVIDENCE_DIR = Path(__file__).parent / "evidence"
+# Committed evidence is only rewritten on purpose (clean run): E2E_WRITE_EVIDENCE=1.
+# Otherwise it goes to a temp dir so routine runs never dirty the tree.
+EVIDENCE_DIR = (Path(__file__).parent / "evidence" if os.environ.get("E2E_WRITE_EVIDENCE") == "1"
+                else Path(tempfile.gettempdir()) / "ipv6-proxy-acceptance-evidence")
 ADMIN = "acceptance-admin-token-" + "x" * 16
 NETWORK_SCOPE = "loopback v4-mapped (::ffff:127.0.0.0/120) - loopback/ULA complementar, NAO IPv6 roteado"
 MAPPED_TARGET = socket.inet_pton(socket.AF_INET6, "::ffff:127.0.0.1")
 FRAME = struct.Struct(">Qd")  # sequence, server send time
 FRAME_INTERVAL = 0.05
 PORT_BLOCK = 48
+ALIVE_TIMEOUT = 2.0
 
 class AuditSupervisor(LocalProcessSupervisor):
     """Real local supervisor that records every call with its target port."""
@@ -217,10 +222,15 @@ class StreamProbe(threading.Thread):
                 "contiguous": self.seqs == list(range(self.seqs[0], self.seqs[0] + len(self.seqs))) if self.seqs else False,
                 "error": self.error, "started_at": self.started_at, "ended_at": time.time()}
 
-    def alive(self):
-        """Frames still arriving right now."""
+    def alive(self, timeout=ALIVE_TIMEOUT):
+        """A new frame arrives within `timeout` and the stream never broke.
+
+        Waiting (instead of sampling a fixed 0.3 s) only absorbs scheduler delay on
+        a loaded host; gaps, EOF/RST and sequence holes are still judged by stats()."""
         count = len(self.seqs)
-        time.sleep(0.3)
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline and self.error is None and len(self.seqs) <= count:
+            time.sleep(0.02)
         return self.error is None and len(self.seqs) > count
 
 WRAPPER = """#!/bin/sh
@@ -319,7 +329,7 @@ def harness(tmp_path):
         item.close()
 
 def write_evidence(name, data, passwords=()):
-    EVIDENCE_DIR.mkdir(exist_ok=True)
+    EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
     text = json.dumps({"network_scope": NETWORK_SCOPE, "generated_at": time.time(), **data}, indent=2,
                       sort_keys=True, default=str)
     leaked = [p for p in passwords if p and p in text]

@@ -1,0 +1,6 @@
+IPv6 Proxy Server
+Nenhum proxy cadastrado.
+Pressione c para criar um proxy ou l para criar um lote.
+? mostra todos os atalhos.
+✓ 0 proxy(s).
+? Ajudac Criarl Lotee Editarr Rotacionard Excluirx Exportars Senhaa Reca

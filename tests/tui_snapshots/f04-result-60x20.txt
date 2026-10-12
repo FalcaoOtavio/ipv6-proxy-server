@@ -1,0 +1,15 @@
+ Porta Status Proto Usuário Senha IPv6
+IPv6 Proxy Server
+ 30010 ● ativo SOCKS5 cli30010 •••• <ipv6>
+ 30011 ● ativo HTTP — — <ipv6>
+ 30012 ● ativo SOCKS5 cli30012 •••• <ipv6>
+ 30013 ● ativo SOCKS5 cli30013 •••• <ipv6>
+╭──────────────────────────────────────────────────────────╮
+│Resultado do lote│
+│Criados: 3 (portas 30010–30013)│
+│Senhas aleatórias ficam só nesta sessão: exporte com x│
+│antes de sair.│
+│ Fechar (Esc) │
+╰──────────────────────────────────────────────────────────╯
+✓ Lote concluído: 3 criado(s), 0 falha(s).
+? Ajudac Criarl Lotee Editarr Rotacionard Excluirx Exp

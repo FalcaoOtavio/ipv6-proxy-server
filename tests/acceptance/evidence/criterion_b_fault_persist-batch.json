@@ -1,6 +1,6 @@
 {
-  "a_pid_after": 3845833,
-  "a_pid_before": 3845833,
+  "a_pid_after": 4022532,
+  "a_pid_before": 4022532,
   "allowed_ports": [
     21002,
     21010,
@@ -20,23 +20,23 @@
     "21001": true
   },
   "egress_after": {
-    "21000": "::ffff:127.0.0.63",
-    "21001": "::ffff:127.0.0.11"
+    "21000": "::ffff:127.0.0.240",
+    "21001": "::ffff:127.0.0.80"
   },
   "egress_initial": {
-    "21000": "::ffff:127.0.0.63",
-    "21001": "::ffff:127.0.0.11"
+    "21000": "::ffff:127.0.0.240",
+    "21001": "::ffff:127.0.0.80"
   },
   "fault": "persist-batch",
-  "generated_at": 1791766611.664963,
+  "generated_at": 1791778241.6479697,
   "network_scope": "loopback v4-mapped (::ffff:127.0.0.0/120) - loopback/ULA complementar, NAO IPv6 roteado",
   "pids_after": {
-    "21000": 3845839,
-    "21001": 3845845
+    "21000": 4022536,
+    "21001": 4022541
   },
   "pids_before": {
-    "21000": 3845839,
-    "21001": 3845845
+    "21000": 4022536,
+    "21001": 4022541
   },
   "result": {
     "expect_ports": [
@@ -47,76 +47,76 @@
   "state_after": [
     [
       21000,
-      "75be9244c46335dd6cebe1a462a72ab6",
-      "::ffff:127.0.0.63"
+      "4b8d8229a95e91541de6490a89ab9625",
+      "::ffff:127.0.0.240"
     ],
     [
       21001,
-      "94ebec9f6ee459d5efe754a45448bebc",
-      "::ffff:127.0.0.11"
+      "81550160ae3cf88000d142e77f56aa03",
+      "::ffff:127.0.0.80"
     ],
     [
       21002,
-      "9471815e07fc89e50deb17f293a52bcf",
-      "::ffff:127.0.0.251"
+      "6d5e2807c65b4917d252aa86f781289c",
+      "::ffff:127.0.0.186"
     ]
   ],
   "streams": [
     {
-      "bytes": 1024,
+      "bytes": 864,
       "contiguous": true,
-      "duration_s": 3.88,
-      "egress": "::ffff:127.0.0.63",
-      "ended_at": 1791766611.5754786,
+      "duration_s": 3.307,
+      "egress": "::ffff:127.0.0.240",
+      "ended_at": 1791778241.6225398,
       "error": null,
-      "frames": 64,
-      "max_gap_s": 0.245,
+      "frames": 54,
+      "max_gap_s": 0.146,
       "name": "B-http-connect",
-      "started_at": 1791766607.5698195
+      "started_at": 1791778238.1476665
     },
     {
-      "bytes": 1104,
+      "bytes": 864,
       "contiguous": true,
-      "duration_s": 3.878,
-      "egress": "::ffff:127.0.0.11",
-      "ended_at": 1791766611.5755558,
+      "duration_s": 3.322,
+      "egress": "::ffff:127.0.0.80",
+      "ended_at": 1791778241.6225555,
       "error": null,
-      "frames": 69,
-      "max_gap_s": 0.141,
+      "frames": 54,
+      "max_gap_s": 0.175,
       "name": "C-socks5",
-      "started_at": 1791766607.6245885
+      "started_at": 1791778238.1918595
     }
   ],
   "supervisor_mutations": [
     {
       "op": "start",
       "port": 21010,
-      "t": 1791766608.0605054
+      "t": 1791778238.580823
     },
     {
       "op": "start",
       "port": 21011,
-      "t": 1791766608.2453313
+      "t": 1791778239.1947079
     },
     {
       "op": "start",
       "port": 21012,
-      "t": 1791766608.3625548
+      "t": 1791778239.3922
     },
     {
       "op": "stop",
       "port": 21012,
-      "t": 1791766608.4621766
+      "t": 1791778239.6474726
     },
     {
       "op": "stop",
       "port": 21011,
-      "t": 1791766608.5749974
+      "t": 1791778239.6803563
     },
     {
       "op": "stop",
       "port": 21010,
-      "t": 1791766608.6487608
+      "t": 1791778239.7134104
     }
   ]
 }

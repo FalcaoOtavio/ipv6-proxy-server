@@ -1,6 +1,6 @@
 {
-  "a_pid_after": 3846024,
-  "a_pid_before": 3846024,
+  "a_pid_after": 4022611,
+  "a_pid_before": 4022611,
   "allowed_ports": [
     21002,
     21010,
@@ -20,23 +20,23 @@
     "21001": true
   },
   "egress_after": {
-    "21000": "::ffff:127.0.0.42",
-    "21001": "::ffff:127.0.0.20"
+    "21000": "::ffff:127.0.0.50",
+    "21001": "::ffff:127.0.0.4"
   },
   "egress_initial": {
-    "21000": "::ffff:127.0.0.42",
-    "21001": "::ffff:127.0.0.20"
+    "21000": "::ffff:127.0.0.50",
+    "21001": "::ffff:127.0.0.4"
   },
   "fault": "rollback-batch",
-  "generated_at": 1791766622.5015368,
+  "generated_at": 1791778250.879599,
   "network_scope": "loopback v4-mapped (::ffff:127.0.0.0/120) - loopback/ULA complementar, NAO IPv6 roteado",
   "pids_after": {
-    "21000": 3846030,
-    "21001": 3846036
+    "21000": 4022615,
+    "21001": 4022619
   },
   "pids_before": {
-    "21000": 3846030,
-    "21001": 3846036
+    "21000": 4022615,
+    "21001": 4022619
   },
   "result": {
     "expect_ports": null,
@@ -45,60 +45,60 @@
   },
   "streams": [
     {
-      "bytes": 960,
+      "bytes": 880,
       "contiguous": true,
-      "duration_s": 3.699,
-      "egress": "::ffff:127.0.0.42",
-      "ended_at": 1791766622.5004675,
+      "duration_s": 3.11,
+      "egress": "::ffff:127.0.0.50",
+      "ended_at": 1791778250.8788521,
       "error": null,
-      "frames": 60,
-      "max_gap_s": 0.261,
+      "frames": 55,
+      "max_gap_s": 0.228,
       "name": "B-http-connect",
-      "started_at": 1791766618.7264328
+      "started_at": 1791778247.6723726
     },
     {
-      "bytes": 1040,
+      "bytes": 912,
       "contiguous": true,
-      "duration_s": 3.673,
-      "egress": "::ffff:127.0.0.20",
-      "ended_at": 1791766622.5004904,
+      "duration_s": 3.109,
+      "egress": "::ffff:127.0.0.4",
+      "ended_at": 1791778250.8788712,
       "error": null,
-      "frames": 65,
-      "max_gap_s": 0.123,
+      "frames": 57,
+      "max_gap_s": 0.179,
       "name": "C-socks5",
-      "started_at": 1791766618.7711587
+      "started_at": 1791778247.7183352
     }
   ],
   "supervisor_mutations": [
     {
       "op": "start",
       "port": 21010,
-      "t": 1791766619.2011924
+      "t": 1791778248.253387
     },
     {
       "op": "start",
       "port": 21011,
-      "t": 1791766619.394119
+      "t": 1791778248.4237914
     },
     {
       "op": "start",
       "port": 21012,
-      "t": 1791766619.8384845
+      "t": 1791778248.6889708
     },
     {
       "op": "stop",
       "port": 21012,
-      "t": 1791766620.0981815
+      "t": 1791778248.7758849
     },
     {
       "op": "stop",
       "port": 21011,
-      "t": 1791766620.2870846
+      "t": 1791778248.814153
     },
     {
       "op": "stop",
       "port": 21010,
-      "t": 1791766620.852104
+      "t": 1791778248.8456242
     }
   ]
 }

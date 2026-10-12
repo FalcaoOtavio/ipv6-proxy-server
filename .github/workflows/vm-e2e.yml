@@ -20,7 +20,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # The base revision aa29685 must be reachable from the local clone.
           fetch-depth: 0
@@ -38,7 +38,7 @@ jobs:
           sudo sh -c 'cp /var/lib/ipv6-proxy-e2e/*.json /var/lib/ipv6-proxy-e2e/*.tsv e2e-evidence/ 2>/dev/null; true'
           sudo journalctl -u ipv6-proxy-api -u 'ipv6-proxy@*' --no-pager -n 300 > e2e-evidence/journal.txt || true
           sudo chown -R "$USER" e2e-evidence
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: vm-e2e-${{ matrix.os }}

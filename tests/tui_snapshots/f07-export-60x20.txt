@@ -1,0 +1,16 @@
+ Porta Status Proto Usuário Senha IPv6
+IPv6 Proxy Server
+ 30070 ● ativo HTTP known n/d <ipv6>
+ 30071 ● ativo HTTP dora •••• <ipv6>
+ 30072 ● ativo HTTP — — <ipv6>
+╭──────────────────────────────────────────────────────────╮
+│Exportar lista (IPv4:porta:usuário:senha)│
+│1 omitido(s): senha desconhecida (a API não devolve│
+│senhas).│
+│Arquivo (criado com permissão 0600; não sobrescreve)│
+│m/pytest-N/test_f07_reveal_and_export_siz1/out-60.txt│
+││
+│ Confirmar Cancelar │
+╰──────────────────────────────────────────────────────────╯
+✓ Senha da porta 30071 oculta.
+? Ajudac Criarl Lotee Editarr Rotacionard Excluirx Exp

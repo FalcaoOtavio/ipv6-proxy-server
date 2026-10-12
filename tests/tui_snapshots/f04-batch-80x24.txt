@@ -1,0 +1,23 @@
+ Porta Status Proto Usuário Senha IPv6
+IPv6 Proxy Server
+ 30011 ● ativo HTTP — — <ipv6>
+╭──────────────────────────────────────────────────────────────╮
+│Criar lote│
+│Quantidade│
+│3│
+│Porta inicial (vazio = início da faixa)│
+│30010│
+│Protocolo│
+│SOCKS5▼│
+│Credenciais│
+│Aleatória por proxy▼│
+│Usuário (comum) ou prefixo (aleatória, opcional)│
+│cli│
+│Senha (só no modo comum)│
+││
+│X Parcial: manter os criados se alguma porta falhar │
+│✕ Usuário: 1-64 caracteres entre letras, números, _ . -│
+│ Confirmar Cancelar │
+╰──────────────────────────────────────────────────────────────╯
+✓ 1 proxy(s).
+? Ajudac Criarl Lotee Editarr Rotacionard Excluirx Exportars Senhaa Reca
