@@ -18,3 +18,5 @@ build/
 .next/
 out/
 coverage/
+
+.dpm-security/
