@@ -1,0 +1,24 @@
+ Porta  Status    Proto   Usuário  Senha  IPv6                                  
+ 41301  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.62                     
+ 41302  ✕ falhou  SOCKS5  —        —      ::ffff:127.0.0.191                    
+                                                                                
+                                                                                
+        ╭──────────────────────────────────────────────────────────────╮        
+        │ Editar proxy da porta 41302                                  │        
+        │ Porta                                                        │        
+        │ 41303                                                        │        
+        │ Protocolo                                                    │        
+        │ HTTP                                                      ▼  │        
+        │ Usuário                                                      │        
+        │ bob                                                          │        
+        │ Nova senha (vazio = manter credenciais)                      │        
+        │ ••••••••                                                     │        
+        │ ▐X▌ Remover autenticação                                     │        
+        │                                                              │        
+        │    Confirmar         Cancelar                                │        
+        ╰──────────────────────────────────────────────────────────────╯        
+                                                                                
+                                                                                
+                                                                                
+ ✕ Conflito: porta já em uso ou faixa de portas esgotada. Nada foi alterado.    
+? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exportar s Senha a Reca

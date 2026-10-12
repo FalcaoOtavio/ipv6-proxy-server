@@ -1,0 +1,24 @@
+ Porta  Status    Proto   Usuário  Senha  IPv6                                  
+ 41301  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.62                     
+ 41303  ● ativo   HTTP    bob      ••••   ::ffff:127.0.0.89                     
+ 41304  ● ativo   HTTP    —        —      ::ffff:127.0.0.178                    
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+ ✕ Aguarde: Rotacionando porta 41301 em andamento; a lista recarrega ao final.  
+? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exportar s Senha a Reca

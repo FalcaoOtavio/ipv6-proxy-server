@@ -1,0 +1,24 @@
+ Porta  Status   Proto  Usuário  Senha  IPv6                                    
+ 43032  ● ativo  HTTP   —        —      2001:db8:abcd🔢41d2:3fa1:8b63:3c6a      
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+ ✓ 1 proxy(s).                                                                  
+? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exportar s Senha a Reca

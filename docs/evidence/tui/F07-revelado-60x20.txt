@@ -1,0 +1,20 @@
+ Porta  Status    Proto   Usuário  Senha    IPv6            
+ 44313  ● ativo   HTTP    alice    ••••     ::ffff:127.0.0.5
+ 44315  ● ativo   HTTP    bob      ••••     ::ffff:127.0.0.2
+ 44323  ● ativo   HTTP    lote     LotePw1  ::ffff:127.0.0.1
+ 44325  ● ativo   HTTP    lote     ••••     ::ffff:127.0.0.1
+ 44327  ● ativo   HTTP    u44327   ••••     ::ffff:127.0.0.2
+ 44328  ● ativo   HTTP    u44328   ••••     ::ffff:127.0.0.1
+ 44333  ● ativo   HTTP    outro    n/d      ::ffff:127.0.0.1
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                         ▎  
+ ✓ Senha da porta 44323 visível.                            
+? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exp

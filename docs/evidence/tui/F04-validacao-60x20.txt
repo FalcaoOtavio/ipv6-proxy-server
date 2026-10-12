@@ -1,0 +1,20 @@
+╭──────────────────────────────────────────────────────────╮
+│ Criar lote                                               │
+│ Quantidade                                               │
+│ 0                                                        │
+│ Porta inicial (vazio = início da faixa)                  │
+│                                                          │
+│ Protocolo                                                │
+│ HTTP                                                  ▼  │
+│ Credenciais                                              │
+│ Sem autenticação                                      ▼  │
+│ Usuário (comum) ou prefixo (aleatória, opcional)         │
+│                                                          │
+│ Senha (só no modo comum)                                 │
+│                                                          │
+│ ▐X▌ Parcial: manter os criados se alguma porta falhar    │
+│ ✕ Quantidade deve ser um número entre 1 e 1000           │
+│ (PROXY_BATCH_MAX).                                       │
+│    Confirmar         Cancelar                            │
+╰──────────────────────────────────────────────────────────╯
+? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exp

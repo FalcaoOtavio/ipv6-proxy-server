@@ -1,0 +1,20 @@
+ Porta  Status    Proto   Usuário  Senha  IPv6              
+ 44313  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.38 
+ 44314  ✕ falhou  SOCKS5  —        —      ::ffff:127.0.0.24 
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+ ✕ Conflito: porta já em uso ou faixa de portas esgotada.   
+ Nada foi alterado.                                         
+? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exp
