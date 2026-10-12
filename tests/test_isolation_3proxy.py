@@ -197,8 +197,10 @@ def test_capabilities_are_exactly_the_proven_set(env):
     assert call(client, "GET", "/capabilities", "wrong" * 8).status_code == 401
     assert call(client, "GET", "/capabilities", TENANT_A).json() == {
         "spec": "ashford.proxy/1", "capabilities": CAPABILITIES}
+    # edit/batch/per_proxy_status: proven in tests/test_supervisor_3proxy.py.
     assert set(CAPABILITIES) == {"isolated_mutations", "owner_scoping", "idempotency_keys",
-                                 "conditional_mutations", "socks5_udp_associate"}
+                                 "conditional_mutations", "socks5_udp_associate",
+                                 "edit", "batch", "per_proxy_status"}
 
 def test_mutating_a_keeps_b_stream_and_process(env):
     client, ports, echo = env

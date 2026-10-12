@@ -7,6 +7,7 @@ import time
 from ipaddress import IPv6Address
 from pathlib import Path
 
+from .instance_address import address_path
 from .supervisor import LocalProcessSupervisor, SystemdSupervisor
 
 logger = logging.getLogger(__name__)
@@ -120,7 +121,8 @@ class LinuxBackend:
 
     def _release(self, address):
         address = str(address)
-        if address not in self.addresses:
+        # A port move keeps the IPv6: the new instance may already be using it.
+        if address not in self.addresses or address in {str(r.ipv6) for r in self.serving.values()}:
             return
         if address in self.existing_addresses():
             self._ip("-6", "addr", "del", f"{address}/128", "dev", self.settings.interface)
@@ -158,8 +160,14 @@ class LinuxBackend:
         raise RuntimeError(f"3proxy for port {port} did not become ready; inspect its log "
                            f"(journalctl -u ipv6-proxy@{port} or {self.config_dir}/{port}.log)")
 
+    def _write_address(self, record):
+        # Read by the instance's ExecStartPre (instance_address) to restore its own /128 on boot.
+        atomic_json(address_path(self.config_dir, record.port),
+                    {"ipv6": str(record.ipv6), "interface": self.settings.interface})
+
     def _run(self, record):
         atomic_write(self.config_path(record.port), render_config(self.settings, record))
+        self._write_address(record)
         if self.supervisor.is_active(record.port):
             self.supervisor.restart(record.port)
         else:
@@ -190,6 +198,7 @@ class LinuxBackend:
         self.serving.pop(record.port, None)
         self.supervisor.stop(record.port)
         self.config_path(record.port).unlink(missing_ok=True)
+        address_path(self.config_dir, record.port).unlink(missing_ok=True)
         self._release(record.ipv6)
 
     def reconcile(self, records):
@@ -203,13 +212,15 @@ class LinuxBackend:
         wanted = {record.port: record for record in records}
         for port in sorted(self.supervisor.list_managed() - wanted.keys()):
             self.supervisor.stop(port)
-        for stale in [*self.config_dir.glob("*.cfg"), *self.settings.data_dir.glob("3proxy-*.cfg")]:
+        for stale in [*self.config_dir.glob("*.cfg"), *self.config_dir.glob("*.addr"),
+                      *self.settings.data_dir.glob("3proxy-*.cfg")]:
             name = stale.stem.removeprefix("3proxy-")
             if name.isdigit() and (stale.parent != self.config_dir or int(name) not in wanted):
                 stale.unlink()
         for record in records:
             try:
                 self._claim(record.ipv6)
+                self._write_address(record)
                 path = self.config_path(record.port)
                 current = path.read_text() if path.exists() else None
                 if current == render_config(self.settings, record) and self.ready(record.port):
@@ -222,6 +233,20 @@ class LinuxBackend:
         for address in sorted(self.addresses - {str(record.ipv6) for record in records}):
             self._release(address)
         return failed
+
+    def statuses(self, records):
+        """port -> running | starting | failed, from one supervisor read."""
+        states = self.supervisor.list_states() if records else {}
+        result = {}
+        for record in records:
+            state = states.get(record.port)
+            if self.serving.get(record.port) == record and state == "active":
+                result[record.port] = "running"
+            elif state in ("activating", "reloading"):
+                result[record.port] = "starting"
+            else:
+                result[record.port] = "failed"
+        return result
 
     def healthy(self, records):
         active = self.supervisor.list_active() if records else set()

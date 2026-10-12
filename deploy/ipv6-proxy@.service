@@ -10,11 +10,17 @@ ConditionPathExists=/var/lib/ipv6-proxy-api/proxies/%i.cfg
 [Service]
 Type=simple
 User=root
+# '+' runs only this step with full privileges: restore this instance's own
+# /128 (lost on reboot) before 3proxy egresses from it. Refuses unowned addresses.
+ExecStartPre=+/opt/ipv6-proxy-server/.venv/bin/python /opt/ipv6-proxy-server/proxy_api/instance_address.py %i
 ExecStart=/usr/local/bin/3proxy /var/lib/ipv6-proxy-api/proxies/%i.cfg
 Restart=on-failure
 RestartSec=2
 KillMode=control-group
-TimeoutStopSec=15
+# 3proxy exits at once on SIGINT; on SIGTERM it lingers ~5 s in its own loop,
+# which every edit/rotate/delete of this instance would pay. SIGKILL after 3 s.
+KillSignal=SIGINT
+TimeoutStopSec=3
 UMask=0077
 LimitNOFILE=65536
 NoNewPrivileges=true

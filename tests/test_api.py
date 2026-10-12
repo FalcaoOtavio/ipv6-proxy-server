@@ -44,6 +44,9 @@ class FakeBackend:
     def healthy(self, records):
         return True
 
+    def statuses(self, records):
+        return {r.port: "running" if r in self.records else "failed" for r in records}
+
     def close(self):
         pass
 

@@ -165,3 +165,37 @@ def test_systemd_config_path_is_fixed(tmp_path):
         supervisor.start(30000, tmp_path / "elsewhere.cfg")
     with pytest.raises(ValueError):
         supervisor.restart("*")
+
+def test_systemd_states_and_per_proxy_status(tmp_path):
+    listing = ("ipv6-proxy@30000.service loaded active running IPv6 proxy instance on port 30000\n"
+               "ipv6-proxy@30001.service loaded activating auto-restart IPv6 proxy instance on port 30001\n"
+               "ipv6-proxy@30002.service loaded failed failed IPv6 proxy instance on port 30002\n")
+    supervisor = SystemdSupervisor(run=lambda argv, check=True: SimpleNamespace(stdout=listing))
+    assert supervisor.list_states() == {30000: "active", 30001: "activating", 30002: "failed"}
+    backend = LinuxBackend(settings_for(tmp_path), supervisor)
+    records = [record(30000 + i, f"2001:db8::{i + 1}") for i in range(4)]
+    backend.serving = {r.port: r for r in records}
+    assert backend.statuses(records) == {30000: "running", 30001: "starting", 30002: "failed", 30003: "failed"}
+
+def test_instance_address_file_follows_the_proxy(tmp_path):
+    host = Host()
+    backend = backend_for(tmp_path, host)
+    a = record(30000, "2001:db8::a")
+    backend.provision(a)
+    spec = json.loads((tmp_path / "proxies" / "30000.addr").read_text())
+    assert spec == {"ipv6": "2001:db8::a", "interface": "eth0"}
+    backend.replace(a, a.model_copy(update={"ipv6": IPv6Address("2001:db8::b")}))
+    assert json.loads((tmp_path / "proxies" / "30000.addr").read_text())["ipv6"] == "2001:db8::b"
+    backend.deprovision(a)
+    assert not (tmp_path / "proxies" / "30000.addr").exists()
+
+def test_port_move_keeps_the_shared_address(tmp_path):
+    host = Host()
+    backend = backend_for(tmp_path, host)
+    a = record(30000, "2001:db8::a")
+    backend.provision(a)
+    host.commands.clear()
+    backend.replace(a, a.model_copy(update={"port": 30001}))
+    assert mutating(host.commands) == [["systemctl", "enable", "--now", "ipv6-proxy@30001.service"],
+                                       ["systemctl", "disable", "--now", "ipv6-proxy@30000.service"]]
+    assert "2001:db8::a" in host.addresses and json.loads(backend.journal.read_text()) == ["2001:db8::a"]
