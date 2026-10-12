@@ -1,0 +1,99 @@
+{
+  "a_pid_after": null,
+  "a_pid_before": 3845929,
+  "allowed_ports": [
+    21002,
+    21010,
+    21011,
+    21012,
+    21013,
+    21014,
+    21015,
+    21016,
+    21017,
+    21018,
+    21019,
+    21020
+  ],
+  "config_identical": {
+    "21000": true,
+    "21001": true
+  },
+  "egress_after": {
+    "21000": "::ffff:127.0.0.212",
+    "21001": "::ffff:127.0.0.100"
+  },
+  "egress_initial": {
+    "21000": "::ffff:127.0.0.212",
+    "21001": "::ffff:127.0.0.100"
+  },
+  "fault": "rollback-single",
+  "generated_at": 1791766617.6946037,
+  "network_scope": "loopback v4-mapped (::ffff:127.0.0.0/120) - loopback/ULA complementar, NAO IPv6 roteado",
+  "pids_after": {
+    "21000": 3845935,
+    "21001": 3845950
+  },
+  "pids_before": {
+    "21000": 3845935,
+    "21001": 3845950
+  },
+  "result": {
+    "a_status": "fenced",
+    "expect_ports": null,
+    "status": 503
+  },
+  "streams": [
+    {
+      "bytes": 1056,
+      "contiguous": true,
+      "duration_s": 4.038,
+      "egress": "::ffff:127.0.0.212",
+      "ended_at": 1791766617.694108,
+      "error": null,
+      "frames": 66,
+      "max_gap_s": 0.337,
+      "name": "B-http-connect",
+      "started_at": 1791766613.593548
+    },
+    {
+      "bytes": 1120,
+      "contiguous": true,
+      "duration_s": 3.991,
+      "egress": "::ffff:127.0.0.100",
+      "ended_at": 1791766617.694131,
+      "error": null,
+      "frames": 70,
+      "max_gap_s": 0.178,
+      "name": "C-socks5",
+      "started_at": 1791766613.6440895
+    }
+  ],
+  "supervisor_mutations": [
+    {
+      "op": "restart",
+      "port": 21002,
+      "t": 1791766614.2564034
+    },
+    {
+      "op": "stop",
+      "port": 21002,
+      "t": 1791766614.2564118
+    },
+    {
+      "op": "start",
+      "port": 21002,
+      "t": 1791766614.2886612
+    },
+    {
+      "op": "start",
+      "port": 21002,
+      "t": 1791766614.4932199
+    },
+    {
+      "op": "stop",
+      "port": 21002,
+      "t": 1791766614.5545769
+    }
+  ]
+}

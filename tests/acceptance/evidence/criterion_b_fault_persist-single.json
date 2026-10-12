@@ -1,0 +1,122 @@
+{
+  "a_pid_after": 3845795,
+  "a_pid_before": 3845746,
+  "allowed_ports": [
+    21002,
+    21010,
+    21011,
+    21012,
+    21013,
+    21014,
+    21015,
+    21016,
+    21017,
+    21018,
+    21019,
+    21020
+  ],
+  "config_identical": {
+    "21000": true,
+    "21001": true
+  },
+  "egress_after": {
+    "21000": "::ffff:127.0.0.104",
+    "21001": "::ffff:127.0.0.45"
+  },
+  "egress_initial": {
+    "21000": "::ffff:127.0.0.104",
+    "21001": "::ffff:127.0.0.45"
+  },
+  "fault": "persist-single",
+  "generated_at": 1791766605.2772777,
+  "network_scope": "loopback v4-mapped (::ffff:127.0.0.0/120) - loopback/ULA complementar, NAO IPv6 roteado",
+  "pids_after": {
+    "21000": 3845750,
+    "21001": 3845759
+  },
+  "pids_before": {
+    "21000": 3845750,
+    "21001": 3845759
+  },
+  "result": {
+    "expect_ports": [
+      21002
+    ],
+    "status": 503
+  },
+  "state_after": [
+    [
+      21000,
+      "7d3db039c724142571bef681053b0ab2",
+      "::ffff:127.0.0.104"
+    ],
+    [
+      21001,
+      "c34087c38371d91eb966e0d7b58aa1c0",
+      "::ffff:127.0.0.45"
+    ],
+    [
+      21002,
+      "621fe1d1c995dd3ea6cb2b8b6cdc7006",
+      "::ffff:127.0.0.120"
+    ]
+  ],
+  "streams": [
+    {
+      "bytes": 912,
+      "contiguous": true,
+      "duration_s": 3.848,
+      "egress": "::ffff:127.0.0.104",
+      "ended_at": 1791766605.2598338,
+      "error": null,
+      "frames": 57,
+      "max_gap_s": 0.217,
+      "name": "B-http-connect",
+      "started_at": 1791766601.3490565
+    },
+    {
+      "bytes": 880,
+      "contiguous": true,
+      "duration_s": 3.673,
+      "egress": "::ffff:127.0.0.45",
+      "ended_at": 1791766605.2598531,
+      "error": null,
+      "frames": 55,
+      "max_gap_s": 0.312,
+      "name": "C-socks5",
+      "started_at": 1791766601.396005
+    }
+  ],
+  "supervisor_mutations": [
+    {
+      "op": "restart",
+      "port": 21002,
+      "t": 1791766601.8899636
+    },
+    {
+      "op": "stop",
+      "port": 21002,
+      "t": 1791766601.8899715
+    },
+    {
+      "op": "start",
+      "port": 21002,
+      "t": 1791766601.9138515
+    },
+    {
+      "op": "restart",
+      "port": 21002,
+      "t": 1791766602.343949
+    },
+    {
+      "op": "stop",
+      "port": 21002,
+      "t": 1791766602.3439567
+    },
+    {
+      "op": "start",
+      "port": 21002,
+      "t": 1791766602.3672829
+    }
+  ]
+}
