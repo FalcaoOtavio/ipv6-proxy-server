@@ -1,12 +1,12 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                
- 40097  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.81   
- 40099  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.91   
- 40107  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.2    
- 40109  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.217  
- 40111  ● ativo  HTTP   u40111   ••••   ::ffff:127.0.0.67   
+ 42470  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.231  
+ 42472  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.251  
+ 42480  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.50   
+ 42482  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.118  
+ 42484  ● ativo  HTTP   u42484   ••••   ::ffff:127.0.0.161  
 ╭──────────────────────────────────────────────────────────╮
 │ Resultado do lote                                        │
-│ Criados: 2 (portas 40111–40112)                          │
+│ Criados: 2 (portas 42484–42485)                          │
 │ Senhas aleatórias ficam só nesta sessão: exporte com x   │
 │ antes de sair.                                           │
 │   Fechar (Esc)                                           │

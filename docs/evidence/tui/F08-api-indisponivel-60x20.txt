@@ -14,7 +14,7 @@
                                                             
                                                             
                                                             
- ✕ API indisponível em http://127.0.0.1:45275. Verifique:   
+ ✕ API indisponível em http://127.0.0.1:37211. Verifique:   
  sudo systemctl status ipv6-proxy-api                       
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            

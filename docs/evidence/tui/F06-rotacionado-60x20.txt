@@ -1,6 +1,6 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                
- 40097  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.229  
- 40099  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.91   
+ 42470  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.175  
+ 42472  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.251  
                                                             
                                                             
                                                             
@@ -14,7 +14,7 @@
                                                             
                                                             
                                                             
- ✓ Porta 40099: novo IPv6 ::ffff:127.0.0.91 (era            
- ::ffff:127.0.0.154).                                       
+ ✓ Porta 42472: novo IPv6 ::ffff:127.0.0.251 (era           
+ ::ffff:127.0.0.45).                                        
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            

@@ -1,11 +1,11 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                
- 40097  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.81   
- 40099  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.91   
- 40107  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.2    
- 40109  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.217  
- 40111  ● ativo  HTTP   u40111   ••••   ::ffff:127.0.0.67   
- 40112  ● ativo  HTTP   u40112   ••••   ::ffff:127.0.0.210  
- 40117  ● ativo  HTTP   outro    n/d    ::ffff:127.0.0.139  
+ 42470  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.231  
+ 42472  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.251  
+ 42480  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.50   
+ 42482  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.118  
+ 42484  ● ativo  HTTP   u42484   ••••   ::ffff:127.0.0.161  
+ 42485  ● ativo  HTTP   u42485   ••••   ::ffff:127.0.0.187  
+ 42490  ● ativo  HTTP   outro    n/d    ::ffff:127.0.0.190  
                                                             
                                                             
                                                             
@@ -13,8 +13,8 @@
                                                             
                                                             
                                                             
- ✕ 6 linha(s) exportada(s) para                             
- /tmp/tui-val-60x20-3hse2bp6/proxies-20261012-053323.txt    
- (0600). 1 omitido(s): senha desconhecida (a API não        
+ ✕ 6 exportada(s), 1 omitida(s) (senha desconhecida) para   
+ /tmp/tui-val-60x20-eqwtt__o/proxies-20261012-055643.txt    
+ (0600).                                                    
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            

@@ -1,7 +1,7 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                
- 40097  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.229  
- 40099  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.91   
- 40100  ● ativo  HTTP   —        —      ::ffff:127.0.0.130  
+ 42470  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.175  
+ 42472  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.251  
+ 42473  ● ativo  HTTP   —        —      ::ffff:127.0.0.105  
                                                             
                                                             
                                                             
@@ -14,7 +14,7 @@
                                                             
                                                             
                                                             
- ✕ Aguarde: Rotacionando porta 40097 em andamento; a lista  
+ ✕ Aguarde: Rotacionando porta 42470 em andamento; a lista  
  recarrega ao final.                                        
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            

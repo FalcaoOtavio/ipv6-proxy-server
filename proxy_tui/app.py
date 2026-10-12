@@ -380,8 +380,9 @@ class ProxyTui(App):
                 # e.g. expanduser('~nobody-such/x') raises RuntimeError; never show locals.
                 self.say(f"Não foi possível gravar {path}: caminho inválido.", error=True)
                 return
-            message = f"{len(lines)} linha(s) exportada(s) para {written} (0600)."
-            self.say(message + (f" {note}" if note else ""), error=bool(skipped))
+            # Counts first, path last: at 60 columns only the long path wraps.
+            omitted = f", {skipped} omitida(s) (senha desconhecida)" if skipped else ""
+            self.say(f"{len(lines)} exportada(s){omitted} para {written} (0600).", error=bool(skipped))
 
         self.push_screen(ExportDialog(default, note), done)
 

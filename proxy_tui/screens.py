@@ -14,12 +14,12 @@ CREDENTIAL_MODES = [("Sem autenticação", "none"), ("Comum (mesmo usuário/senh
                     ("Aleatória por proxy", "random")]
 HELP = """\
 [b]Atalhos[/b]
-  ↑ ↓      mover seleção          a   recarregar lista
-  c        criar proxy            l   criar lote
-  e        editar selecionado     r   rotacionar IPv6
-  d        excluir (confirma)     s   ver/ocultar senha
-  x        exportar lista         ?   esta ajuda
-  Esc      fechar diálogo         q   sair
+  ↑ ↓  mover seleção         a  recarregar lista
+  c    criar proxy           l  criar lote
+  e    editar selecionado    r  rotacionar IPv6
+  d    excluir (confirma)    s  ver/ocultar senha
+  x    exportar lista        ?  esta ajuda
+  Esc  fechar diálogo        q  sair
 
 [b]Status[/b]
   ● ativo   ◐ subindo   ✕ falhou
