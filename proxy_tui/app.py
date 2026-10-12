@@ -15,7 +15,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widgets import DataTable, Footer, Static
 
-from .client import ApiError, Client
+from .client import BATCH_MAX, ApiError, Client
 from .screens import (BatchDialog, ConfirmDialog, CreateDialog, EditDialog, ExportDialog, HelpDialog,
                       MessageDialog)
 
@@ -28,6 +28,7 @@ STATUS = {
 # IPv6 last: it is the widest column and the one cut first on narrow terminals.
 COLUMNS = [("Porta", "port"), ("Status", "status"), ("Proto", "protocol"), ("Usuário", "username"),
            ("Senha", "password"), ("IPv6", "ipv6")]
+GENERIC_ERROR = "Erro inesperado na operação; nada foi exibido por segurança. Recarregue com a e tente de novo."
 EMPTY = "Nenhum proxy cadastrado.\n\nPressione c para criar um proxy ou l para criar um lote.\n? mostra todos os atalhos."
 
 def export_lines(proxies, passwords):
@@ -48,6 +49,8 @@ def write_private(path, lines):
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
     with os.fdopen(descriptor, "w") as handle:
         handle.write("".join(line + "\n" for line in lines))
+        handle.flush()
+        os.fsync(handle.fileno())
     return path
 
 class ProxyTui(App):
@@ -84,6 +87,7 @@ class ProxyTui(App):
         self.passwords = {}
         self.revealed = set()
         self.busy = None
+        self.batch_max = BATCH_MAX
 
     def compose(self) -> ComposeResult:
         table = DataTable(id="table", cursor_type="row", zebra_stripes=True)
@@ -103,6 +107,13 @@ class ProxyTui(App):
         self.run_worker(self.load(), group="refresh")
         if self.refresh_seconds:
             self.set_interval(self.refresh_seconds, self.periodic)
+
+    def _fatal_error(self):
+        """Textual's default renders a traceback with show_locals, i.e. passwords in
+        clear on the terminal. Exit with a fixed message instead."""
+        self.bell()
+        self._exit_renderables.append(Text("ipv6-proxy-tui: " + GENERIC_ERROR, style="bold red"))
+        self._close_messages_no_wait()
 
     # -- display -----------------------------------------------------------
     def say(self, message, error=False):
@@ -182,9 +193,16 @@ class ProxyTui(App):
     async def _guarded(self, coroutine):
         try:
             message = await coroutine
-        except ApiError as exc:
+        except Exception as exc:
             self.busy = None
-            self.say(exc.args[0], error=True)
+            if isinstance(exc, ApiError):
+                if exc.limit:
+                    self.batch_max = exc.limit
+                text = exc.args[0]
+            else:
+                # Never render the exception: its text/locals can hold passwords.
+                text = GENERIC_ERROR
+            self.say(text, error=True)
             await self.load(quiet=True)
             return
         self.busy = None
@@ -214,6 +232,9 @@ class ProxyTui(App):
         self.push_screen(HelpDialog())
 
     def action_reload(self):
+        if self.busy:
+            self.say(f"Aguarde: {self.busy} em andamento; a lista recarrega ao final.", error=True)
+            return
         if self.client is not None:
             self.run_worker(self.load(), group="refresh", exclusive=True)
 
@@ -263,10 +284,13 @@ class ProxyTui(App):
                 summary += "\nVeja: sudo journalctl -u ipv6-proxy@<porta>"
             if payload["credentials"] == "random":
                 summary += "\nSenhas aleatórias ficam só nesta sessão: exporte com x antes de sair."
+                if any(item.get("password") is None for item in created):
+                    # Replay after a lost response: the API never stores passwords.
+                    summary += "\nSenhas perdidas na reconexão (n/d): defina novas com e."
             self.call_later(self.push_screen, MessageDialog("Resultado do lote", summary))
             return f"Lote concluído: {len(created)} criado(s), {len(failed)} falha(s)."
 
-        self.push_screen(BatchDialog(), lambda payload: payload and self.start("Criando lote", run(payload)))
+        self.push_screen(BatchDialog(self.batch_max), lambda payload: payload and self.start("Criando lote", run(payload)))
 
     def action_edit(self):
         target = self.needs_target()
@@ -329,6 +353,10 @@ class ProxyTui(App):
                 return
             except OSError as exc:
                 self.say(f"Não foi possível gravar {path}: {exc.strerror}.", error=True)
+                return
+            except Exception:
+                # e.g. expanduser('~nobody-such/x') raises RuntimeError; never show locals.
+                self.say(f"Não foi possível gravar {path}: caminho inválido.", error=True)
                 return
             message = f"{len(lines)} linha(s) exportada(s) para {written} (0600)."
             self.say(message + (f" {note}" if note else ""), error=bool(skipped))

@@ -10,23 +10,46 @@ operacionais exigem `sudo`; `--help` funciona sem root.
 
 | Comando | Endpoint | Efeito em sessoes ativas |
 |---|---|---|
-| `list [--output table\|json]` | `GET /proxies` | nenhum |
+| `list [--output table\|json]` | `GET /proxies?include=status` | nenhum |
 | `create [--port N] [--protocol http\|socks5] [--username U [--password-stdin]]` | `POST /proxies` | nenhum (porta nova) |
 | `batch ...` | `POST /proxies/batch` | nenhum (so portas novas) |
 | `edit <porta> ...` | `GET` + `PATCH /proxies/{porta}` com `If-Match` | reinicia so o 3proxy da porta |
-| `rotate <porta>` | `POST /proxies/{porta}/rotate` | reinicia so o 3proxy da porta |
-| `delete <porta>` | `DELETE /proxies/{porta}` | encerra so a porta |
-| `export [--format F] [-f ARQ] [--force]` | `GET /proxies` | nenhum |
+| `rotate <porta>` | `GET` + `POST /proxies/{porta}/rotate` com `If-Match` | reinicia so o 3proxy da porta |
+| `delete <porta>` | `GET` + `DELETE /proxies/{porta}` com `If-Match` | encerra so a porta |
+| `export [--format F] [-f ARQ] [--force]` | `GET /proxies?include=status` | nenhum |
 
 Cada proxy roda em processo 3proxy proprio (ver `docs/API.md`); `edit`,
 `rotate` e `delete` avisam em stderr que somente as sessoes daquela porta caem.
 Nenhuma mutacao reinicia os demais proxies.
 
+`list` e `export` usam `?include=status`: um proxy caido nao esconde a lista
+(a rota legada `GET /proxies` responde 503 nesse caso). `list` mostra a coluna
+`STATUS` (`running`, `starting`, `failed`, `fenced`) e avisa em stderr quais
+portas estao fora do ar.
+
+### Idempotencia e alvo fixo (todas as mutacoes)
+
+- Cada invocacao de `create`, `batch`, `edit`, `rotate` e `delete` envia um
+  `Idempotency-Key` (uuid4 novo). `--idempotency-key K` reusa uma chave.
+- Em falha de transporte/timeout (codigo 6) o resultado e desconhecido; a
+  mensagem traz a chave e, se houver, o id. Repita **o mesmo comando** com
+  `--idempotency-key K` (e `--if-match ID`): a API devolve o resultado gravado
+  em vez de repetir, entao o lote nao duplica (validade da chave: 24 h na API).
+- **Senhas aleatorias nao sao recuperaveis no replay**: a API nunca guarda
+  senhas e so as devolve na primeira resposta. Se ela se perdeu, o replay lista
+  os proxies sem senha e avisa; defina novas com
+  `ipv6-proxy edit <porta> -u <usuario>`.
+- `edit`, `rotate` e `delete` leem o `id` (`GET /proxies/{porta}`), mostram
+  `Alvo: porta P, id ID` em stderr e enviam `If-Match: ID`; se a porta foi
+  excluida e recriada nesse intervalo, a API responde 412 e o herdeiro nao e
+  tocado. `--if-match ID` pula a leitura.
+- O timeout do `batch` cresce com a quantidade (60 s + 5 s por proxy).
+
 ### `batch`
 
 | Opcao | Descricao |
 |---|---|
-| `-c`, `--proxy-count N` | Quantidade (1–64512; a API limita a `PROXY_BATCH_MAX`, padrao 1000) |
+| `-c`, `--proxy-count N` | Quantidade, de 1 ate `PROXY_BATCH_MAX` lido de `/etc/ipv6-proxy-api.env` (padrao 1000) |
 | `--start-port P` | Primeira porta candidata (padrao: inicio da faixa). Portas ocupadas sao puladas; as portas nao precisam ser contiguas |
 | `-t`, `--protocol http\|socks5` | Padrao `http` |
 | `-u`, `--username U` | Usuario comum a todos (senha sem eco ou `--password-stdin`); com `--random` e o prefixo (usuario `<prefixo><porta>`, padrao `u<porta>`). Maximo 58 caracteres |
@@ -38,6 +61,7 @@ Nenhuma mutacao reinicia os demais proxies.
 | `-f`, `--output-file ARQ` | Grava a lista em arquivo `0600` em vez do stdout |
 | `--force` | Permite substituir `ARQ` (troca atomica; um symlink e substituido, nunca seguido) |
 | `--yes` | Modo nao interativo: nao pergunta nada |
+| `--idempotency-key K` | Reexecuta com seguranca apos timeout (ver Idempotencia) |
 
 Sem `--yes` e em terminal, o CLI pergunta em PT-BR somente o que faltou
 (quantidade, porta inicial, protocolo, credenciais, arquivo), mostra o resumo e
@@ -95,7 +119,7 @@ sudo ipv6-proxy export --format json
 | 3 | Privilegio/configuracao/token invalido (inclui HTTP 401) |
 | 4 | Erro HTTP 4xx, exceto 401 (404, 409 portas insuficientes, 412 proxy mudou, 422) |
 | 5 | Erro do servidor (inclui 503 do lote tudo-ou-nada), redirect ou resposta invalida |
-| 6 | Falha de transporte; o resultado pode ser desconhecido (consulte `list`) |
+| 6 | Falha de transporte; o resultado pode ser desconhecido (consulte `list` ou repita com a `--idempotency-key` da mensagem) |
 | 7 | Lote parcial (`--partial`): parte criada, portas com falha em stderr |
 | 130 | Interrompido |
 

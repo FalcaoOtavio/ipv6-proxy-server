@@ -129,6 +129,10 @@ class CreateDialog(Dialog):
 class BatchDialog(Dialog):
     title_text = "Criar lote"
 
+    def __init__(self, max_count=1000):
+        super().__init__()
+        self.max_count = max_count
+
     def fields(self):
         yield Label("Quantidade")
         yield Input(id="count", value="10", compact=True)
@@ -142,13 +146,15 @@ class BatchDialog(Dialog):
         yield Input(id="username", compact=True)
         yield Label("Senha (só no modo comum)")
         yield Input(id="password", password=True, compact=True)
+        yield Checkbox("Parcial: manter os criados se alguma porta falhar", id="partial", compact=True)
 
     def build(self):
         count = self.value("#count").strip()
-        if not count.isdigit() or not 1 <= int(count) <= 10000:
-            raise ValueError("Quantidade deve ser um número entre 1 e 10000.")
+        if not count.isdigit() or not 1 <= int(count) <= self.max_count:
+            raise ValueError(f"Quantidade deve ser um número entre 1 e {self.max_count} (PROXY_BATCH_MAX).")
         mode = self.value("#mode")
-        payload = {"count": int(count), "protocol": self.value("#protocol"), "credentials": mode}
+        payload = {"count": int(count), "protocol": self.value("#protocol"), "credentials": mode,
+                   "partial": self.value("#partial")}
         start = parse_port(self.value("#start"))
         if start is not None:
             payload["start_port"] = start
