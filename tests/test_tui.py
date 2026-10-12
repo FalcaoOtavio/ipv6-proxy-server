@@ -11,8 +11,8 @@ from textual.widgets import DataTable, Input, Static
 
 from proxy_api.app import create_app
 from proxy_api.config import Settings
-from proxy_tui.app import ProxyTui, export_lines
-from proxy_tui.client import ApiError, Client, validate_url
+from proxy_tui.app import ProxyTui
+from proxy_tui.client import Client
 from test_api import FakeBackend
 
 TOKEN = "t" * 40
@@ -32,9 +32,10 @@ class GatedBackend(FakeBackend):
         super().replace(old, new)
 
 class Api:
-    def __init__(self, tmp_path):
+    def __init__(self, tmp_path, **overrides):
         settings = Settings(subnet="2001:db8:1::/64", bind_ipv4="127.0.0.1", interface="eth0",
-                            api_token=TOKEN, data_dir=tmp_path / "data", port_start=30000, port_end=30099)
+                            api_token=TOKEN, data_dir=tmp_path / "data", port_start=30000, port_end=30099,
+                            **overrides)
         self.app = create_app(settings, GatedBackend)
         sock = socket.socket()
         sock.bind(("127.0.0.1", 0))
@@ -392,15 +393,102 @@ async def test_f08_small_terminal_with_many_rows(api):
         await pilot.press("tab", "tab", "tab", "tab", "tab", "tab", "tab")
         await pilot.pause()
 
-def test_export_lines_and_client_guards():
-    proxies = [{"id": "a", "ipv4": "1.2.3.4", "port": 1, "username": None},
-               {"id": "b", "ipv4": "1.2.3.4", "port": 2, "username": "u"},
-               {"id": "c", "ipv4": "1.2.3.4", "port": 3, "username": "v"}]
-    assert export_lines(proxies, {"c": "p"}) == (["1.2.3.4:1", "1.2.3.4:3:v:p"], 1)
-    for url in ("https://127.0.0.1:8000", "http://example.com:8000", "http://127.0.0.1:8000/x"):
-        with pytest.raises(ApiError):
-            validate_url(url)
-    assert validate_url("http://[::1]:8000/") == "http://[::1]:8000"
-    with pytest.raises(ApiError):
-        Client.from_env({"PROXY_API_TOKEN": "short"})
-    assert Client.from_env({"PROXY_API_TOKEN": TOKEN}).token == TOKEN
+async def test_a6_export_to_unknown_user_home_shows_generic_error(api, tmp_path):
+    """expanduser('~nobody/x') raises RuntimeError: must not reach Textual's show_locals traceback."""
+    app = tui(api)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await settle(pilot, app)
+        await pilot.press("c")
+        await pilot.pause()
+        await fill(pilot, app, port="30090", username="eve", password="TopS3cretPw")
+        await pilot.click("#ok")
+        await settle(pilot, app, lambda: rows(app))
+        await pilot.press("x")
+        await pilot.pause()
+        await fill(pilot, app, path="~usuarioinexistente/x")
+        await pilot.click("#ok")
+        await settle(pilot, app)
+        assert app.is_running and app.screen is app.screen_stack[0]
+        assert "caminho inválido" in status(app) and "TopS3cretPw" not in status(app)
+
+async def test_a6_unexpected_exception_in_action_is_generic(api, monkeypatch):
+    def boom(payload):
+        password = payload["password"]  # noqa: F841  (a local the traceback would print)
+        raise RuntimeError("leaked " + payload["password"])
+    monkeypatch.setattr(api.client, "create", boom)
+    app = tui(api)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await settle(pilot, app)
+        await pilot.press("c")
+        await pilot.pause()
+        await fill(pilot, app, username="eve", password="TopS3cretPw")
+        await pilot.click("#ok")
+        await settle(pilot, app)
+        assert app.is_running and "Erro inesperado" in status(app)
+        assert "TopS3cretPw" not in status(app)
+
+async def test_a6_fatal_error_never_renders_locals(api):
+    app = tui(api)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await settle(pilot, app)
+        password = "TopS3cretPw"
+        try:
+            raise RuntimeError("crash")
+        except RuntimeError:
+            app._fatal_error()
+        rendered = " ".join(str(r) for r in app._exit_renderables)
+        assert "Erro inesperado" in rendered and password not in rendered and "crash" not in rendered
+        app._exit_renderables.clear()
+
+async def test_batch_limit_follows_api_and_partial_is_sent(tmp_path):
+    api = Api(tmp_path, batch_max=5)
+    try:
+        original = api.backend.provision
+        def flaky(record):
+            if record.port == 30001:
+                raise RuntimeError("boom")
+            original(record)
+        api.backend.provision = flaky
+        app = tui(api)
+        async with app.run_test(size=(80, 24)) as pilot:
+            await settle(pilot, app)
+            await pilot.press("l")
+            await pilot.pause()
+            await fill(pilot, app, count="6")
+            await pilot.click("#ok")
+            await settle(pilot, app)
+            assert "limite da API (5" in status(app) and app.batch_max == 5
+            await pilot.press("l")
+            await pilot.pause()
+            await fill(pilot, app, count="6")
+            await pilot.click("#ok")
+            await pilot.pause()
+            assert "entre 1 e 5" in str(app.screen.query_one("#error", Static).render())
+            await fill(pilot, app, count="3", partial=True)
+            await pilot.click("#ok")
+            await settle(pilot, app, lambda: len(rows(app)) == 2)
+            result = str(app.screen.query(Static)[1].render())
+            assert "Falhas: 1 — 30001" in result
+            assert set(api.records()) == {30000, 30002}
+    finally:
+        api.stop()
+
+async def test_reload_is_blocked_during_mutation(api):
+    api.client.create({"port": 30080})
+    app = tui(api)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await settle(pilot, app, lambda: rows(app))
+        api.backend.gate.clear()
+        api.backend.entered.clear()
+        await pilot.press("r")
+        await pilot.pause()
+        await pilot.click("#ok")
+        for _ in range(100):
+            if api.backend.entered.is_set():
+                break
+            await pilot.pause(0.02)
+        await pilot.press("a")
+        await pilot.pause()
+        assert "Aguarde" in status(app) and not any(w.group == "refresh" and w.is_running for w in app.workers)
+        api.backend.gate.set()
+        await settle(pilot, app, lambda: "novo IPv6" in status(app))

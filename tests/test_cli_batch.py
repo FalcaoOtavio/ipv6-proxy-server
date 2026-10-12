@@ -302,3 +302,42 @@ def test_abbreviated_password_flag_is_rejected_without_echo():
                             capture_output=True, text=True)
     assert result.returncode == 2 and "S3cret-x" not in result.stdout
     assert "S3cret-x" not in result.stderr and "nao reconhecidos" in result.stderr
+
+def test_batch_retry_with_same_key_does_not_duplicate(api, env_file):
+    """A7: rerun after a lost response replays the stored result; random passwords are not recoverable."""
+    url, app = api
+    args = ("batch", "-c", "3", "--random", "--yes", "--idempotency-key", "retry-1")
+    first = run(env_file, url, *args)
+    assert first.returncode == 0, first.stderr
+    again = run(env_file, url, *args)
+    assert again.returncode == 0, again.stderr
+    assert len(stored(app)) == 3
+    assert [line.split(":")[:3] for line in again.stdout.splitlines()] == \
+        [line.split(":")[:3] for line in first.stdout.splitlines()]
+    assert "nao sao recuperaveis" in again.stderr
+    assert not any(r.password in again.stdout + again.stderr for r in stored(app).values())
+
+def test_batch_count_follows_proxy_batch_max(api, env_file):
+    url, app = api
+    env_file.write_text(f"PROXY_API_TOKEN={TOKEN}\nPROXY_BATCH_MAX=5\n")
+    result = run(env_file, url, "batch", "-c", "6", "--no-auth", "--yes")
+    assert result.returncode == 2 and "PROXY_BATCH_MAX=5" in result.stderr
+    assert not stored(app)
+    # Default (1000) when the env file does not set it; the API is the final judge.
+    env_file.write_text(f"PROXY_API_TOKEN={TOKEN}\n")
+    result = run(env_file, url, "batch", "-c", "1001", "--no-auth", "--yes")
+    assert result.returncode == 2 and "PROXY_BATCH_MAX=1000" in result.stderr
+
+def test_list_and_export_survive_a_failed_proxy(api, env_file):
+    """A1: legacy GET /proxies answers 503 when one proxy is down; the CLI must still list all."""
+    url, app = api
+    assert run(env_file, url, "batch", "-c", "2", "--no-auth", "--yes").returncode == 0
+    backend = app.state.manager.backend
+    backend.healthy = lambda records: False
+    backend.statuses = lambda records: {r.port: "failed" if r.port == 30001 else "running" for r in records}
+    listed = run(env_file, url, "list")
+    assert listed.returncode == 0, listed.stderr
+    assert "failed" in listed.stdout and "30001" in listed.stderr
+    exported = run(env_file, url, "export")
+    assert exported.returncode == 0
+    assert exported.stdout.splitlines() == ["127.0.0.1:30000", "127.0.0.1:30001"]

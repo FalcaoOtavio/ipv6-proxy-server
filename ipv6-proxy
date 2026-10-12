@@ -14,6 +14,7 @@ import sys
 import tempfile
 import urllib.error
 import urllib.request
+import uuid
 import warnings
 from pathlib import Path
 
@@ -25,9 +26,16 @@ MAX_ENV = 64 * 1024
 # Only operations on an existing port touch live sessions (per-port 3proxy,
 # proven by tests/test_isolation_3proxy.py); create/batch disrupt nothing.
 PORT_WARNING = "Esta operacao reinicia somente o 3proxy da porta afetada e desconecta as sessoes dessa porta."
-MAX_COUNT = 64512
+# Default of PROXY_BATCH_MAX; the env file value wins (the API enforces it with 422).
+BATCH_MAX = 1000
+TIMEOUT = 60
+# The API may take up to ~5 s per port in a batch; a shorter client timeout
+# would give up on a batch the server still completes.
+BATCH_SECONDS_PER_PROXY = 5
 FORMATS = ("ipv4:port:user:pass", "text", "json")
 ID_RE = re.compile(r"^[0-9a-f]{32}$")
+KEY_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+STATUSES = {"running", "starting", "failed", "fenced"}
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 PASSWORD_RE = re.compile(r"^[A-Za-z0-9_.!@%+=-]{1,128}$")
 
@@ -79,11 +87,13 @@ def build_parser():
 
     rotate = subparsers.add_parser("rotate", help="Troca somente o IPv6 de uma porta")
     rotate.add_argument("port", type=port)
+    add_if_match(rotate)
     add_mutation_options(rotate)
     add_output(rotate)
 
     batch = subparsers.add_parser("batch", help="Cria proxies em lote")
-    batch.add_argument("-c", "--proxy-count", type=count, help=f"Quantidade de proxies (1-{MAX_COUNT})")
+    batch.add_argument("-c", "--proxy-count", type=count,
+                       help=f"Quantidade de proxies (1 ate PROXY_BATCH_MAX, padrao {BATCH_MAX})")
     batch.add_argument("--start-port", type=port, help="Primeira porta candidata; portas ocupadas sao puladas")
     batch.add_argument("-t", "--protocol", choices=("http", "socks5"))
     auth = batch.add_mutually_exclusive_group()
@@ -99,6 +109,7 @@ def build_parser():
 
     edit = subparsers.add_parser("edit", help="Edita porta, protocolo ou credenciais de um proxy")
     edit.add_argument("port", type=port)
+    add_if_match(edit)
     edit.add_argument("--new-port", type=port, help="Nova porta")
     edit.add_argument("-t", "--protocol", choices=("http", "socks5"))
     edit_auth = edit.add_mutually_exclusive_group()
@@ -114,6 +125,7 @@ def build_parser():
 
     delete = subparsers.add_parser("delete", help="Remove um proxy")
     delete.add_argument("port", type=port)
+    add_if_match(delete)
     add_mutation_options(delete)
     add_output(delete)
     return parser
@@ -125,6 +137,23 @@ def add_output(parser):
 
 def add_mutation_options(parser):
     parser.add_argument("--yes", action="store_true", help="Confirma sem perguntar (modo nao interativo)")
+    parser.add_argument("--idempotency-key", type=idempotency_key, default=None,
+                        help="Chave de idempotencia (padrao: uuid4 novo); repita a mesma chave para "
+                             "reexecutar com seguranca apos timeout")
+
+def add_if_match(parser):
+    parser.add_argument("--if-match", type=proxy_id, metavar="ID",
+                        help="Id esperado do proxy (pula a leitura previa; use o id da mensagem de timeout)")
+
+def idempotency_key(value):
+    if not KEY_RE.fullmatch(value):
+        raise argparse.ArgumentTypeError("chave invalida: 1-128 caracteres entre letras, numeros, . _ : -")
+    return value
+
+def proxy_id(value):
+    if not ID_RE.fullmatch(value):
+        raise argparse.ArgumentTypeError("id invalido: 32 caracteres hexadecimais minusculos")
+    return value
 
 def add_file_options(parser):
     parser.add_argument("--format", choices=FORMATS, default="ipv4:port:user:pass",
@@ -137,8 +166,8 @@ def count(value):
         parsed = int(value)
     except ValueError as exc:
         raise argparse.ArgumentTypeError("a quantidade deve ser um numero inteiro") from exc
-    if not 1 <= parsed <= MAX_COUNT:
-        raise argparse.ArgumentTypeError(f"a quantidade deve estar entre 1 e {MAX_COUNT}")
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("a quantidade deve ser no minimo 1")
     return parsed
 
 
@@ -153,6 +182,10 @@ def port(value):
 
 
 def load_token(path=ENV_FILE, expected_uid=0):
+    return load_config(path, expected_uid)[0]
+
+def load_config(path=ENV_FILE, expected_uid=0):
+    """(token, batch_max) from the API env file."""
     flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     try:
         descriptor = os.open(path, flags)
@@ -204,7 +237,8 @@ def load_token(path=ENV_FILE, expected_uid=0):
     token = values.get("PROXY_API_TOKEN", "")
     if len(token) < 32:
         raise CliError("PROXY_API_TOKEN ausente ou curto no arquivo de configuracao.", 3)
-    return token
+    batch_max = values.get("PROXY_BATCH_MAX", str(BATCH_MAX))
+    return token, int(batch_max) if batch_max.isdigit() and int(batch_max) >= 1 else BATCH_MAX
 
 
 def confirm(args, stdin, stderr, warning=PORT_WARNING):
@@ -249,7 +283,8 @@ def read_password(args, stdin):
     return password
 
 
-def request(method, path, token, payload=None, opener=None, headers=None):
+def request(method, path, token, payload=None, opener=None, headers=None, timeout=TIMEOUT, retry_hint=""):
+    """retry_hint: how to repeat a mutation safely, shown when its result is unknown."""
     data = None if payload is None else json.dumps(payload, separators=(",", ":")).encode("ascii")
     headers = {**(headers or {}), "Authorization": "Bearer " + token, "Accept": "application/json"}
     if data is not None:
@@ -257,7 +292,7 @@ def request(method, path, token, payload=None, opener=None, headers=None):
     req = urllib.request.Request(API_URL + path, data=data, headers=headers, method=method)
     client = opener or urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
     try:
-        with client.open(req, timeout=60) as response:
+        with client.open(req, timeout=timeout) as response:
             status_code = response.status
             body = response.read(MAX_BODY + 1)
     except urllib.error.HTTPError as exc:
@@ -269,6 +304,8 @@ def request(method, path, token, payload=None, opener=None, headers=None):
         message = "Falha de comunicacao com a API local"
         if method != "GET":
             message += "; o resultado pode ser desconhecido. Execute 'sudo ipv6-proxy list' antes de tentar novamente"
+            if retry_hint:
+                message += ". " + retry_hint
         raise CliError(message + ".", 6) from exc
 
     if len(body) > MAX_BODY:
@@ -325,8 +362,12 @@ def proxy_view(value):
         ipv6 = str(ipaddress.IPv6Address(value["ipv6"]))
     except (ipaddress.AddressValueError, TypeError) as exc:
         raise CliError("API retornou um endereco IP invalido.", 5) from exc
-    return {"port": item_port, "protocol": value["protocol"], "ipv4": ipv4,
-            "ipv6": ipv6, "username": username}
+    view = {"port": item_port, "protocol": value["protocol"], "ipv4": ipv4, "ipv6": ipv6, "username": username}
+    if "status" in value:
+        if value["status"] not in STATUSES:
+            raise CliError("API retornou um status invalido.", 5)
+        view["status"] = value["status"]
+    return view
 
 def batch_view(decoded):
     if not isinstance(decoded, dict) or not isinstance(decoded.get("created"), list) \
@@ -380,6 +421,10 @@ def table(records):
     rows = [["PORTA", "PROTOCOLO", "IPV4", "IPV6", "USUARIO"]]
     rows.extend([[str(item["port"]), item["protocol"], item["ipv4"], item["ipv6"],
                   item["username"] or "-"] for item in records])
+    if any("status" in item for item in records):
+        rows[0].append("STATUS")
+        for row, item in zip(rows[1:], records):
+            row.append(item.get("status", "-"))
     if any(item.get("password") for item in records):
         rows[0].append("SENHA")
         for row, item in zip(rows[1:], records):
@@ -527,8 +572,53 @@ def batch_payload(args, stdin, stderr):
         payload.update(credentials="common", username=args.username, password=read_password(args, stdin))
     return payload, interactive
 
+def new_key(args):
+    """One Idempotency-Key per invocation; --idempotency-key reuses the one of a timed-out run."""
+    return args.idempotency_key or str(uuid.uuid4())
+
+def retry_hint(argv_hint, key, proxy_id=None):
+    hint = f"Para reexecutar sem duplicar, repita com --idempotency-key {key}"
+    if proxy_id:
+        hint += f" --if-match {proxy_id}"
+    return hint + f" ({argv_hint})"
+
+def mutate(args, method, path, token, opener, payload=None, proxy_id=None, timeout=TIMEOUT):
+    key = new_key(args)
+    headers = {"Idempotency-Key": key}
+    if proxy_id:
+        headers["If-Match"] = proxy_id
+    return request(method, path, token, payload, opener, headers, timeout,
+                   retry_hint(f"ipv6-proxy {args.command}", key, proxy_id))
+
+def pinned_id(args, token, stderr, opener):
+    """Id of the proxy at args.port (or --if-match), sent as If-Match: a concurrent
+    delete+recreate on this port answers 412 instead of hitting the heir."""
+    if args.if_match:
+        return args.if_match
+    status_code, body = request("GET", f"/proxies/{args.port}", token, opener=opener)
+    if status_code != 200:
+        raise CliError(f"API retornou HTTP {status_code}; esperado 200.", 5)
+    current = decode_json(body)
+    value = current.get("id") if isinstance(current, dict) else None
+    if not isinstance(value, str) or not ID_RE.fullmatch(value):
+        raise CliError("API retornou um id invalido.", 5)
+    print(f"Alvo: porta {args.port}, id {value}.", file=stderr)
+    return value
+
+def list_records(token, stderr, opener):
+    """Per-item status: one broken proxy no longer hides the whole list (legacy GET /proxies answers 503)."""
+    status_code, body = request("GET", "/proxies?include=status", token, opener=opener)
+    records = parse_response("list", status_code, body)
+    down = [str(item["port"]) for item in records if item.get("status") in ("failed", "fenced")]
+    if down:
+        print(f"Aviso: {len(down)} proxy(s) fora do ar (portas {', '.join(down)}); "
+              "veja sudo journalctl -u ipv6-proxy@<porta>.", file=stderr)
+    return records
+
 def run_batch(args, token, stdin, stdout, stderr, opener):
     payload, interactive = batch_payload(args, stdin, stderr)
+    if payload["count"] > args.batch_max:
+        raise CliError(f"Quantidade acima do limite da API (PROXY_BATCH_MAX={args.batch_max}).", 2)
     if interactive:
         start = payload.get("start_port", "inicio da faixa")
         print(f"Criar {payload['count']} proxies {payload['protocol']} a partir da porta {start}, "
@@ -536,7 +626,8 @@ def run_batch(args, token, stdin, stdout, stderr, opener):
     confirm(args, stdin, stderr, warning=None)
     output_file = OutputFile(args.output_file, args.force) if args.output_file else None
     try:
-        status_code, body = request("POST", "/proxies/batch", token, payload, opener)
+        status_code, body = mutate(args, "POST", "/proxies/batch", token, opener, payload,
+                                   timeout=TIMEOUT + BATCH_SECONDS_PER_PROXY * payload["count"])
         if status_code not in (201, 207):
             raise CliError(f"API retornou HTTP {status_code}; esperado 201 ou 207.", 5)
         created, failed = batch_view(decode_json(body))
@@ -546,6 +637,10 @@ def run_batch(args, token, stdin, stdout, stderr, opener):
         raise
     if payload["credentials"] == "common":
         created = [{**item, "password": payload["password"]} for item in created]
+    elif payload["credentials"] == "random" and any(item["password"] is None for item in created):
+        # Replay of a key: the API never stores passwords, so only the first response had them.
+        print("Aviso: resposta repetida (mesma --idempotency-key); senhas aleatorias nao sao recuperaveis. "
+              "Defina novas com 'ipv6-proxy edit <porta> -u <usuario>'.", file=stderr)
     emit(created, args, stdout, stderr, output_file)
     print(f"Criados: {len(created)}; falhas: {len(failed)}.", file=stderr)
     if failed:
@@ -567,16 +662,8 @@ def run_edit(args, token, stdin, stdout, stderr, opener):
         payload.update(username=None, password=None)
     elif args.username:
         payload.update(username=args.username, password=read_password(args, stdin))
-    status_code, body = request("GET", f"/proxies/{args.port}", token, opener=opener)
-    if status_code != 200:
-        raise CliError(f"API retornou HTTP {status_code}; esperado 200.", 5)
-    current = decode_json(body)
-    proxy_id = current.get("id") if isinstance(current, dict) else None
-    if not isinstance(proxy_id, str) or not ID_RE.fullmatch(proxy_id):
-        raise CliError("API retornou um id invalido.", 5)
-    # If-Match: a concurrent delete+recreate on this port answers 412 instead of editing the heir.
-    status_code, body = request("PATCH", f"/proxies/{args.port}", token, payload, opener,
-                                headers={"If-Match": proxy_id})
+    proxy_id = pinned_id(args, token, stderr, opener)
+    status_code, body = mutate(args, "PATCH", f"/proxies/{args.port}", token, opener, payload, proxy_id)
     if status_code != 200:
         raise CliError(f"API retornou HTTP {status_code}; esperado 200.", 5)
     render("edit", proxy_view(decode_json(body)), args.output, stdout)
@@ -584,8 +671,7 @@ def run_edit(args, token, stdin, stdout, stderr, opener):
 def run_export(args, token, stdin, stdout, stderr, opener):
     output_file = OutputFile(args.output_file, args.force) if args.output_file else None
     try:
-        status_code, body = request("GET", "/proxies", token, opener=opener)
-        records = parse_response("list", status_code, body)
+        records = list_records(token, stderr, opener)
     except BaseException:
         if output_file:
             output_file.discard()
@@ -604,8 +690,7 @@ def execute(args, token, stdin, stdout, stderr, opener=None):
     if args.command == "export":
         return run_export(args, token, stdin, stdout, stderr, opener)
     if args.command == "list":
-        status_code, body = request("GET", "/proxies", token, opener=opener)
-        result = parse_response("list", status_code, body)
+        result = list_records(token, stderr, opener)
     elif args.command == "create":
         confirm(args, stdin, stderr, warning=None)
         password = read_password(args, stdin)
@@ -614,15 +699,17 @@ def execute(args, token, stdin, stdout, stderr, opener=None):
             payload["port"] = args.port
         if args.username is not None:
             payload.update(username=args.username, password=password)
-        status_code, body = request("POST", "/proxies", token, payload, opener)
+        status_code, body = mutate(args, "POST", "/proxies", token, opener, payload)
         result = parse_response("create", status_code, body)
     elif args.command == "rotate":
+        proxy_id = pinned_id(args, token, stderr, opener)
         confirm(args, stdin, stderr)
-        status_code, body = request("POST", f"/proxies/{args.port}/rotate", token, opener=opener)
+        status_code, body = mutate(args, "POST", f"/proxies/{args.port}/rotate", token, opener, proxy_id=proxy_id)
         result = parse_response("rotate", status_code, body)
     else:
+        proxy_id = pinned_id(args, token, stderr, opener)
         confirm(args, stdin, stderr)
-        status_code, body = request("DELETE", f"/proxies/{args.port}", token, opener=opener)
+        status_code, body = mutate(args, "DELETE", f"/proxies/{args.port}", token, opener, proxy_id=proxy_id)
         result = parse_response("delete", status_code, body, args.port)
     render(args.command, result, args.output, stdout)
 
@@ -638,7 +725,7 @@ def main(argv=None, stdin=None, stdout=None, stderr=None, env_file=ENV_FILE,
         print("Erro: execute os comandos operacionais com sudo.", file=stderr)
         return 3
     try:
-        token = load_token(env_file, expected_uid)
+        token, args.batch_max = load_config(env_file, expected_uid)
         execute(args, token, stdin, stdout, stderr, opener)
         return 0
     except CliError as exc:

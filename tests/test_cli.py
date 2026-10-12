@@ -49,9 +49,15 @@ class Opener:
         self.requests = []
 
     def open(self, request, timeout):
+        """response may be a list: one item (Response or exception) per request."""
         self.requests.append((request, timeout))
         if self.error:
             raise self.error
+        if isinstance(self.response, list):
+            item = self.response.pop(0)
+            if isinstance(item, BaseException):
+                raise item
+            return item
         return self.response
 
 
@@ -153,7 +159,7 @@ def test_list_json_sanitizes_server_fields(env_file):
     assert "must-not-leak" not in stdout + stderr
     request, timeout = opener.requests[0]
     assert request.get_method() == "GET"
-    assert request.full_url == "http://127.0.0.1:8000/proxies"
+    assert request.full_url == "http://127.0.0.1:8000/proxies?include=status"
     assert request.get_header("Authorization") == "Bearer " + TOKEN
     assert timeout == 60
 
@@ -178,22 +184,83 @@ def test_create_sends_credentials_from_stdin_without_leaking(env_file):
     assert cli.PORT_WARNING not in stderr  # create disrupts no existing session
 
 
+PROXY_ID = "a" * 32
+CURRENT = {**PROXY, "id": PROXY_ID, "status": "running"}
+
 def test_rotate_and_delete_contract(env_file):
-    code, stdout, _, opener = invoke(
-        env_file, ["rotate", "30000", "--yes", "--output", "json"], json_response(200, PROXY)
+    code, stdout, stderr, opener = invoke(
+        env_file, ["rotate", "30000", "--yes", "--output", "json"],
+        [json_response(200, CURRENT), json_response(200, PROXY)]
     )
     assert code == 0 and json.loads(stdout) == PROXY
-    assert opener.requests[0][0].get_method() == "POST"
-    assert opener.requests[0][0].data is None
-    assert opener.requests[0][0].full_url.endswith("/proxies/30000/rotate")
+    assert PROXY_ID in stderr
+    read, sent = opener.requests[0][0], opener.requests[1][0]
+    assert read.get_method() == "GET" and read.full_url.endswith("/proxies/30000")
+    assert sent.get_method() == "POST"
+    assert sent.data is None
+    assert sent.full_url.endswith("/proxies/30000/rotate")
+    assert sent.get_header("If-match") == PROXY_ID
 
     code, stdout, _, opener = invoke(
-        env_file, ["delete", "30000", "--yes", "--output", "json"], Response(204)
+        env_file, ["delete", "30000", "--yes", "--output", "json"], [json_response(200, CURRENT), Response(204)]
     )
     assert code == 0
     assert json.loads(stdout) == {"deleted": True, "port": 30000}
-    assert opener.requests[0][0].get_method() == "DELETE"
-    assert opener.requests[0][0].data is None
+    sent = opener.requests[1][0]
+    assert sent.get_method() == "DELETE"
+    assert sent.data is None
+    assert sent.get_header("If-match") == PROXY_ID
+
+def test_delete_of_replaced_proxy_reports_412(env_file):
+    """M1: delete+recreate between the read and the DELETE must not remove the heir."""
+    error = urllib.error.HTTPError("http://127.0.0.1:8000/proxies/30000", 412, "", {}, io.BytesIO(b"{}"))
+    code, _, stderr, opener = invoke(env_file, ["delete", "30000", "--yes"], [json_response(200, CURRENT), error])
+    assert code == 4 and "HTTP 412" in stderr
+    assert len(opener.requests) == 2
+
+def test_if_match_option_skips_the_read(env_file):
+    code, _, _, opener = invoke(env_file, ["delete", "30000", "--yes", "--if-match", PROXY_ID], Response(204))
+    assert code == 0 and len(opener.requests) == 1
+    assert opener.requests[0][0].get_header("If-match") == PROXY_ID
+
+@pytest.mark.parametrize("argv, responses", [
+    (["create", "--yes"], [json_response(201, PROXY)]),
+    (["rotate", "30000", "--yes"], [json_response(200, CURRENT), json_response(200, PROXY)]),
+    (["delete", "30000", "--yes"], [json_response(200, CURRENT), Response(204)]),
+])
+def test_every_mutation_sends_a_fresh_idempotency_key(env_file, argv, responses):
+    keys = []
+    for _ in range(2):
+        code, _, _, opener = invoke(env_file, argv, list(responses))
+        assert code == 0
+        keys.append(opener.requests[-1][0].get_header("Idempotency-key"))
+        assert all(r.get_header("Idempotency-key") is None for r, _ in opener.requests[:-1])
+    assert keys[0] != keys[1]
+    assert all(cli.KEY_RE.fullmatch(key) for key in keys)
+
+def test_timeout_message_carries_the_key_and_retry_reuses_it(env_file):
+    """A7: on timeout the user gets the exact key; rerunning with it sends the same key."""
+    code, _, stderr, opener = invoke(env_file, ["rotate", "30000", "--yes"],
+                                     [json_response(200, CURRENT), TimeoutError()])
+    assert code == 6
+    key = opener.requests[1][0].get_header("Idempotency-key")
+    assert f"--idempotency-key {key} --if-match {PROXY_ID}" in stderr
+    code, _, _, opener = invoke(env_file, ["rotate", "30000", "--yes", "--idempotency-key", key,
+                                           "--if-match", PROXY_ID], json_response(200, PROXY))
+    assert code == 0 and opener.requests[0][0].get_header("Idempotency-key") == key
+
+def test_invalid_idempotency_key_is_rejected_by_the_parser(env_file):
+    with pytest.raises(SystemExit):
+        invoke(env_file, ["create", "--yes", "--idempotency-key", "bad key"])
+
+def test_list_shows_status_and_warns_about_broken_proxies(env_file):
+    """A1: one failed proxy must not hide the list."""
+    records = [CURRENT, {**CURRENT, "port": 30001, "id": "b" * 32, "status": "failed"}]
+    code, stdout, stderr, opener = invoke(env_file, ["list"], json_response(200, records))
+    assert code == 0
+    assert "STATUS" in stdout and "failed" in stdout and "running" in stdout
+    assert "30001" in stderr and "fora do ar" in stderr
+    assert opener.requests[0][0].full_url.endswith("/proxies?include=status")
 
 
 def test_mutation_requires_confirmation_without_tty(env_file):
@@ -227,11 +294,11 @@ def test_validation_error_array_is_not_rendered(env_file):
 
 def test_transport_failure_is_not_retried_and_warns_of_unknown_result(env_file):
     code, stdout, stderr, opener = invoke(
-        env_file, ["rotate", "30000", "--yes"], error=urllib.error.URLError("refused")
+        env_file, ["rotate", "30000", "--yes"], [json_response(200, CURRENT), urllib.error.URLError("refused")]
     )
     assert code == 6
     assert not stdout
-    assert len(opener.requests) == 1
+    assert len(opener.requests) == 2
     assert "resultado pode ser desconhecido" in stderr
 
 
@@ -416,6 +483,9 @@ def live_api(tmp_path):
         def existing_addresses(self):
             return {str(r.ipv6) for r in self.records}
 
+        def statuses(self, records):
+            return {r.port: "running" for r in records}
+
         def healthy(self, records):
             return self.records == records
 
@@ -479,7 +549,8 @@ def test_live_http_cli_share_serialized_state(live_api, env_file):
         assert len({r["port"] for r in records}) == 12
         assert len({r["ipv6"] for r in records}) == 12
         # The CLI view keeps its 0.1.0 fields; owner and id are API-only.
-        listed = [{k: v for k, v in r.items() if k not in ("owner", "id")} for r in http.get("/proxies").json()]
+        listed = [{k: v for k, v in r.items() if k not in ("owner", "id")}
+                  for r in http.get("/proxies?include=status").json()]
         result = process_cli(env_file, url, "list", "--output", "json")
         assert result.returncode == 0 and json.loads(result.stdout) == listed
         assert {r["port"] for r in listed} == {r["port"] for r in records}
@@ -541,7 +612,7 @@ def test_transport_ignores_environment_proxies_and_refuses_redirects(env_file, m
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             requests.append((self.path, self.headers.get("Authorization")))
-            if self.path == "/proxies":
+            if self.path == "/proxies?include=status":
                 self.send_response(status)
                 self.send_header("Location", "/credential-sink")
             else:
@@ -565,7 +636,15 @@ def test_transport_ignores_environment_proxies_and_refuses_redirects(env_file, m
             code = cli.main(["list"], env_file=env_file, expected_uid=os.getuid(),
                             effective_uid=0, stdout=io.StringIO(), stderr=stderr)
             assert code == 5 and f"HTTP {status}" in stderr.getvalue()
-            assert requests == [("/proxies", "Bearer " + TOKEN)]
+            assert requests == [("/proxies?include=status", "Bearer " + TOKEN)]
         finally:
             server.shutdown()
             thread.join(timeout=5)
+
+def test_batch_timeout_grows_with_count(env_file):
+    body = {"created": [], "failed": []}
+    code, _, _, opener = invoke(env_file, ["batch", "-c", "200", "--no-auth", "--yes"], json_response(201, body))
+    assert code == 0
+    request, timeout = opener.requests[0]
+    assert timeout == cli.TIMEOUT + cli.BATCH_SECONDS_PER_PROXY * 200
+    assert request.get_header("Idempotency-key")

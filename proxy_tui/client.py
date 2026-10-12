@@ -12,6 +12,7 @@ import stat
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from pathlib import Path
 
 DEFAULT_URL = "http://127.0.0.1:8000"
@@ -19,6 +20,10 @@ ENV_FILE = Path("/etc/ipv6-proxy-api.env")
 MAX_BODY = 16 * 1024 * 1024
 MAX_ENV = 64 * 1024
 TIMEOUT = 60
+# The API may take ~5 s per port in a batch; timing out earlier abandons a batch the server completes.
+BATCH_SECONDS_PER_PROXY = 5
+BATCH_MAX = 1000  # PROXY_BATCH_MAX default; a 422 reporting another limit updates it
+LIMIT_RE = re.compile(rb"count above the configured limit \((\d{1,6})\)")
 
 MESSAGES = {
     401: "Token inválido. Confira PROXY_API_TOKEN em /etc/ipv6-proxy-api.env e rode com sudo.",
@@ -32,9 +37,13 @@ MESSAGES = {
 }
 
 class ApiError(Exception):
-    def __init__(self, message, status=None):
+    def __init__(self, message, status=None, limit=None):
         super().__init__(message)
         self.status = status
+        self.limit = limit
+
+class _Transport(Exception):
+    """Request outcome unknown (connection lost or timeout)."""
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
@@ -93,25 +102,45 @@ class Client:
         token = environ.get("PROXY_API_TOKEN")
         return cls(url, check_token(token) if token else load_token())
 
-    def _call(self, method, path, payload=None, if_match=None):
+    def _call(self, method, path, payload=None, if_match=None, timeout=TIMEOUT):
+        """Mutations carry one Idempotency-Key and are retried once with it after a
+        transport failure: the API replays the stored result instead of repeating it."""
         data = None if payload is None else json.dumps(payload).encode()
         headers = {"Authorization": "Bearer " + self.token, "Accept": "application/json"}
         if data is not None:
             headers["Content-Type"] = "application/json"
         if if_match:
             headers["If-Match"] = if_match
+        attempts = 1
+        if method != "GET":
+            headers["Idempotency-Key"] = str(uuid.uuid4())
+            attempts = 2
+        for attempt in range(attempts):
+            try:
+                return self._send(method, path, data, headers, timeout)
+            except _Transport:
+                if attempt + 1 < attempts:
+                    continue
+                message = f"API indisponível em {self.url}. Verifique: sudo systemctl status ipv6-proxy-api"
+                if method != "GET":
+                    message += " (a operação pode ter sido aplicada; recarregue com a antes de repetir)"
+                raise ApiError(message) from None
+
+    def _send(self, method, path, data, headers, timeout):
         req = urllib.request.Request(self.url + path, data=data, headers=headers, method=method)
         try:
-            with self._opener.open(req, timeout=TIMEOUT) as response:
+            with self._opener.open(req, timeout=timeout) as response:
                 status, body = response.status, response.read(MAX_BODY + 1)
         except urllib.error.HTTPError as exc:
+            # Only a bare number is taken from an error body (they can reflect secrets).
+            match = LIMIT_RE.search(exc.read(512)) if exc.code == 422 and path == "/proxies/batch" else None
             exc.close()
+            if match:
+                limit = int(match.group(1))
+                raise ApiError(f"Quantidade acima do limite da API ({limit}, PROXY_BATCH_MAX).", 422, limit) from None
             raise ApiError(MESSAGES.get(exc.code, f"A API respondeu HTTP {exc.code}."), exc.code) from None
         except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException):
-            message = f"API indisponível em {self.url}. Verifique: sudo systemctl status ipv6-proxy-api"
-            if method != "GET":
-                message += " (a operação pode ter sido aplicada; recarregue com a antes de repetir)"
-            raise ApiError(message) from None
+            raise _Transport from None
         if len(body) > MAX_BODY:
             raise ApiError("Resposta da API excedeu o limite permitido.")
         if not body:
@@ -125,7 +154,8 @@ class Client:
         return self._call("POST", "/proxies", payload)[1]
 
     def batch(self, payload):
-        return self._call("POST", "/proxies/batch", payload)[1]
+        timeout = TIMEOUT + BATCH_SECONDS_PER_PROXY * payload["count"]
+        return self._call("POST", "/proxies/batch", payload, timeout=timeout)[1]
 
     def update(self, target, payload):
         return self._call("PATCH", f"/proxies/{target['port']}", payload, target["id"])[1]
