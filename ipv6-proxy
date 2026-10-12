@@ -11,6 +11,7 @@ import os
 import re
 import stat
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 import warnings
@@ -21,7 +22,12 @@ ENV_FILE = Path("/etc/ipv6-proxy-api.env")
 # Allow all 64,512 supported ports, including maximum-length view fields.
 MAX_BODY = 16 * 1024 * 1024
 MAX_ENV = 64 * 1024
-MUTATION_WARNING = "Esta operacao reinicia somente o 3proxy da porta afetada e desconecta as sessoes dessa porta."
+# Only operations on an existing port touch live sessions (per-port 3proxy,
+# proven by tests/test_isolation_3proxy.py); create/batch disrupt nothing.
+PORT_WARNING = "Esta operacao reinicia somente o 3proxy da porta afetada e desconecta as sessoes dessa porta."
+MAX_COUNT = 64512
+FORMATS = ("ipv4:port:user:pass", "text", "json")
+ID_RE = re.compile(r"^[0-9a-f]{32}$")
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 PASSWORD_RE = re.compile(r"^[A-Za-z0-9_.!@%+=-]{1,128}$")
 
@@ -37,8 +43,20 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+class Parser(argparse.ArgumentParser):
+    """No prefix matching and no echo of unknown arguments: a mistyped
+    "--password secret" must neither become --password-stdin nor land in stderr."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, allow_abbrev=False, **kwargs)
+
+    def error(self, message):
+        if message.startswith("unrecognized arguments"):
+            message = "argumentos nao reconhecidos (valores omitidos); senhas nunca sao aceitas em argumentos"
+        super().error(message)
+
 def build_parser():
-    parser = argparse.ArgumentParser(
+    parser = Parser(
         prog="ipv6-proxy",
         description="Gerencia proxies pelo mesmo servico da API local.",
     )
@@ -64,6 +82,36 @@ def build_parser():
     add_mutation_options(rotate)
     add_output(rotate)
 
+    batch = subparsers.add_parser("batch", help="Cria proxies em lote")
+    batch.add_argument("-c", "--proxy-count", type=count, help=f"Quantidade de proxies (1-{MAX_COUNT})")
+    batch.add_argument("--start-port", type=port, help="Primeira porta candidata; portas ocupadas sao puladas")
+    batch.add_argument("-t", "--protocol", choices=("http", "socks5"))
+    auth = batch.add_mutually_exclusive_group()
+    auth.add_argument("--random", action="store_true",
+                      help="Senha aleatoria por proxy; -u vira prefixo do usuario (<prefixo><porta>)")
+    auth.add_argument("--no-auth", action="store_true", help="Proxies sem autenticacao")
+    batch.add_argument("-u", "--username", help="Usuario comum (ou prefixo com --random)")
+    batch.add_argument("--password-stdin", action="store_true",
+                       help="Le a senha comum de uma linha da entrada padrao (requer --yes)")
+    batch.add_argument("--partial", action="store_true", help="Mantem os criados se algum falhar")
+    add_file_options(batch)
+    add_mutation_options(batch)
+
+    edit = subparsers.add_parser("edit", help="Edita porta, protocolo ou credenciais de um proxy")
+    edit.add_argument("port", type=port)
+    edit.add_argument("--new-port", type=port, help="Nova porta")
+    edit.add_argument("-t", "--protocol", choices=("http", "socks5"))
+    edit_auth = edit.add_mutually_exclusive_group()
+    edit_auth.add_argument("-u", "--username", help="Novo usuario (senha sem eco ou --password-stdin)")
+    edit_auth.add_argument("--no-auth", action="store_true", help="Remove a autenticacao")
+    edit.add_argument("--password-stdin", action="store_true",
+                      help="Le a nova senha de uma linha da entrada padrao (requer --yes)")
+    add_mutation_options(edit)
+    add_output(edit)
+
+    export = subparsers.add_parser("export", help="Exporta a lista existente (sem senhas)")
+    add_file_options(export)
+
     delete = subparsers.add_parser("delete", help="Remove um proxy")
     delete.add_argument("port", type=port)
     add_mutation_options(delete)
@@ -76,7 +124,22 @@ def add_output(parser):
 
 
 def add_mutation_options(parser):
-    parser.add_argument("--yes", action="store_true", help="Confirma a interrupcao de conexoes")
+    parser.add_argument("--yes", action="store_true", help="Confirma sem perguntar (modo nao interativo)")
+
+def add_file_options(parser):
+    parser.add_argument("--format", choices=FORMATS, default="ipv4:port:user:pass",
+                        help="Formato da lista (padrao IPv4:porta:usuario:senha)")
+    parser.add_argument("-f", "--output-file", help="Grava a lista neste arquivo (modo 0600) em vez do stdout")
+    parser.add_argument("--force", action="store_true", help="Substitui o arquivo de saida se existir")
+
+def count(value):
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("a quantidade deve ser um numero inteiro") from exc
+    if not 1 <= parsed <= MAX_COUNT:
+        raise argparse.ArgumentTypeError(f"a quantidade deve estar entre 1 e {MAX_COUNT}")
+    return parsed
 
 
 def port(value):
@@ -144,8 +207,9 @@ def load_token(path=ENV_FILE, expected_uid=0):
     return token
 
 
-def confirm(args, stdin, stderr):
-    print(MUTATION_WARNING, file=stderr)
+def confirm(args, stdin, stderr, warning=PORT_WARNING):
+    if warning:
+        print(warning, file=stderr)
     if args.yes:
         return
     if not stdin.isatty():
@@ -185,9 +249,9 @@ def read_password(args, stdin):
     return password
 
 
-def request(method, path, token, payload=None, opener=None):
+def request(method, path, token, payload=None, opener=None, headers=None):
     data = None if payload is None else json.dumps(payload, separators=(",", ":")).encode("ascii")
-    headers = {"Authorization": "Bearer " + token, "Accept": "application/json"}
+    headers = {**(headers or {}), "Authorization": "Bearer " + token, "Accept": "application/json"}
     if data is not None:
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(API_URL + path, data=data, headers=headers, method=method)
@@ -217,6 +281,7 @@ def raise_api_error(status_code):
         401: "token invalido ou ausente",
         404: "proxy nao encontrado",
         409: "conflito de porta, credenciais ou pool esgotado",
+        412: "o proxy mudou desde a leitura; consulte 'list' e tente novamente",
         422: "entrada invalida; verifique os argumentos e a faixa de portas configurada",
         503: "servico indisponivel; consulte os logs da API",
     }
@@ -263,6 +328,25 @@ def proxy_view(value):
     return {"port": item_port, "protocol": value["protocol"], "ipv4": ipv4,
             "ipv6": ipv6, "username": username}
 
+def batch_view(decoded):
+    if not isinstance(decoded, dict) or not isinstance(decoded.get("created"), list) \
+            or not isinstance(decoded.get("failed"), list):
+        raise CliError("API retornou um lote invalido.", 5)
+    created = []
+    for item in decoded["created"]:
+        view = proxy_view(item)
+        password = item.get("password")
+        if password is not None and (not isinstance(password, str) or not PASSWORD_RE.fullmatch(password)):
+            raise CliError("API retornou uma senha invalida.", 5)
+        created.append({**view, "password": password})
+    failed = []
+    for item in decoded["failed"]:
+        failed_port = item.get("port") if isinstance(item, dict) else None
+        if isinstance(failed_port, bool) or not isinstance(failed_port, int) or not 1024 <= failed_port <= 65535:
+            raise CliError("API retornou uma falha de lote invalida.", 5)
+        failed.append(failed_port)
+    return created, failed
+
 
 def parse_response(command, status_code, body, requested_port=None):
     expected = {"list": 200, "create": 201, "rotate": 200, "delete": 204}[command]
@@ -288,24 +372,242 @@ def render(command, value, output, stdout):
     if command == "delete":
         print(f"Proxy da porta {value['port']} removido.", file=stdout)
         return
-    records = value if command == "list" else [value]
+    stdout.write(table(value if command == "list" else [value]))
+
+def table(records):
     if not records:
-        print("Nenhum proxy.", file=stdout)
-        return
+        return "Nenhum proxy.\n"
     rows = [["PORTA", "PROTOCOLO", "IPV4", "IPV6", "USUARIO"]]
     rows.extend([[str(item["port"]), item["protocol"], item["ipv4"], item["ipv6"],
                   item["username"] or "-"] for item in records])
+    if any(item.get("password") for item in records):
+        rows[0].append("SENHA")
+        for row, item in zip(rows[1:], records):
+            row.append(item.get("password") or "-")
     widths = [max(len(row[index]) for row in rows) for index in range(len(rows[0]))]
-    for row in rows:
-        print("  ".join(cell.ljust(widths[index]) for index, cell in enumerate(row)).rstrip(), file=stdout)
+    return "".join("  ".join(cell.ljust(widths[index]) for index, cell in enumerate(row)).rstrip() + "\n"
+                   for row in rows)
 
+
+def proxy_line(item):
+    """IPv4:porta[:usuario[:senha]]; fields the CLI does not have are omitted, never invented."""
+    fields = [item["ipv4"], str(item["port"])]
+    if item["username"]:
+        fields.append(item["username"])
+        if item.get("password"):
+            fields.append(item["password"])
+    return ":".join(fields)
+
+def format_list(records, fmt):
+    if fmt == "json":
+        return json.dumps(records, ensure_ascii=True, separators=(",", ":")) + "\n"
+    if fmt == "text":
+        return table(records)
+    return "".join(proxy_line(item) + "\n" for item in records)
+
+class OutputFile:
+    """Credential list file: 0600, never follows a symlink, never clobbers without --force.
+
+    Opened before the API call so a bad path cannot lose one-time passwords."""
+
+    def __init__(self, path, force):
+        self.path = Path(path)
+        self.temp = None
+        try:
+            if force:
+                if self.path.is_dir():
+                    raise CliError(f"{self.path} e um diretorio.", 2)
+                descriptor, self.temp = tempfile.mkstemp(prefix=".ipv6-proxy-", dir=self.path.parent or ".")
+            else:
+                flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+                descriptor = os.open(self.path, flags, 0o600)
+            os.fchmod(descriptor, 0o600)
+        except FileExistsError as exc:
+            raise CliError(f"{self.path} ja existe; use --force para substituir.", 2) from exc
+        except OSError as exc:
+            raise CliError(f"Nao foi possivel criar {self.path}: {exc.strerror}.", 2) from exc
+        self.file = os.fdopen(descriptor, "w", encoding="ascii")
+
+    def commit(self, text):
+        try:
+            with self.file:
+                self.file.write(text)
+                self.file.flush()
+                os.fsync(self.file.fileno())
+            if self.temp:
+                os.replace(self.temp, self.path)
+        except OSError as exc:
+            raise CliError(f"Falha ao gravar {self.path}: {exc.strerror}.", 5) from exc
+
+    def discard(self):
+        self.file.close()
+        os.unlink(self.temp or self.path)
+
+def emit(records, args, stdout, stderr, output_file=None):
+    text = format_list(records, args.format)
+    if output_file:
+        output_file.commit(text)
+        print(f"Lista gravada em {output_file.path} (modo 0600).", file=stderr)
+    else:
+        stdout.write(text)
+
+def ask(stdin, stderr, question, default=None, parse=str):
+    """Interactive question in PT-BR; repeats until the answer parses."""
+    suffix = f" [{default}]" if default is not None else ""
+    while True:
+        print(f"{question}{suffix}: ", end="", file=stderr, flush=True)
+        line = stdin.readline()
+        if not line:
+            raise CliError("Operacao cancelada.", 2)
+        answer = line.strip() or default
+        if answer is None:
+            continue
+        try:
+            return parse(str(answer))
+        except (argparse.ArgumentTypeError, ValueError) as exc:
+            print(f"Valor invalido: {exc}", file=stderr)
+
+def choice(*options):
+    def parse(value):
+        if value not in options:
+            raise ValueError("escolha " + ", ".join(options))
+        return value
+    return parse
+
+def optional_port(value):
+    return None if value == "auto" else port(value)
+
+def interactive_batch(args, stdin, stderr):
+    """Fill only the missing parameters; flags already given are kept."""
+    if args.proxy_count is None:
+        args.proxy_count = ask(stdin, stderr, "Quantidade de proxies", parse=count)
+    if args.start_port is None:
+        args.start_port = ask(stdin, stderr, "Porta inicial (auto = inicio da faixa)", "auto", optional_port)
+    if args.protocol is None:
+        args.protocol = ask(stdin, stderr, "Protocolo (http/socks5)", "http", choice("http", "socks5"))
+    if not (args.random or args.no_auth or args.username):
+        mode = ask(stdin, stderr, "Credenciais (comum/aleatoria/nenhuma)", "aleatoria",
+                   choice("comum", "aleatoria", "nenhuma"))
+        args.random, args.no_auth = mode == "aleatoria", mode == "nenhuma"
+        if mode == "comum":
+            args.username = ask(stdin, stderr, "Usuario")
+        elif args.random:
+            args.username = ask(stdin, stderr, "Prefixo do usuario", "u")
+    if args.output_file is None:
+        target = ask(stdin, stderr, "Arquivo de saida (- = tela)", "-")
+        args.output_file = None if target == "-" else target
+
+def batch_payload(args, stdin, stderr):
+    interactive = not args.yes and stdin.isatty()
+    if interactive:
+        interactive_batch(args, stdin, stderr)
+    if args.proxy_count is None:
+        raise CliError("Informe -c/--proxy-count (ou rode em terminal para o modo interativo).", 2)
+    if not (args.random or args.no_auth or args.username):
+        raise CliError("Escolha as credenciais: -u/--username (comum), --random ou --no-auth.", 2)
+    if args.no_auth and (args.username or args.password_stdin):
+        raise CliError("--no-auth nao aceita usuario ou senha.", 2)
+    payload = {"count": args.proxy_count, "protocol": args.protocol or "http", "partial": args.partial}
+    if args.start_port is not None:
+        payload["start_port"] = args.start_port
+    if args.random:
+        if args.password_stdin:
+            raise CliError("--random gera as senhas; nao use --password-stdin.", 2)
+        payload["credentials"] = "random"
+        if args.username:
+            # The API appends the port (up to 5 digits) to the 64-char username.
+            if not USERNAME_RE.fullmatch(args.username) or len(args.username) > 58:
+                raise CliError("Prefixo deve ter 1-58 caracteres: letras, numeros, _, . ou -.", 2)
+            payload["username"] = args.username
+    elif args.no_auth:
+        payload["credentials"] = "none"
+    else:
+        if len(args.username) > 58:
+            raise CliError("Usuario do lote deve ter no maximo 58 caracteres.", 2)
+        payload.update(credentials="common", username=args.username, password=read_password(args, stdin))
+    return payload, interactive
+
+def run_batch(args, token, stdin, stdout, stderr, opener):
+    payload, interactive = batch_payload(args, stdin, stderr)
+    if interactive:
+        start = payload.get("start_port", "inicio da faixa")
+        print(f"Criar {payload['count']} proxies {payload['protocol']} a partir da porta {start}, "
+              f"credenciais {payload['credentials']}.", file=stderr)
+    confirm(args, stdin, stderr, warning=None)
+    output_file = OutputFile(args.output_file, args.force) if args.output_file else None
+    try:
+        status_code, body = request("POST", "/proxies/batch", token, payload, opener)
+        if status_code not in (201, 207):
+            raise CliError(f"API retornou HTTP {status_code}; esperado 201 ou 207.", 5)
+        created, failed = batch_view(decode_json(body))
+    except BaseException:
+        if output_file:
+            output_file.discard()
+        raise
+    if payload["credentials"] == "common":
+        created = [{**item, "password": payload["password"]} for item in created]
+    emit(created, args, stdout, stderr, output_file)
+    print(f"Criados: {len(created)}; falhas: {len(failed)}.", file=stderr)
+    if failed:
+        print("Portas com falha: " + ", ".join(map(str, failed)), file=stderr)
+        raise CliError("Lote parcial: alguns proxies nao foram criados.", 7)
+
+def run_edit(args, token, stdin, stdout, stderr, opener):
+    if args.password_stdin and not args.username:
+        raise CliError("--password-stdin exige --username.", 2)
+    if args.new_port is None and args.protocol is None and not args.username and not args.no_auth:
+        raise CliError("Nada a alterar: use --new-port, --protocol, --username ou --no-auth.", 2)
+    payload = {}
+    if args.new_port is not None:
+        payload["port"] = args.new_port
+    if args.protocol is not None:
+        payload["protocol"] = args.protocol
+    confirm(args, stdin, stderr)
+    if args.no_auth:
+        payload.update(username=None, password=None)
+    elif args.username:
+        payload.update(username=args.username, password=read_password(args, stdin))
+    status_code, body = request("GET", f"/proxies/{args.port}", token, opener=opener)
+    if status_code != 200:
+        raise CliError(f"API retornou HTTP {status_code}; esperado 200.", 5)
+    current = decode_json(body)
+    proxy_id = current.get("id") if isinstance(current, dict) else None
+    if not isinstance(proxy_id, str) or not ID_RE.fullmatch(proxy_id):
+        raise CliError("API retornou um id invalido.", 5)
+    # If-Match: a concurrent delete+recreate on this port answers 412 instead of editing the heir.
+    status_code, body = request("PATCH", f"/proxies/{args.port}", token, payload, opener,
+                                headers={"If-Match": proxy_id})
+    if status_code != 200:
+        raise CliError(f"API retornou HTTP {status_code}; esperado 200.", 5)
+    render("edit", proxy_view(decode_json(body)), args.output, stdout)
+
+def run_export(args, token, stdin, stdout, stderr, opener):
+    output_file = OutputFile(args.output_file, args.force) if args.output_file else None
+    try:
+        status_code, body = request("GET", "/proxies", token, opener=opener)
+        records = parse_response("list", status_code, body)
+    except BaseException:
+        if output_file:
+            output_file.discard()
+        raise
+    emit(records, args, stdout, stderr, output_file)
+    with_auth = sum(1 for item in records if item["username"])
+    if with_auth:
+        print(f"Aviso: {with_auth} proxies com autenticacao exportados sem senha; a API nao devolve "
+              "senhas existentes (elas so aparecem na criacao).", file=stderr)
 
 def execute(args, token, stdin, stdout, stderr, opener=None):
+    if args.command == "batch":
+        return run_batch(args, token, stdin, stdout, stderr, opener)
+    if args.command == "edit":
+        return run_edit(args, token, stdin, stdout, stderr, opener)
+    if args.command == "export":
+        return run_export(args, token, stdin, stdout, stderr, opener)
     if args.command == "list":
         status_code, body = request("GET", "/proxies", token, opener=opener)
         result = parse_response("list", status_code, body)
     elif args.command == "create":
-        confirm(args, stdin, stderr)
+        confirm(args, stdin, stderr, warning=None)
         password = read_password(args, stdin)
         payload = {"protocol": args.protocol}
         if args.port is not None:
@@ -323,7 +625,6 @@ def execute(args, token, stdin, stdout, stderr, opener=None):
         status_code, body = request("DELETE", f"/proxies/{args.port}", token, opener=opener)
         result = parse_response("delete", status_code, body, args.port)
     render(args.command, result, args.output, stdout)
-
 
 def main(argv=None, stdin=None, stdout=None, stderr=None, env_file=ENV_FILE,
          expected_uid=0, effective_uid=None, opener=None):

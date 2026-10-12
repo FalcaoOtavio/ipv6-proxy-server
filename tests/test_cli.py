@@ -175,7 +175,7 @@ def test_create_sends_credentials_from_stdin_without_leaking(env_file):
         "port": 30000, "protocol": "http", "username": "alice", "password": "secret-123"
     }
     assert "secret-123" not in stdout + stderr
-    assert cli.MUTATION_WARNING in stderr
+    assert cli.PORT_WARNING not in stderr  # create disrupts no existing session
 
 
 def test_rotate_and_delete_contract(env_file):
