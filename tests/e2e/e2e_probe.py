@@ -93,10 +93,10 @@ def open_tunnel(proxy, target_port, target_host="::1"):
     return sock, line.decode().strip()
 
 
-def hold(proxy, target_port, seconds, result):
+def hold(proxy, target_port, seconds, result, target_host="::1"):
     entry = result[proxy["name"]] = {"port": proxy["port"], "ok": False}
     try:
-        sock, egress = open_tunnel(proxy, target_port)
+        sock, egress = open_tunnel(proxy, target_port, target_host)
         entry["egress"] = egress
         sock.settimeout(2)
         last = start = time.monotonic()
@@ -126,7 +126,7 @@ def streams(args):
     threading.Thread(target=serve, args=(args.target_port, stop), daemon=True).start()
     time.sleep(0.3)
     result = {}
-    threads = [threading.Thread(target=hold, args=(p, args.target_port, args.seconds, result)) for p in proxies]
+    threads = [threading.Thread(target=hold, args=(p, args.target_port, args.seconds, result, args.target_host)) for p in proxies]
     for thread in threads:
         thread.start()
     if args.ready_file:
@@ -180,6 +180,7 @@ def main(argv=None):
     s.add_argument("--target-port", type=int, default=18080)
     s.add_argument("--seconds", type=float, default=15)
     s.add_argument("--ready-file")
+    s.add_argument("--target-host", default="::1", help="Address the proxies connect to (target listens on [::])")
     s.add_argument("--proxy", action="append", required=True, help="name:http|socks5:port:user:ipv6")
     t = sub.add_parser("tui")
     t.add_argument("--seconds", type=float, default=5)
