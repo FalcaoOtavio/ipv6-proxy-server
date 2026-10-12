@@ -3,4 +3,5 @@ IPv6 Proxy Server
  30005 ✕ falhou SOCKS5 — — <ipv6>
 ✕ 1 proxy(s). 1 fora do ar: sudo journalctl -u
 ipv6-proxy@<porta>
-? Ajudac Criarl Lotee Editarr Rotacionard Excluirx Exp
+l Lote e Editar r Rotacionar d Excluir x Exportar
+? Ajuda c Criar a Recarregar s Senha q Sair

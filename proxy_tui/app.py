@@ -10,10 +10,11 @@ import os
 import time
 from pathlib import Path
 
+from rich.cells import cell_len
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.widgets import DataTable, Footer, Static
+from textual.widgets import DataTable, Static
 
 from .client import BATCH_MAX, ApiError, Client
 from .screens import (BatchDialog, ConfirmDialog, CreateDialog, EditDialog, ExportDialog, HelpDialog,
@@ -29,6 +30,10 @@ STATUS = {
 COLUMNS = [("Porta", "port"), ("Status", "status"), ("Proto", "protocol"), ("Usuário", "username"),
            ("Senha", "password"), ("IPv6", "ipv6")]
 GENERIC_ERROR = "Erro inesperado na operação; nada foi exibido por segurança. Recarregue com a e tente de novo."
+# Two fixed lines instead of Footer: Footer truncates from the right at 80 columns. Essentials last
+# so they sit on the bottom line; each line fits 60 columns minus padding.
+KEY_LINES = [[("l", "Lote"), ("e", "Editar"), ("r", "Rotacionar"), ("d", "Excluir"), ("x", "Exportar")],
+             [("?", "Ajuda"), ("c", "Criar"), ("a", "Recarregar"), ("s", "Senha"), ("q", "Sair")]]
 EMPTY = "Nenhum proxy cadastrado.\n\nPressione c para criar um proxy ou l para criar um lote.\n? mostra todos os atalhos."
 
 def export_lines(proxies, passwords):
@@ -42,6 +47,16 @@ def export_lines(proxies, passwords):
         else:
             skipped += 1
     return lines, skipped
+
+def key_bar():
+    text = Text()
+    for number, line in enumerate(KEY_LINES):
+        if number:
+            text.append("\n")
+        for index, (key, label) in enumerate(line):
+            text.append(("  " if index else "") + key, style="bold")
+            text.append(" " + label)
+    return text
 
 def write_private(path, lines):
     """Create (never overwrite) a 0600 file; returns the absolute path."""
@@ -63,8 +78,8 @@ class ProxyTui(App):
     #status { height: auto; max-height: 3; padding: 0 1; background: $boost; }
     #status.error { color: $text-error; background: $error-muted; text-style: bold; }
     #status.ok { color: $text-success; }
+    #keys { height: 2; padding: 0 1; background: $panel; }
     """
-    # Help first: on narrow terminals the footer is cut from the right.
     BINDINGS = [
         Binding("question_mark", "help", "Ajuda", key_display="?"),
         Binding("c", "create", "Criar"),
@@ -90,13 +105,11 @@ class ProxyTui(App):
         self.batch_max = BATCH_MAX
 
     def compose(self) -> ComposeResult:
-        table = DataTable(id="table", cursor_type="row", zebra_stripes=True)
-        for label, key in COLUMNS:
-            table.add_column(label, key=key)
-        yield table
-        yield Static(EMPTY, id="empty")
-        yield Static("Carregando…", id="status")
-        yield Footer(compact=True)
+        yield DataTable(id="table", cursor_type="row", zebra_stripes=True)
+        yield Static(EMPTY, id="empty", markup=False)
+        # API messages carry user data (IPv6, usernames, paths): never parse them as markup/emoji.
+        yield Static("Carregando…", id="status", markup=False)
+        yield Static(key_bar(), id="keys")
 
     def on_mount(self):
         self.query_one("#table").display = False
@@ -139,11 +152,20 @@ class ProxyTui(App):
     def render_rows(self):
         table = self.query_one("#table", DataTable)
         current = self.selected()
-        table.clear()
+        rows = []
         for proxy in self.proxies:
             label, style = STATUS.get(proxy.get("status"), ("? —", "dim"))
-            table.add_row(str(proxy["port"]), Text(label, style=style), proxy["protocol"].upper(),
-                          proxy.get("username") or "—", self.password_cell(proxy), proxy["ipv6"], key=proxy["id"])
+            # Plain str cells are parsed as markup by DataTable (':1234:' in an IPv6 became an emoji).
+            rows.append((proxy["id"], [Text(str(proxy["port"])), Text(label, style=style),
+                                       Text(proxy["protocol"].upper()), Text(proxy.get("username") or "—"),
+                                       Text(self.password_cell(proxy)), Text(proxy["ipv6"])]))
+        # Fixed widths computed here: auto widths are only measured when the table goes idle, which
+        # under a modal (batch result) can leave columns truncated ('SOCKS' for 'SOCKS5') on screen.
+        table.clear(columns=True)
+        for index, (label, key) in enumerate(COLUMNS):
+            table.add_column(label, key=key, width=max([cell_len(label)] + [c[index].cell_len for _, c in rows]))
+        for key, cells in rows:
+            table.add_row(*cells, key=key)
         table.display = bool(self.proxies)
         self.query_one("#empty").display = not self.proxies
         if current:

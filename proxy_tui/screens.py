@@ -66,9 +66,9 @@ class Dialog(ModalScreen):
 
     def compose(self) -> ComposeResult:
         with VerticalScroll():
-            yield Static(self.title_text, classes="title")
+            yield Static(self.title_text, classes="title", markup=False)
             yield from self.fields()
-            yield Static("", id="error", classes="error")
+            yield Static("", id="error", classes="error", markup=False)
             with Horizontal():
                 yield Button("Confirmar", variant="primary", id="ok", compact=True)
                 yield Button("Cancelar", id="cancel", compact=True)
@@ -222,7 +222,7 @@ class ConfirmDialog(Dialog):
     def fields(self):
         yield Static("Só o 3proxy desta porta reinicia; as sessões dela caem.")
         if self.typed:
-            yield Label(f"Digite {self.port} para confirmar")
+            yield Label(f"Digite {self.port} para confirmar", markup=False)
             yield Input(id="confirm", compact=True)
 
     def on_mount(self):
@@ -243,7 +243,7 @@ class ExportDialog(Dialog):
 
     def fields(self):
         if self.note:
-            yield Static(self.note)
+            yield Static(self.note, markup=False)
         yield Label("Arquivo (criado com permissão 0600; não sobrescreve)")
         yield Input(self.default_path, id="path", compact=True)
 
@@ -260,7 +260,7 @@ class MessageDialog(Dialog):
 
     def compose(self) -> ComposeResult:
         with VerticalScroll():
-            yield Static(self.title_text, classes="title")
+            yield Static(self.title_text, classes="title", markup=False)
             yield Static(self.body, markup=False)
             yield Button("Fechar (Esc)", id="cancel", compact=True)
 

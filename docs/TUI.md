@@ -38,6 +38,11 @@ Requer o Python do venv da instalação (onde o Textual está instalado).
 | `Esc` | fechar diálogo sem efeito |
 | `q` | sair |
 
+O rodapé mostra todos os atalhos em duas linhas fixas (cabem a partir de 60 colunas);
+`? Ajuda`, `c Criar`, `a Recarregar`, `s Senha` e `q Sair` ficam na última linha.
+Dados vindos da API (IPv6, usuário, mensagens, caminhos) são exibidos literalmente:
+nunca são interpretados como markup ou códigos de emoji do Rich.
+
 Status em texto e símbolo (não só cor): `● ativo`, `◐ subindo`, `✕ falhou`,
 `■ isolado` (dupla falha; reinicie a API). A lista vem de
 `GET /proxies?include=status`, então um proxy fora do ar aparece como tal em vez

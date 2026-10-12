@@ -12,4 +12,5 @@ IPv6 Proxy Server
 │ Confirmar Cancelar │
 ╰──────────────────────────────────────────────────────────────╯
 ✓ Senha da porta 30071 oculta.
-? Ajudac Criarl Lotee Editarr Rotacionard Excluirx Exportars Senhaa Reca
+l Lote e Editar r Rotacionar d Excluir x Exportar
+? Ajuda c Criar a Recarregar s Senha q Sair
