@@ -127,10 +127,12 @@ sudo bash install.sh --cli-only
 sudo bash install.sh --tui-only
 ```
 
+Dependencias Python: o instalador usa `pip install --require-hashes -r requirements.lock` (pins exatos com hashes; regere com o comando no topo do arquivo) e reinstala o venv somente quando o lock muda.
+
 Esses modos nunca chamam `systemctl`: nao reiniciam API nem proxies e nao
 alteram token, env, estado ou unidades. `--cli-only` substitui atomicamente
 apenas `/usr/local/bin/ipv6-proxy` (root:root 0755). `--tui-only` instala o
-pin de `textual` do `requirements.txt` no venv da API, `proxy_tui/` em
+`requirements.lock` (com hashes) no venv da API, `proxy_tui/` em
 `/opt/ipv6-proxy-server` e `/usr/local/bin/ipv6-proxy-tui`. Ambos recusam
 sobrescrever arquivo desconhecido, symlink ou com permissoes inesperadas.
 

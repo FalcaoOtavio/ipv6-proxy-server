@@ -38,7 +38,9 @@ def test_real_ipv4_to_ipv6_and_auth(tmp_path):
     ports = [item.getsockname()[1] for item in sockets]
     for item in sockets:
         item.close()
-    settings = Settings(subnet="::/126", bind_ipv4="127.0.0.1", interface="lo", block_private_destinations=False,
+    # loopback-only test harness: targets/egress are loopback, so the SSRF deny is off
+    settings = Settings(subnet="::/126", bind_ipv4="127.0.0.1", interface="lo",
+                        block_private_destinations=False,
                         api_token="x" * 32, data_dir=tmp_path)
     records = [ProxyRecord(port=ports[0], protocol="http", username="alice", password="secret", ipv6="::1"),
                ProxyRecord(port=ports[1], protocol="socks5", username="bob", password="other", ipv6="::1")]

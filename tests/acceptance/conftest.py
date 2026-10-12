@@ -244,7 +244,9 @@ class Harness:
         wrapper = tmp_path / "3proxy-wrapper"
         wrapper.write_text(WRAPPER.format(faults=self.faults, binary=Path(BINARY).resolve()))
         wrapper.chmod(0o755)
-        self.settings = Settings(subnet="::ffff:127.0.0.0/120", bind_ipv4="127.0.0.1", interface="lo", block_private_destinations=False,
+        # loopback-only test harness: targets/egress are loopback, so the SSRF deny is off
+        self.settings = Settings(subnet="::ffff:127.0.0.0/120", bind_ipv4="127.0.0.1", interface="lo",
+                                 block_private_destinations=False,
                                  api_token=ADMIN, data_dir=self.data_dir, binary=wrapper,
                                  port_start=self.ports[0], port_end=self.ports[-1], supervisor="local")
         self.app = create_app(self.settings, LoopbackBackend)

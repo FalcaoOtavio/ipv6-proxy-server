@@ -17,7 +17,9 @@ pytestmark = pytest.mark.skipif(not BINARY, reason="Set TEST_3PROXY_BINARY for r
 def setup(tmp_path):
     from proxy_api.config import Settings
     ports = free_ports(4)
-    settings = Settings(subnet="::ffff:127.0.0.0/120", bind_ipv4="127.0.0.1", interface="lo", block_private_destinations=False,
+    # loopback-only test harness: targets/egress are loopback, so the SSRF deny is off
+    settings = Settings(subnet="::ffff:127.0.0.0/120", bind_ipv4="127.0.0.1", interface="lo",
+                        block_private_destinations=False,
                         api_token=ADMIN, data_dir=tmp_path, binary=BINARY,
                         port_start=min(ports), port_end=max(ports), supervisor="local")
     manager = Manager(settings, LoopbackBackend(settings))
@@ -95,7 +97,9 @@ def test_edit_batch_and_status_against_real_3proxy(tmp_path):
     from proxy_api.config import Settings
     from test_isolation_3proxy import EchoServer, tunnel, Heartbeat
     ports = sorted(free_ports(6))
-    settings = Settings(subnet="::ffff:127.0.0.0/120", bind_ipv4="127.0.0.1", interface="lo", block_private_destinations=False, api_token=ADMIN,
+    # loopback-only test harness: targets/egress are loopback, so the SSRF deny is off
+    settings = Settings(subnet="::ffff:127.0.0.0/120", bind_ipv4="127.0.0.1", interface="lo", api_token=ADMIN,
+                        block_private_destinations=False,
                         data_dir=tmp_path, binary=BINARY, port_start=ports[0], port_end=ports[-1], supervisor="local")
     echo = EchoServer()
     try:
@@ -161,6 +165,7 @@ def test_reconcile_of_200_proxies_is_measured_and_adopts_on_restart(tmp_path):
     from proxy_api.config import Settings
     from proxy_api.models import ProxyRecord
     ports = bindable_ports(200)
+    # loopback-only test harness: targets/egress are loopback, so the SSRF deny is off
     settings = Settings(subnet="::ffff:127.0.0.0/120", bind_ipv4="127.0.0.1", interface="lo",
                         block_private_destinations=False, api_token=ADMIN, data_dir=tmp_path,
                         binary=BINARY, supervisor="local")
