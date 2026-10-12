@@ -34,12 +34,6 @@ ProtectHome=true
 PrivateTmp=true
 ReadOnlyPaths=/var/lib/ipv6-proxy-api/proxies
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
-# Kernel-level SSRF backstop (ADR 0007), TCP and UDP alike, independent of the
-# 3proxy ACL: host loopback, IPv4-mapped, link-local, ULA and multicast IPv6.
-# IPv4 is untouched, so clients reaching -i<bind_ipv4> are never affected. The
-# own subnet is not listed (a static unit cannot know it); the per-instance
-# 3proxy "deny" ACL covers it. Needs cgroup v2 + BPF; ignored with a warning otherwise.
-IPAddressDeny=::/128 ::1/128 ::ffff:0:0/96 fe80::/10 fc00::/7 ff00::/8
 CapabilityBoundingSet=
 
 [Install]

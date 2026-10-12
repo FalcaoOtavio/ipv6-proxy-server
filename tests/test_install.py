@@ -18,6 +18,7 @@ from proxy_api.backend import render_config  # noqa: E402
 
 ROOT = Path(__file__).parents[1]
 INSTALLER = ROOT / "install.sh"
+DROPIN = ROOT / "deploy/ipv6-proxy@.service.d/50-block-private.conf"
 TOKEN = "f" * 64
 SUBNET = "2001:db8::/64"
 
@@ -140,6 +141,10 @@ def fake_installation(tmp_path, flavor, ports=(30000, 30001)):
     if flavor == "independent":
         (etc / "systemd/system/ipv6-proxy@.service").write_bytes((ROOT / "deploy/ipv6-proxy@.service").read_bytes())
         (etc / "systemd/system/ipv6-proxy@.service").chmod(0o644)
+        dropin = etc / "systemd/system/ipv6-proxy@.service.d/50-block-private.conf"
+        dropin.parent.mkdir()
+        dropin.write_bytes(DROPIN.read_bytes())
+        dropin.chmod(0o644)
     state = root / "var/lib/ipv6-proxy-api"
     state.mkdir(parents=True)
     proxies = [{"port": p, "protocol": "http", "ipv6": f"2001:db8::{i + 1}"} for i, p in enumerate(ports)]
@@ -773,3 +778,85 @@ def test_vm_e2e_shellcheck_clean():
         pytest.skip("shellcheck not installed")
     result = subprocess.run([str(found), str(ROOT / "tests/e2e/vm_e2e.sh")], capture_output=True, text=True)
     assert result.returncode == 0, result.stdout
+
+# --- IPAddressDeny drop-in follows PROXY_BLOCK_PRIVATE_DESTINATIONS (ADR 0007) ------------
+
+def dropin_path(root):
+    return root / "etc/systemd/system/ipv6-proxy@.service.d/50-block-private.conf"
+
+def synced_installation(tmp_path):
+    """Independent install already at this release (dropin on, as the default block is)."""
+    root = fake_installation(tmp_path, "independent")
+    run(tmp_path, stub_source() + "resolve_source\nstage_release\nplan_changes\napply_release")
+    (tmp_path / "calls").unlink(missing_ok=True)
+    return root
+
+def set_block(root, value):
+    env = root / "etc/ipv6-proxy-api.env"
+    env.write_text(env.read_text() + f"PROXY_BLOCK_PRIVATE_DESTINATIONS={value}\n")
+
+def test_dropin_denies_internal_ipv6_never_ipv4():
+    import configparser
+    from ipaddress import ip_network
+    from proxy_api.backend import PRIVATE_DESTINATIONS
+    unit = configparser.ConfigParser(strict=False, interpolation=None)
+    unit.read(DROPIN)
+    denied = {ip_network(net) for net in unit["Service"]["IPAddressDeny"].split()}
+    assert denied == {ip_network(net) for net in PRIVATE_DESTINATIONS.split(",")}  # same set as the 3proxy ACL
+    assert all(net.version == 6 for net in denied)  # clients reach -i<bind_ipv4> over IPv4
+    assert "IPAddressDeny" not in (ROOT / "deploy/ipv6-proxy@.service").read_text()  # never static
+
+@pytest.mark.parametrize("block,present_before,present_after", [
+    (None, False, True),     # default on: missing drop-in is installed
+    ("true", False, True),
+    ("false", True, False),  # off: drop-in removed
+    (" No ", True, False),
+])
+def test_update_syncs_dropin_without_restarting_proxies(tmp_path, block, present_before, present_after):
+    root = synced_installation(tmp_path)
+    if block is not None:
+        set_block(root, block)
+    if not present_before:
+        dropin_path(root).unlink()
+    result = run(tmp_path, stub_source() + "mode=update\nupdate_install independent")
+    assert "Atualizacao concluida" in result.stdout, result.stderr
+    assert dropin_path(root).exists() == present_after
+    if present_after:
+        assert dropin_path(root).read_bytes() == DROPIN.read_bytes()
+        assert stat.S_IMODE(dropin_path(root).stat().st_mode) == 0o644
+    # Only daemon-reload: each instance picks it up on its next start, none restarts now.
+    assert mutating_systemctl(tmp_path) == ["systemctl daemon-reload"]
+    assert "50-block-private.conf) mudou" in result.stdout
+    backup = next((root / "var/backups/ipv6-proxy").iterdir())
+    assert (backup / "dropin").exists() == present_before and (backup / "dropin.absent").exists() != present_before
+
+@pytest.mark.parametrize("block,present", [("true", True), ("false", False)])
+def test_update_with_dropin_in_sync_is_a_noop(tmp_path, block, present):
+    root = synced_installation(tmp_path)
+    set_block(root, block)
+    if not present:
+        dropin_path(root).unlink()
+    result = run(tmp_path, stub_source() + "mode=update\nupdate_install independent")
+    assert "Nada a atualizar" in result.stdout and mutating_systemctl(tmp_path) == []
+
+@pytest.mark.parametrize("present_before", [True, False])
+def test_failed_update_restores_dropin_state(tmp_path, present_before):
+    root = fake_installation(tmp_path, "independent")
+    old_app(root)
+    set_block(root, "true" if not present_before else "false")
+    if not present_before:
+        dropin_path(root).unlink()
+    (tmp_path / "on-api-start").write_text(f'touch "{tmp_path}/api-down"\n')
+    result = run(tmp_path, stub_source() + "mode=update\nassume_yes=true\nupdate_install independent", check=False)
+    assert result.returncode == 1 and "ok: restaurar arquivos do backup" in result.stderr, result.stderr
+    assert dropin_path(root).exists() == present_before
+
+@pytest.mark.parametrize("block,present", [(None, True), ("false", False)])
+def test_fresh_install_writes_block_and_dropin(tmp_path, block, present):
+    env = {} if block is None else {"PROXY_BLOCK_PRIVATE_DESTINATIONS": block}
+    result = run(tmp_path, stub_source() + FRESH + "trap on_exit EXIT\nfresh_install", env=env)
+    assert "Instalacao concluida" in result.stdout
+    root = tmp_path / "root"
+    written = (root / "etc/ipv6-proxy-api.env").read_text()
+    assert f"PROXY_BLOCK_PRIVATE_DESTINATIONS={'true' if present else 'false'}" in written
+    assert dropin_path(root).exists() == present

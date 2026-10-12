@@ -159,11 +159,20 @@ sem HTTPS e controle de acesso. Contrato completo em [API.md](API.md).
   anuncia `socks5_udp_associate` em `/capabilities`: inseguro, so para testes ou
   rede controlada. Mudar o valor altera a config de cada proxy; o instalador
   pede confirmacao e reinicia so os proxies afetados.
-- Defesa em profundidade: `ipv6-proxy@.service` tem `IPAddressDeny=` para
-  `::/128 ::1/128 ::ffff:0:0/96 fe80::/10 fc00::/7 ff00::/8` (TCP e UDP, independente
-  da variavel acima; exige cgroup v2). IPv4 nao e bloqueado, entao clientes na
-  `bind_ipv4` nao sao afetados. A subnet propria nao entra (unidade estatica);
-  a ACL do 3proxy cobre esse caso.
+- Defesa em profundidade: com o bloqueio ligado o instalador cria o drop-in
+  `/etc/systemd/system/ipv6-proxy@.service.d/50-block-private.conf` com
+  `IPAddressDeny=::/128 ::1/128 ::ffff:0:0/96 fe80::/10 fc00::/7 ff00::/8`
+  (TCP e UDP no kernel, exige cgroup v2). Com `false` o drop-in e removido. IPv4
+  nao e bloqueado, entao clientes na `bind_ipv4` nao sao afetados. A subnet
+  propria nao entra (arquivo estatico); a ACL do 3proxy cobre esse caso.
+- Instalacao nova grava no env o valor de `PROXY_BLOCK_PRIVATE_DESTINATIONS` do
+  ambiente do instalador (padrao `true`), ex.: laboratorio em loopback/ULA:
+  `sudo PROXY_BLOCK_PRIVATE_DESTINATIONS=false bash install.sh ...` (CI e
+  `tests/e2e/vm_e2e.sh` fazem isso, rotulado). Depois disso a fonte e o env.
+- Mudou a variavel no env? Rode `sudo bash install.sh --update`: o drop-in e
+  criado/removido (com backup e rollback), so `systemctl daemon-reload`, nenhum
+  proxy e reiniciado; cada `ipv6-proxy@<porta>` adota o drop-in na proxima
+  partida (editar/rotacionar/reboot ou `systemctl restart ipv6-proxy@<porta>`).
 
 ## Limitacoes
 
