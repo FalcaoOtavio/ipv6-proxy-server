@@ -3,7 +3,7 @@
 │ Quantidade                                               │
 │ 3                                                        │
 │ Porta inicial (vazio = início da faixa)                  │
-│ 40107                                                    │
+│ 42480                                                    │
 │ Protocolo                                                │
 │ HTTP                                                  ▼  │
 │ Credenciais                                              │

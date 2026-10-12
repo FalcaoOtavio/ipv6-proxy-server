@@ -1,20 +1,20 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                
- 40097  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.229  
- 40099  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.91   
+ 42470  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.175  
+ 42472  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.251  
                                                             
                                                             
                                                             
 ╭──────────────────────────────────────────────────────────╮
-│ Excluir o proxy da porta 40097?                          │
+│ Excluir o proxy da porta 42470?                          │
 │ Só o 3proxy desta porta reinicia; as sessões dela caem.  │
-│ Digite 40097 para confirmar                              │
+│ Digite 42470 para confirmar                              │
 │ 1234                                                     │
-│ ✕ Digite exatamente 40097; nada foi alterado.            │
+│ ✕ Digite exatamente 42470; nada foi alterado.            │
 │    Confirmar         Cancelar                            │
 ╰──────────────────────────────────────────────────────────╯
                                                             
                                                             
- ✓ Porta 40099: novo IPv6 ::ffff:127.0.0.91 (era            
- ::ffff:127.0.0.154).                                       
+ ✓ Porta 42472: novo IPv6 ::ffff:127.0.0.251 (era           
+ ::ffff:127.0.0.45).                                        
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            

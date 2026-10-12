@@ -4,7 +4,7 @@
       "viewport": "80x24",
       "criterion": "IPv6 exibido exatamente como na API",
       "ok": true,
-      "seen": "API: 2001:db8:abcd:1234:2812:9244:2381:8d66 | tela: 51375  ● ativo  HTTP   —        —      2001:db8:abcd:1234:2812:9244:2381:8d66",
+      "seen": "API: 2001:db8:abcd:1234:5f60:43a4:e37f:ea21 | tela: 48729  ● ativo  HTTP   —        —      2001:db8:abcd:1234:5f60:43a4:e37f:ea21",
       "evidence": "docs/evidence/tui/F01-ipv6-real-80x24.png"
     },
     {
@@ -31,14 +31,14 @@
       "viewport": "80x24",
       "criterion": "status atualiza por atalho de recarregar (a)",
       "ok": true,
-      "seen": "3proxy da porta 53299 morto (kill -9); após a: ‘✕ falhou’ + aviso journalctl",
+      "seen": "3proxy da porta 42524 morto (kill -9); após a: ‘✕ falhou’ + aviso journalctl",
       "evidence": "docs/evidence/tui/F01-status-atualizado-80x24.png"
     },
     {
       "viewport": "60x20",
       "criterion": "IPv6 exibido exatamente como na API",
       "ok": true,
-      "seen": "API: 2001:db8:abcd:1234:698a:ca7f:1c78:1fe8 | tela: TP   —        —      2001:db8:abcd:1234:698a:ca7f:1c78:1fe8",
+      "seen": "API: 2001:db8:abcd:1234:3693:1fcb:b7ae:762 | tela: TTP   —        —      2001:db8:abcd:1234:3693:1fcb:b7ae:762",
       "evidence": "docs/evidence/tui/F01-ipv6-real-60x20.png"
     },
     {
@@ -65,7 +65,7 @@
       "viewport": "60x20",
       "criterion": "status atualiza por atalho de recarregar (a)",
       "ok": true,
-      "seen": "3proxy da porta 40098 morto (kill -9); após a: ‘✕ falhou’ + aviso journalctl",
+      "seen": "3proxy da porta 42471 morto (kill -9); após a: ‘✕ falhou’ + aviso journalctl",
       "evidence": "docs/evidence/tui/F01-status-atualizado-60x20.png"
     }
   ],
@@ -87,7 +87,7 @@
       "viewport": "80x24",
       "criterion": "API indisponível: erro acionável sem traceback",
       "ok": true,
-      "seen": "para recarregar. | ✕ API indisponível em http://127.0.0.1:48919. Verifique: sudo systemctl status | ipv6-proxy-api | l Lote  e Editar  r Rotacionar  d Excluir  x Exportar | ? Ajuda  c Criar  a Recarregar  s Senha  q Sair",
+      "seen": "para recarregar. | ✕ API indisponível em http://127.0.0.1:59935. Verifique: sudo systemctl status | ipv6-proxy-api | l Lote  e Editar  r Rotacionar  d Excluir  x Exportar | ? Ajuda  c Criar  a Recarregar  s Senha  q Sair",
       "evidence": "docs/evidence/tui/F08-api-indisponivel-80x24.png"
     },
     {
@@ -120,7 +120,7 @@
       "viewport": "60x20",
       "criterion": "API indisponível: erro acionável sem traceback",
       "ok": true,
-      "seen": "para recarregar. | ✕ API indisponível em http://127.0.0.1:45275. Verifique: | sudo systemctl status ipv6-proxy-api | l Lote  e Editar  r Rotacionar  d Excluir  x Exportar | ? Ajuda  c Criar  a Recarregar  s Senha  q Sair",
+      "seen": "para recarregar. | ✕ API indisponível em http://127.0.0.1:37211. Verifique: | sudo systemctl status ipv6-proxy-api | l Lote  e Editar  r Rotacionar  d Excluir  x Exportar | ? Ajuda  c Criar  a Recarregar  s Senha  q Sair",
       "evidence": "docs/evidence/tui/F08-api-indisponivel-60x20.png"
     },
     {
@@ -162,7 +162,7 @@
       "viewport": "80x24",
       "criterion": "Esc fecha diálogo sem efeito colateral",
       "ok": true,
-      "seen": "formulário com porta 53298 cancelado; registros: 0"
+      "seen": "formulário com porta 42523 cancelado; registros: 0"
     },
     {
       "viewport": "80x24",
@@ -194,7 +194,7 @@
       "viewport": "60x20",
       "criterion": "Esc fecha diálogo sem efeito colateral",
       "ok": true,
-      "seen": "formulário com porta 40097 cancelado; registros: 0"
+      "seen": "formulário com porta 42470 cancelado; registros: 0"
     },
     {
       "viewport": "60x20",
@@ -229,14 +229,14 @@
       "viewport": "80x24",
       "criterion": "feedback de sucesso e novo item na lista",
       "ok": true,
-      "seen": "status ‘Proxy criado na porta 53298 com IPv6 …’; linha 53298 ● ativo",
+      "seen": "status ‘Proxy criado na porta 42523 com IPv6 …’; linha 42523 ● ativo",
       "evidence": "docs/evidence/tui/F03-criado-80x24.png"
     },
     {
       "viewport": "80x24",
       "criterion": "protocolo escolhido no formulário",
       "ok": true,
-      "seen": "porta 53299 criada como socks5"
+      "seen": "porta 42524 criada como socks5"
     },
     {
       "viewport": "60x20",
@@ -263,14 +263,14 @@
       "viewport": "60x20",
       "criterion": "feedback de sucesso e novo item na lista",
       "ok": true,
-      "seen": "status ‘Proxy criado na porta 40097 com IPv6 …’; linha 40097 ● ativo",
+      "seen": "status ‘Proxy criado na porta 42470 com IPv6 …’; linha 42470 ● ativo",
       "evidence": "docs/evidence/tui/F03-criado-60x20.png"
     },
     {
       "viewport": "60x20",
       "criterion": "protocolo escolhido no formulário",
       "ok": true,
-      "seen": "porta 40098 criada como socks5"
+      "seen": "porta 42471 criada como socks5"
     }
   ],
   "F05": [
@@ -278,42 +278,42 @@
       "viewport": "80x24",
       "criterion": "conflito de porta mostra erro sem alterar nada",
       "ok": true,
-      "seen": "porta 53299→53298: ‘Conflito: porta já em uso…’; nada mudou",
+      "seen": "porta 42524→42523: ‘Conflito: porta já em uso…’; nada mudou",
       "evidence": "docs/evidence/tui/F05-conflito-80x24.png"
     },
     {
       "viewport": "80x24",
       "criterion": "altera credenciais/protocolo/porta",
       "ok": true,
-      "seen": "53299 SOCKS5 → 53300 HTTP usuário bob",
+      "seen": "42524 SOCKS5 → 42525 HTTP usuário bob",
       "evidence": "docs/evidence/tui/F05-editado-80x24.png"
     },
     {
       "viewport": "80x24",
       "criterion": "demais proxies inalterados",
       "ok": true,
-      "seen": "supervisor tocou só [53299, 53300]; 53298 idêntico",
+      "seen": "supervisor tocou só [42524, 42525]; 42523 idêntico",
       "evidence": "docs/evidence/tui/F05-formulario-80x24.png"
     },
     {
       "viewport": "60x20",
       "criterion": "conflito de porta mostra erro sem alterar nada",
       "ok": true,
-      "seen": "porta 40098→40097: ‘Conflito: porta já em uso…’; nada mudou",
+      "seen": "porta 42471→42470: ‘Conflito: porta já em uso…’; nada mudou",
       "evidence": "docs/evidence/tui/F05-conflito-60x20.png"
     },
     {
       "viewport": "60x20",
       "criterion": "altera credenciais/protocolo/porta",
       "ok": true,
-      "seen": "40098 SOCKS5 → 40099 HTTP usuário bob",
+      "seen": "42471 SOCKS5 → 42472 HTTP usuário bob",
       "evidence": "docs/evidence/tui/F05-editado-60x20.png"
     },
     {
       "viewport": "60x20",
       "criterion": "demais proxies inalterados",
       "ok": true,
-      "seen": "supervisor tocou só [40098, 40099]; 40097 idêntico",
+      "seen": "supervisor tocou só [42471, 42472]; 42470 idêntico",
       "evidence": "docs/evidence/tui/F05-formulario-60x20.png"
     }
   ],
@@ -322,7 +322,7 @@
       "viewport": "80x24",
       "criterion": "rotação mostra novo IPv6 só do alvo",
       "ok": true,
-      "seen": "porta 53300: ::ffff:127.0.0.201 → ::ffff:127.0.0.173; outras iguais",
+      "seen": "porta 42525: ::ffff:127.0.0.203 → ::ffff:127.0.0.61; outras iguais",
       "evidence": "docs/evidence/tui/F06-rotacionado-80x24.png"
     },
     {
@@ -342,21 +342,21 @@
       "viewport": "80x24",
       "criterion": "navegar/cancelar durante requisição não opera outro proxy",
       "ok": true,
-      "seen": "rotação de 53298 retida; ↓ + d/r/e/Esc/a → ‘Aguarde…’; supervisor tocou só [53298]; [53300, 53301] intactos [busy=True busy_delete=True dialog=False rotated=True]",
+      "seen": "rotação de 42523 retida; ↓ + d/r/e/Esc/a → ‘Aguarde…’; supervisor tocou só [42523]; [42525, 42526] intactos [busy=True busy_delete=True dialog=False rotated=True]",
       "evidence": "docs/evidence/tui/F06-corrida-em-andamento-80x24.png"
     },
     {
       "viewport": "80x24",
       "criterion": "exclusão confirmada remove só o alvo",
       "ok": true,
-      "seen": "porta 53301 removida; demais intactas",
+      "seen": "porta 42526 removida; demais intactas",
       "evidence": "docs/evidence/tui/F06-excluido-80x24.png"
     },
     {
       "viewport": "60x20",
       "criterion": "rotação mostra novo IPv6 só do alvo",
       "ok": true,
-      "seen": "porta 40099: ::ffff:127.0.0.154 → ::ffff:127.0.0.91; outras iguais",
+      "seen": "porta 42472: ::ffff:127.0.0.45 → ::ffff:127.0.0.251; outras iguais",
       "evidence": "docs/evidence/tui/F06-rotacionado-60x20.png"
     },
     {
@@ -376,14 +376,14 @@
       "viewport": "60x20",
       "criterion": "navegar/cancelar durante requisição não opera outro proxy",
       "ok": true,
-      "seen": "rotação de 40097 retida; ↓ + d/r/e/Esc/a → ‘Aguarde…’; supervisor tocou só [40097]; [40099, 40100] intactos [busy=True busy_delete=True dialog=False rotated=True]",
+      "seen": "rotação de 42470 retida; ↓ + d/r/e/Esc/a → ‘Aguarde…’; supervisor tocou só [42470]; [42472, 42473] intactos [busy=True busy_delete=True dialog=False rotated=True]",
       "evidence": "docs/evidence/tui/F06-corrida-em-andamento-60x20.png"
     },
     {
       "viewport": "60x20",
       "criterion": "exclusão confirmada remove só o alvo",
       "ok": true,
-      "seen": "porta 40100 removida; demais intactas",
+      "seen": "porta 42473 removida; demais intactas",
       "evidence": "docs/evidence/tui/F06-excluido-60x20.png"
     }
   ],
@@ -399,14 +399,14 @@
       "viewport": "80x24",
       "criterion": "quantidade, porta inicial, protocolo e modo de credenciais",
       "ok": true,
-      "seen": "API: {53308: ('lote', 'http'), 53310: ('lote', 'http')}; 3 a partir de 53308, HTTP, comum lote/•••, parcial",
+      "seen": "API: {42533: ('lote', 'http'), 42535: ('lote', 'http')}; 3 a partir de 42533, HTTP, comum lote/•••, parcial",
       "evidence": "docs/evidence/tui/F04-formulario-80x24.png"
     },
     {
       "viewport": "80x24",
       "criterion": "resultado mostra criados e falhas",
       "ok": true,
-      "seen": "‘Criados: 2 … Falhas: 1 — 53309’ (porta 53309 ocupada por socket externo)",
+      "seen": "‘Criados: 2 … Falhas: 1 — 42534’ (porta 42534 ocupada por socket externo)",
       "evidence": "docs/evidence/tui/F04-resultado-80x24.png"
     },
     {
@@ -427,14 +427,14 @@
       "viewport": "60x20",
       "criterion": "quantidade, porta inicial, protocolo e modo de credenciais",
       "ok": true,
-      "seen": "API: {40107: ('lote', 'http'), 40109: ('lote', 'http')}; 3 a partir de 40107, HTTP, comum lote/•••, parcial",
+      "seen": "API: {42480: ('lote', 'http'), 42482: ('lote', 'http')}; 3 a partir de 42480, HTTP, comum lote/•••, parcial",
       "evidence": "docs/evidence/tui/F04-formulario-60x20.png"
     },
     {
       "viewport": "60x20",
       "criterion": "resultado mostra criados e falhas",
       "ok": true,
-      "seen": "‘Criados: 2 … Falhas: 1 — 40108’ (porta 40108 ocupada por socket externo)",
+      "seen": "‘Criados: 2 … Falhas: 1 — 42481’ (porta 42481 ocupada por socket externo)",
       "evidence": "docs/evidence/tui/F04-resultado-60x20.png"
     },
     {
@@ -457,7 +457,7 @@
       "viewport": "80x24",
       "criterion": "revelar só por ação explícita (s), só o selecionado",
       "ok": true,
-      "seen": "após s: senha da porta 53308 visível (1 ocorrência)",
+      "seen": "após s: senha da porta 42533 visível (1 ocorrência)",
       "evidence": "docs/evidence/tui/F07-revelado-80x24.png"
     },
     {
@@ -470,7 +470,7 @@
       "viewport": "80x24",
       "criterion": "exporta IPv4:porta:usuario:senha em arquivo 0600 com caminho",
       "ok": true,
-      "seen": "6 linhas, modo 0o600, caminho no status; ex.: ['127.0.0.1:53298:alice:S3cretPw']",
+      "seen": "6 linhas, modo 0o600, caminho no status; ex.: ['127.0.0.1:42523:alice:S3cretPw']",
       "evidence": "docs/evidence/tui/F07-exportado-80x24.png"
     },
     {
@@ -491,7 +491,7 @@
       "viewport": "60x20",
       "criterion": "revelar só por ação explícita (s), só o selecionado",
       "ok": true,
-      "seen": "após s: senha da porta 40107 visível (1 ocorrência)",
+      "seen": "após s: senha da porta 42480 visível (1 ocorrência)",
       "evidence": "docs/evidence/tui/F07-revelado-60x20.png"
     },
     {
@@ -504,7 +504,7 @@
       "viewport": "60x20",
       "criterion": "exporta IPv4:porta:usuario:senha em arquivo 0600 com caminho",
       "ok": true,
-      "seen": "6 linhas, modo 0o600, caminho no status; ex.: ['127.0.0.1:40097:alice:S3cretPw']",
+      "seen": "6 linhas, modo 0o600, caminho no status; ex.: ['127.0.0.1:42470:alice:S3cretPw']",
       "evidence": "docs/evidence/tui/F07-exportado-60x20.png"
     },
     {

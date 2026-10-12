@@ -1,5 +1,5 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                                    
- 53298  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.2                        
+ 42523  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.142                      
                                                                                 
                                                                                 
                                                                                 
@@ -19,6 +19,6 @@
                                                                                 
                                                                                 
                                                                                 
- ✓ Proxy criado na porta 53298 com IPv6 ::ffff:127.0.0.2.                       
+ ✓ Proxy criado na porta 42523 com IPv6 ::ffff:127.0.0.142.                     
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                          
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                

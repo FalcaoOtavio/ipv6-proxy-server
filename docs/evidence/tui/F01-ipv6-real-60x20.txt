@@ -1,5 +1,5 @@
-oto  Usuário  Senha  IPv6                                   
-TP   —        —      2001:db8:abcd:1234:698a:ca7f:1c78:1fe8 
+roto  Usuário  Senha  IPv6                                  
+TTP   —        —      2001:db8:abcd:1234:3693:1fcb:b7ae:762 
                                                             
                                                             
                                                             
@@ -14,7 +14,7 @@ TP   —        —      2001:db8:abcd:1234:698a:ca7f:1c78:1fe8
                                                             
                                                             
                                                             
-              ▍                                             
+             ▊                                              
  ✓ 1 proxy(s).                                              
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            

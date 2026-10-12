@@ -1,6 +1,6 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                                    
- 53298  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.202                      
- 53300  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.173                      
+ 42523  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.151                      
+ 42525  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.61                       
                                                                                 
                                                                                 
                                                                                 
@@ -19,6 +19,6 @@
                                                                                 
                                                                                 
                                                                                 
- ✓ Proxy da porta 53301 excluído.                                               
+ ✓ Proxy da porta 42526 excluído.                                               
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                          
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                
