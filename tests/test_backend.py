@@ -15,19 +15,26 @@ def settings_for(tmp_path):
 
 class Host:
     """Mocked systemctl + ip. Records every command the API would run."""
-    def __init__(self, addresses=(), active=()):
+    def __init__(self, addresses=(), active=(), enabled=None):
         self.addresses = set(addresses)
         self.active = set(active)
+        self.enabled = set(self.active if enabled is None else enabled)
         self.commands = []
 
     def systemctl(self, argv, check=True):
         self.commands.append(argv)
         verb, unit = argv[1], argv[-1]
         port = int(unit.split("@")[1].split(".")[0]) if "@" in unit and "*" not in unit else None
-        if verb == "enable" or verb == "restart":
+        if verb in ("start", "restart"):
             self.active.add(port)
-        elif verb == "disable":
+        elif verb == "stop":
             self.active.discard(port)
+        elif verb == "enable":
+            self.enabled.add(port)
+        elif verb == "disable":
+            self.enabled.discard(port)
+        elif verb == "is-enabled":
+            return SimpleNamespace(returncode=0 if port in self.enabled else 1)
         elif verb == "is-active":
             return SimpleNamespace(returncode=0 if port in self.active else 3)
         elif verb == "show":
@@ -103,7 +110,8 @@ def test_every_mutation_names_only_its_target_instance(tmp_path):
     host.commands.clear()
     backend.deprovision(rotated)
     # The address goes only after the instance is stopped.
-    assert mutating(host.commands) == [["systemctl", "disable", "--now", "ipv6-proxy@30000.service"],
+    assert mutating(host.commands) == [["systemctl", "stop", "ipv6-proxy@30000.service"],
+                                       ["systemctl", "disable", "--no-reload", "ipv6-proxy@30000.service"],
                                        ["ip", "-6", "addr", "del", "2001:db8::aa/128", "dev", "eth0"]]
     assert not (tmp_path / "proxies" / "30000.cfg").exists()
     assert (tmp_path / "proxies" / "30001.cfg").stat().st_mode & 0o777 == 0o600
@@ -114,7 +122,18 @@ def test_provision_commands_are_per_instance(tmp_path):
     backend = backend_for(tmp_path, host)
     backend.provision(record(30005, "2001:db8::5"))
     assert_targets_only(host.commands, 30005, {"2001:db8::5"})
-    assert ["systemctl", "enable", "--now", "ipv6-proxy@30005.service"] in host.commands
+    assert mutating(host.commands)[-2:] == [["systemctl", "enable", "--no-reload", "ipv6-proxy@30005.service"],
+                                            ["systemctl", "start", "ipv6-proxy@30005.service"]]
+
+def test_start_enables_only_when_needed_and_never_reloads_pid1(tmp_path):
+    host = Host(enabled={30005})
+    supervisor = SystemdSupervisor(run=host.systemctl, config_dir=tmp_path)
+    supervisor.start(30005, tmp_path / "30005.cfg")
+    assert mutating(host.commands) == [["systemctl", "start", "ipv6-proxy@30005.service"]]
+    assert not any(c[1] == "daemon-reload" or "--now" in c for c in host.commands)
+    host.commands.clear()
+    supervisor.stop(30006)  # never enabled: stop only, no disable
+    assert mutating(host.commands) == [["systemctl", "stop", "ipv6-proxy@30006.service"]]
 
 def test_foreign_address_is_refused_untouched(tmp_path):
     host = Host(addresses={"2001:db8::9"})
@@ -136,15 +155,61 @@ def test_reconcile_adopts_healthy_and_touches_only_divergent(tmp_path):
     host = Host(addresses={"2001:db8::1", "2001:db8::2"}, active={30000, 30001, 30009})
     backend = backend_for(tmp_path, host)
     backend.ready = lambda port: port in host.active
+    atomic_json(tmp_path / "pending-ports.json", [30009])  # interrupted delete of 30009
+    assert backend_for(tmp_path, host).intents == {30009}
+    backend = backend_for(tmp_path, host)
+    backend.ready = lambda port: port in host.active
     assert backend.reconcile([healthy, divergent, missing]) == set()
     assert mutating(host.commands) == [
-        ["systemctl", "disable", "--now", "ipv6-proxy@30009.service"],
+        ["systemctl", "stop", "ipv6-proxy@30009.service"],
+        ["systemctl", "disable", "--no-reload", "ipv6-proxy@30009.service"],
         ["systemctl", "restart", "ipv6-proxy@30001.service"],
         ["ip", "-6", "addr", "add", "2001:db8::3/128", "dev", "eth0", "nodad"],
-        ["systemctl", "enable", "--now", "ipv6-proxy@30002.service"]]
+        ["systemctl", "enable", "--no-reload", "ipv6-proxy@30002.service"],
+        ["systemctl", "start", "ipv6-proxy@30002.service"]]
     assert not (tmp_path / "proxies" / "30009.cfg").exists()
+    assert json.loads((tmp_path / "pending-ports.json").read_text()) == []
+    assert json.loads((tmp_path / "orphans.json").read_text()) == []
     assert (tmp_path / "proxies" / "notes.cfg").exists()
     assert backend.healthy([healthy, divergent, missing])
+
+def test_stale_or_empty_state_never_stops_unknown_proxies(tmp_path):
+    """M7: state.json restored old/empty at API start: instances it lacks keep serving."""
+    settings = settings_for(tmp_path)
+    live = [record(30000 + i, f"2001:db8::{i + 1}") for i in range(5)]
+    (tmp_path / "proxies").mkdir()
+    for r in live:
+        (tmp_path / "proxies" / f"{r.port}.cfg").write_text(render_config(settings, r))
+        atomic_json(tmp_path / "proxies" / f"{r.port}.addr", {"ipv6": str(r.ipv6), "interface": "eth0"})
+    atomic_json(tmp_path / "owned-addresses.json", sorted(str(r.ipv6) for r in live))
+    host = Host(addresses={str(r.ipv6) for r in live}, active={r.port for r in live})
+    backend = backend_for(tmp_path, host)
+    backend.ready = lambda port: port in host.active
+    assert backend.reconcile([live[0]]) == set()  # state.json only knows the first
+    assert mutating(host.commands) == []
+    assert host.active == {r.port for r in live} and host.addresses == {str(r.ipv6) for r in live}
+    assert all((tmp_path / "proxies" / f"{r.port}.cfg").exists() for r in live)
+    assert backend.orphans == {r.port for r in live[1:]}
+    assert json.loads((tmp_path / "orphans.json").read_text()) == [r.port for r in live[1:]]
+    assert backend.reconcile([]) == set() and mutating(host.commands) == []  # empty state.json too
+
+def test_intent_is_settled_only_after_commit(tmp_path):
+    host = Host()
+    backend = backend_for(tmp_path, host)
+    a = record(30000, "2001:db8::a")
+    backend.provision(a)
+    assert json.loads((tmp_path / "pending-ports.json").read_text()) == [30000]
+    backend.settle({30000})
+    assert backend.intents == set()
+    # Crash after start but before state.json committed: next start stops only it.
+    backend.provision(record(30001, "2001:db8::b"))
+    host.commands.clear()
+    restarted = backend_for(tmp_path, host)
+    restarted.ready = lambda port: port in host.active
+    assert restarted.reconcile([a]) == set()
+    assert mutating(host.commands) == [["systemctl", "stop", "ipv6-proxy@30001.service"],
+                                       ["systemctl", "disable", "--no-reload", "ipv6-proxy@30001.service"],
+                                       ["ip", "-6", "addr", "del", "2001:db8::b/128", "dev", "eth0"]]
 
 def test_reconcile_failure_is_reported_per_port(tmp_path):
     host = Host()
@@ -196,8 +261,10 @@ def test_port_move_keeps_the_shared_address(tmp_path):
     backend.provision(a)
     host.commands.clear()
     backend.replace(a, a.model_copy(update={"port": 30001}))
-    assert mutating(host.commands) == [["systemctl", "enable", "--now", "ipv6-proxy@30001.service"],
-                                       ["systemctl", "disable", "--now", "ipv6-proxy@30000.service"]]
+    assert mutating(host.commands) == [["systemctl", "enable", "--no-reload", "ipv6-proxy@30001.service"],
+                                       ["systemctl", "start", "ipv6-proxy@30001.service"],
+                                       ["systemctl", "stop", "ipv6-proxy@30000.service"],
+                                       ["systemctl", "disable", "--no-reload", "ipv6-proxy@30000.service"]]
     assert "2001:db8::a" in host.addresses and json.loads(backend.journal.read_text()) == ["2001:db8::a"]
 
 def test_render_config_denies_private_destinations_before_allow(tmp_path):
@@ -210,3 +277,17 @@ def test_render_config_denies_private_destinations_before_allow(tmp_path):
         assert lines.index(auth) < lines.index(deny) < lines.index(allow)
     open_settings = settings.model_copy(update={"block_private_destinations": False})
     assert not any(line.startswith("deny") for line in render_config(open_settings, record(30000, "2001:db8::1")).splitlines())
+
+def test_units_start_limit_outlasts_boot_retries():
+    import configparser
+    from pathlib import Path
+    for name in ("ipv6-proxy@.service", "ipv6-proxy-api.service"):
+        unit = configparser.ConfigParser(strict=False, interpolation=None)
+        unit.optionxform = str
+        unit.read(Path(__file__).parent.parent / "deploy" / name)
+        interval = int(unit["Unit"]["StartLimitIntervalSec"])
+        burst = int(unit["Unit"]["StartLimitBurst"])
+        restart = int(unit["Service"]["RestartSec"])
+        # The limit must allow retrying for at least a minute at RestartSec pace.
+        assert burst * restart >= 20 and interval >= burst * restart, name
+        assert "StartLimit" not in "".join(unit["Service"]), name  # [Service] placement is ignored
