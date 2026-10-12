@@ -25,6 +25,9 @@ class Settings(BaseModel):
     # Refuse proxy destinations on the host's loopback/internal ranges (SSRF).
     # false only for tests whose targets/egress are loopback.
     block_private_destinations: bool = True
+    # Seconds each 3proxy instance gets to accept connections after (re)start;
+    # slow hosts (small VPS, emulated VMs) need more than a fast one.
+    ready_timeout: int = Field(default=30, ge=1, le=300)
 
     @model_validator(mode="after")
     def validate_ranges(self):
@@ -47,5 +50,6 @@ class Settings(BaseModel):
             "port_start": "PROXY_PORT_START", "port_end": "PROXY_PORT_END",
             "client_tokens_file": "PROXY_CLIENT_TOKENS_FILE", "supervisor": "PROXY_SUPERVISOR",
             "batch_max": "PROXY_BATCH_MAX", "block_private_destinations": "PROXY_BLOCK_PRIVATE_DESTINATIONS",
+            "ready_timeout": "PROXY_READY_TIMEOUT",
         }
         return cls(**{key: os.environ[name] for key, name in names.items() if name in os.environ})

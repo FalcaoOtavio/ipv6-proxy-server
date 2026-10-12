@@ -98,9 +98,12 @@ sudo bash install-ipv6-proxy.sh --update --ref "$REF" --self-test
   `--yes`. Sem confirmacao nada e alterado. A API reinicia cada um em
   sequencia, nunca em conjunto; se algum falhar, o rollback restaura a versao
   anterior e reinicia, um a um, so os proxies que ja tinham a configuracao nova.
-- Prazo do healthcheck: 45 s + 5 s por proxy persistido (a API reconcilia
-  todos antes de responder; ate ~5 s por proxy que precise subir). Usa
-  `GET /proxies?include=status`, que responde mesmo com um proxy isolado.
+- Prazo do healthcheck: `--api-timeout` (padrao 180 s, de 10 a 3600) + 5 s por
+  proxy persistido (a API reconcilia todos antes de responder; as esperas de
+  prontidao de cada proxy correm em paralelo). Usa `GET /proxies?include=status`,
+  que responde mesmo com um proxy isolado. As chamadas do instalador a API
+  (inclusive o `--self-test`) usam `--max-time` = `PROXY_READY_TIMEOUT` + 30 s.
+  Em host lento veja [TROUBLESHOOTING.md](TROUBLESHOOTING.md#host-lento-proxy-nao-fica-pronto).
 - Se `ipv6-proxy@.service` mudar, nenhum proxy e reiniciado; cada um adota a
   nova unidade no proximo reinicio dele (edicao, rotacao ou reboot).
 - Falha (qualquer erro, inclusive mensagens `Erro:`; healthcheck; PID trocado):

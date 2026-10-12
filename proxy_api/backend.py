@@ -89,8 +89,6 @@ class LinuxBackend:
     file, its supervised instance and its own IPv6 address. Nothing here
     restarts, reloads or stops a proxy that is not the target.
     """
-    READY_TIMEOUT = 5
-
     def __init__(self, settings, supervisor=None):
         self.settings = settings
         self.config_dir = settings.data_dir / "proxies"
@@ -179,15 +177,18 @@ class LinuxBackend:
             return False
         return owns_socket(pid, listening_inodes(port))
 
-    def _wait_ready(self, port):
-        deadline = time.monotonic() + self.READY_TIMEOUT
+    def _wait_ready(self, port, since=None):
+        """Wait up to ready_timeout counted from `since` (this proxy's own launch)."""
+        timeout = self.settings.ready_timeout
+        deadline = (time.monotonic() if since is None else since) + timeout
         while time.monotonic() < deadline:
             if self.ready(port):
                 return
             if not self.supervisor.is_active(port):
                 break
             time.sleep(0.05)
-        raise RuntimeError(f"3proxy for port {port} did not become ready; inspect its log "
+        raise RuntimeError(f"3proxy for port {port} did not become ready in {timeout}s "
+                           f"(PROXY_READY_TIMEOUT; raise it on slow hosts); inspect its log "
                            f"(journalctl -u ipv6-proxy@{port} or {self.config_dir}/{port}.log)")
 
     def _write_address(self, record):
@@ -289,13 +290,15 @@ class LinuxBackend:
                     self.serving[record.port] = record  # adopted: same PID, sessions intact
                 else:
                     self._launch(record)
-                    launched.append(record)
+                    launched.append((record, time.monotonic()))
             except Exception:
                 logger.exception("Could not bring up proxy on port %s; fencing it", record.port)
                 failed.add(record.port)
-        for record in launched:
+        # Each deadline counts from that proxy's own launch: waiting in series
+        # never stacks timeouts, and a slow one gets its full PROXY_READY_TIMEOUT.
+        for record, since in launched:
             try:
-                self._wait_ready(record.port)
+                self._wait_ready(record.port, since)
                 self.serving[record.port] = record
             except Exception:
                 logger.exception("Proxy on port %s did not become ready; fencing it", record.port)

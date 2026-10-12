@@ -55,7 +55,7 @@ def backend_for(tmp_path, host):
     backend = LinuxBackend(settings_for(tmp_path), supervisor)
     backend._ip = host.ip
     backend._refuse_foreign_port = lambda port: None
-    backend._wait_ready = lambda port: None
+    backend._wait_ready = lambda port, since=None: None
     return backend
 
 def record(port, ip, **extra):
@@ -216,7 +216,7 @@ def test_reconcile_failure_is_reported_per_port(tmp_path):
     backend = backend_for(tmp_path, host)
     good, bad = record(30000, "2001:db8::1"), record(30001, "2001:db8::2")
 
-    def wait(port):
+    def wait(port, since=None):
         if port == bad.port:
             raise RuntimeError("not ready")
 
@@ -291,3 +291,55 @@ def test_units_start_limit_outlasts_boot_retries():
         # The limit must allow retrying for at least a minute at RestartSec pace.
         assert burst * restart >= 20 and interval >= burst * restart, name
         assert "StartLimit" not in "".join(unit["Service"]), name  # [Service] placement is ignored
+
+def test_ready_timeout_env_default_and_limits(tmp_path, monkeypatch):
+    for name, value in {"PROXY_IPV6_SUBNET": "2001:db8::/64", "PROXY_BIND_IPV4": "127.0.0.1",
+                        "PROXY_INTERFACE": "eth0", "PROXY_API_TOKEN": "x" * 32}.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.delenv("PROXY_READY_TIMEOUT", raising=False)
+    assert Settings.from_env().ready_timeout == 30
+    for value in ("1", "300", "90"):
+        monkeypatch.setenv("PROXY_READY_TIMEOUT", value)
+        assert Settings.from_env().ready_timeout == int(value)
+    for value in ("0", "301", "-5", "x"):
+        monkeypatch.setenv("PROXY_READY_TIMEOUT", value)
+        with pytest.raises(ValueError):
+            Settings.from_env()
+
+class Clock:
+    def __init__(self):
+        self.now = 1000.0
+    def monotonic(self):
+        return self.now
+    def sleep(self, seconds):
+        self.now += seconds
+
+def slow_backend(tmp_path, monkeypatch, timeout, ready_at):
+    """3proxy stays active but only accepts connections at clock time ready_at."""
+    clock = Clock()
+    monkeypatch.setattr("proxy_api.backend.time", clock)
+    host = Host(active={30000, 30001})
+    backend = LinuxBackend(settings_for(tmp_path).model_copy(update={"ready_timeout": timeout}),
+                           SystemdSupervisor(run=host.systemctl, config_dir=tmp_path / "proxies"))
+    backend.ready = lambda port: clock.now >= ready_at
+    return backend, clock
+
+def test_wait_ready_honours_configured_timeout(tmp_path, monkeypatch):
+    # T30: a 3proxy that binds after ~21 s (slow VM) passes with the default 30 s...
+    backend, clock = slow_backend(tmp_path, monkeypatch, 30, 1021.0)
+    backend._wait_ready(30000)
+    # ...and fails with a 10 s override, naming the env to raise.
+    backend, clock = slow_backend(tmp_path, monkeypatch, 10, 1021.0)
+    with pytest.raises(RuntimeError, match=r"in 10s \(PROXY_READY_TIMEOUT"):
+        backend._wait_ready(30000)
+    assert 1010 <= clock.now < 1011
+
+def test_reconcile_deadline_counts_from_each_launch(tmp_path, monkeypatch):
+    # Waiting in series must neither stack timeouts nor shorten a later proxy's budget.
+    backend, clock = slow_backend(tmp_path, monkeypatch, 30, 1021.0)
+    backend._wait_ready(30000, since=clock.now)
+    backend._wait_ready(30001, since=1000.0)  # launched at t=1000: already ready, no extra wait
+    assert clock.now < 1022
+    with pytest.raises(RuntimeError):
+        backend._wait_ready(30001, since=980.0)  # its own 30 s already elapsed
+    assert clock.now < 1022

@@ -135,6 +135,21 @@ sozinho e inicia a API anterior. Cada passo aparece como `ok` ou `FALHOU`.
 - Instalação limpa interrompida com "Instalacao incompleta": remova os
   caminhos listados e repita ([INSTALL.md](INSTALL.md#instalacao-interrompida)).
 
+## Host lento: proxy não fica pronto
+
+Sintoma: criar/rotacionar falha com `3proxy for port N did not become ready in
+30s (PROXY_READY_TIMEOUT ...)`, a porta fica `fenced` após reiniciar a API, ou o
+instalador acusa "API nao respondeu" / falha no `--self-test`. Em VPS pequenas
+ou VMs emuladas `systemctl start ipv6-proxy@N` pode levar 15–20 s e a API mais
+de 2 min para subir.
+
+- Aumente `PROXY_READY_TIMEOUT` (segundos por proxy, 1..300, padrão 30) em
+  `/etc/ipv6-proxy-api.env` e rode `sudo systemctl restart ipv6-proxy-api`.
+  O prazo vale por proxy, também no reconcile de muitos (não se soma).
+- No instalador, aumente a espera pela API com `--api-timeout S` (padrão 180;
+  soma 5 s por proxy). O `--max-time` das chamadas acompanha
+  `PROXY_READY_TIMEOUT` + 30 s.
+
 ## Ainda não validado
 
 Comportamento com systemd real em Linux limpo, após reboot real e com IPv6
