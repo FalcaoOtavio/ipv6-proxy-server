@@ -42,6 +42,8 @@ E2E_BLOCK_PRIVATE=${E2E_BLOCK_PRIVATE:-false}
 # false skips install.sh --self-test on the update (recorded NOT_TESTED), e.g. while a
 # slow emulated host (QEMU TCG) exceeds the proxy readiness deadline.
 E2E_SELF_TEST=${E2E_SELF_TEST:-true}
+# Seconds to wait for the API after install/restart/boot (emulated hosts need minutes).
+E2E_API_WAIT=${E2E_API_WAIT:-60}
 
 APP_DIR=/opt/ipv6-proxy-server
 ENV_FILE=/etc/ipv6-proxy-api.env
@@ -125,8 +127,8 @@ api() {  # method path [json] -> sets $api_status and $api_body (never a subshel
     api_status=${out##*$'\n'}
     api_body=${out%$'\n'*}
 }
-wait_api() {  # [seconds, default 60]
-    for _ in $(seq "${1:-60}"); do
+wait_api() {  # [seconds, default $E2E_API_WAIT]
+    for _ in $(seq "${1:-$E2E_API_WAIT}"); do
         token_conf && api GET /proxies && [[ $api_status == 200 ]] && return 0
         sleep 1
     done
