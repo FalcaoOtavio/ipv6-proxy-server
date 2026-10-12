@@ -29,16 +29,24 @@ def atomic_write(path, content):
     finally:
         os.close(directory)
 
+# Destinations a proxy client must never reach through the host: unspecified,
+# loopback, IPv4-mapped, link-local, ULA (e.g. IMDS fd00:ec2::254), multicast.
+# The configured subnet is appended so one proxy cannot reach another.
+PRIVATE_DESTINATIONS = "::/128,::1/128,::ffff:0:0/96,fe80::/10,fc00::/7,ff00::/8"
+
 def render_config(settings, record):
     # One 3proxy process per port: only this record's user is loaded, and
     # restarting it never touches another port's listener or sessions.
     lines = ["nserver 1.1.1.1", "nscache 65536", "maxconn 200",
              "timeouts 1 5 30 60 180 1800 15 60"]
     if record.username:
-        lines += [f"users {record.username}:CL:{record.password}",
-                  "auth strong", f"allow {record.username}"]
+        lines += [f"users {record.username}:CL:{record.password}", "auth strong"]
     else:
-        lines += ["auth none", "allow *"]
+        lines += ["auth iponly"]  # not "auth none": that one skips every ACL, deny included
+    if settings.block_private_destinations:
+        # Checked after name resolution, so "localhost" is refused too. Must precede allow.
+        lines += [f"deny * * {PRIVATE_DESTINATIONS},{settings.subnet}"]
+    lines += [f"allow {record.username}" if record.username else "allow *"]
     # socks also serves UDP ASSOCIATE; the relay egresses from -e like TCP.
     command = "proxy -6 -n -a" if record.protocol == "http" else "socks -6 -a"
     lines += [f"{command} -p{record.port} -i{settings.bind_ipv4} -e{record.ipv6}"]

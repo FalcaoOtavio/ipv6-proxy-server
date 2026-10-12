@@ -199,3 +199,14 @@ def test_port_move_keeps_the_shared_address(tmp_path):
     assert mutating(host.commands) == [["systemctl", "enable", "--now", "ipv6-proxy@30001.service"],
                                        ["systemctl", "disable", "--now", "ipv6-proxy@30000.service"]]
     assert "2001:db8::a" in host.addresses and json.loads(backend.journal.read_text()) == ["2001:db8::a"]
+
+def test_render_config_denies_private_destinations_before_allow(tmp_path):
+    settings = settings_for(tmp_path)
+    for extra, auth, allow in (({}, "auth iponly", "allow *"),
+                               ({"username": "u", "password": "p"}, "auth strong", "allow u")):
+        lines = render_config(settings, record(30000, "2001:db8::1", **extra)).splitlines()
+        deny = "deny * * ::/128,::1/128,::ffff:0:0/96,fe80::/10,fc00::/7,ff00::/8,2001:db8::/64"
+        assert "auth none" not in lines  # it skips ACLs: the deny would be dead
+        assert lines.index(auth) < lines.index(deny) < lines.index(allow)
+    open_settings = settings.model_copy(update={"block_private_destinations": False})
+    assert not any(line.startswith("deny") for line in render_config(open_settings, record(30000, "2001:db8::1")).splitlines())

@@ -53,7 +53,7 @@ tokens = scratch / "client-tokens.json"
 tokens.write_text(json.dumps({os.environ["CONTRACT_OWNER"]:
                               hashlib.sha256(os.environ["CONTRACT_CLIENT_TOKEN"].encode()).hexdigest()}))
 first, last = free_range(6)
-settings = Settings(subnet="::ffff:127.0.0.0/120", bind_ipv4="127.0.0.1", interface="lo",
+settings = Settings(subnet="::ffff:127.0.0.0/120", bind_ipv4="127.0.0.1", interface="lo", block_private_destinations=False,
                     api_token=os.environ["CONTRACT_ADMIN_TOKEN"], data_dir=scratch / "data",
                     binary=os.environ["TEST_3PROXY_BINARY"], port_start=first, port_end=last,
                     client_tokens_file=tokens, supervisor="local")
