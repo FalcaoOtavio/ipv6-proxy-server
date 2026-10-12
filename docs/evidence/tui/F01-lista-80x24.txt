@@ -1,6 +1,6 @@
  Porta  Status   Proto   Usuário  Senha  IPv6                                   
- 41301  ● ativo  HTTP    alice    ••••   ::ffff:127.0.0.62                      
- 41302  ● ativo  SOCKS5  —        —      ::ffff:127.0.0.191                     
+ 52552  ● ativo  HTTP    alice    ••••   ::ffff:127.0.0.32                      
+ 52553  ● ativo  SOCKS5  —        —      ::ffff:127.0.0.96                      
                                                                                 
                                                                                 
                                                                                 
@@ -19,6 +19,6 @@
                                                                                 
                                                                                 
                                                                                 
-                                                                                
- ✓ Proxy criado na porta 41302 com IPv6 ::ffff:127.0.0.191.                     
-? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exportar s Senha a Reca
+ ✓ Proxy criado na porta 52553 com IPv6 ::ffff:127.0.0.96.                      
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                          
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                

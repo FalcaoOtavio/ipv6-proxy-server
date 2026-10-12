@@ -1,15 +1,15 @@
- Porta  Status    Proto   Usuário  Senha  IPv6                                  
- 41301  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.142                    
- 41303  ● ativo   HTTP    bob      ••••   ::ffff:127.0.0.89                     
- 41311  ● ativo   HTTP    lote     ••••   ::ffff:127.0.0.56                     
- 41313  ● ativo   HTTP    lote     ••••   ::ffff:127.0.0.20                     
+ Porta  Status   Proto  Usuário  Senha  IPv6                                    
+ 52552  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.180                      
+ 52554  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.127                      
+ 52562  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.181                      
+ 52564  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.63                       
                                                                                 
                                                                                 
                                                                                 
         ╭──────────────────────────────────────────────────────────────╮        
         │ Resultado do lote                                            │        
-        │ Criados: 2 (portas 41311–41313)                              │        
-        │ Falhas: 1 — 41312                                            │        
+        │ Criados: 2 (portas 52562–52564)                              │        
+        │ Falhas: 1 — 52563                                            │        
         │ Veja: sudo journalctl -u ipv6-proxy@<porta>                  │        
         │   Fechar (Esc)                                               │        
         ╰──────────────────────────────────────────────────────────────╯        
@@ -19,6 +19,6 @@
                                                                                 
                                                                                 
                                                                                 
-                                                                                
  ✓ Lote concluído: 2 criado(s), 1 falha(s).                                     
-? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exportar s Senha a Reca
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                          
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                

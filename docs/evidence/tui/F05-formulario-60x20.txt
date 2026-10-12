@@ -1,10 +1,10 @@
  Porta  Status    Proto   Usuário  Senha  IPv6              
- 44313  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.38 
- 44314  ✕ falhou  SOCKS5  —        —      ::ffff:127.0.0.24 
+ 55218  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.94 
+ 55219  ✕ falhou  SOCKS5  —        —      ::ffff:127.0.0.45 
 ╭──────────────────────────────────────────────────────────╮
-│ Editar proxy da porta 44314                              │
+│ Editar proxy da porta 55219                              │
 │ Porta                                                    │
-│ 44315                                                    │
+│ 55220                                                    │
 │ Protocolo                                                │
 │ HTTP                                                  ▼  │
 │ Usuário                                                  │
@@ -15,6 +15,6 @@
 │                                                          │
 │    Confirmar         Cancelar                            │
 ╰──────────────────────────────────────────────────────────╯
- ✕ Conflito: porta já em uso ou faixa de portas esgotada.   
  Nada foi alterado.                                         
-? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exp
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            

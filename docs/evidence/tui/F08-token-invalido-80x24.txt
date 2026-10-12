@@ -6,7 +6,6 @@
                                                                                 
                                                                                 
                                                                                 
-                                                                                
                        Não foi possível carregar a lista.                       
                                                                                 
             Corrija o problema abaixo e pressione a para recarregar.            
@@ -21,4 +20,5 @@
                                                                                 
  ✕ Token inválido. Confira PROXY_API_TOKEN em /etc/ipv6-proxy-api.env e rode    
  com sudo.                                                                      
-? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exportar s Senha a Reca
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                          
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                

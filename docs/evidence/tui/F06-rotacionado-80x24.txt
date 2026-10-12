@@ -1,6 +1,6 @@
- Porta  Status    Proto   Usuário  Senha  IPv6                                  
- 41301  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.62                     
- 41303  ● ativo   HTTP    bob      ••••   ::ffff:127.0.0.89                     
+ Porta  Status   Proto  Usuário  Senha  IPv6                                    
+ 52552  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.32                       
+ 52554  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.127                      
                                                                                 
                                                                                 
                                                                                 
@@ -19,6 +19,6 @@
                                                                                 
                                                                                 
                                                                                 
-                                                                                
- ✓ Porta 41303: novo IPv6 ::ffff:127.0.0.89 (era ::ffff:127.0.0.191).           
-? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exportar s Senha a Reca
+ ✓ Porta 52554: novo IPv6 ::ffff:127.0.0.127 (era ::ffff:127.0.0.96).           
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                          
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                

@@ -1,6 +1,6 @@
- Porta  Status    Proto   Usuário  Senha  IPv6                                  
- 41301  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.142                    
- 41303  ● ativo   HTTP    bob      ••••   ::ffff:127.0.0.89                     
+ Porta  Status   Proto  Usuário  Senha  IPv6                                    
+ 52552  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.180                      
+ 52554  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.127                      
                                                                                 
                                                                                 
                                                                                 
@@ -19,6 +19,6 @@
                                                                                 
                                                                                 
                                                                                 
-                                                                                
- ✓ Proxy da porta 41304 excluído.                                               
-? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exportar s Senha a Reca
+ ✓ Proxy da porta 52555 excluído.                                               
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                          
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                

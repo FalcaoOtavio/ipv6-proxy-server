@@ -1,5 +1,5 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                
- 44313  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.38   
+ 55218  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.94   
                                                             
                                                             
                                                             
@@ -15,6 +15,6 @@
                                                             
                                                             
                                                             
-                                                            
- ✓ Proxy criado na porta 44313 com IPv6 ::ffff:127.0.0.38.  
-? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exp
+ ✓ Proxy criado na porta 55218 com IPv6 ::ffff:127.0.0.94.  
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            

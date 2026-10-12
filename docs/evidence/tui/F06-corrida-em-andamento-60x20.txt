@@ -1,7 +1,7 @@
- Porta  Status    Proto   Usuário  Senha  IPv6              
- 44313  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.38 
- 44315  ● ativo   HTTP    bob      ••••   ::ffff:127.0.0.237
- 44316  ● ativo   HTTP    —        —      ::ffff:127.0.0.62 
+ Porta  Status   Proto  Usuário  Senha  IPv6                
+ 55218  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.94   
+ 55220  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.244  
+ 55221  ● ativo  HTTP   —        —      ::ffff:127.0.0.199  
                                                             
                                                             
                                                             
@@ -14,7 +14,7 @@
                                                             
                                                             
                                                             
-                                                           ▏
- ✕ Aguarde: Rotacionando porta 44313 em andamento; a lista  
+ ✕ Aguarde: Rotacionando porta 55218 em andamento; a lista  
  recarrega ao final.                                        
-? Ajuda c Criar l Lote e Editar r Rotacionar d Excluir x Exp
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            
