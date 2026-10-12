@@ -15,7 +15,8 @@
 set -Eeuo pipefail
 umask 077
 
-BASE_SHA=aa2968556f861f56c7e5d37c70a859797a8d8772
+# Base release to upgrade from: aa29685 (fork main, default) or bdfe9c7 (ashford/isolated-mutations).
+BASE_SHA=${E2E_BASE_SHA:-aa2968556f861f56c7e5d37c70a859797a8d8772}
 FORK_URL=https://github.com/FalcaoOtavio/ipv6-proxy-server
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 repo=$(cd -- "$here/../.." && pwd)
@@ -179,7 +180,7 @@ export E2E_PASSWORD_30002=base-socks-pw E2E_PASSWORD_30011=bob-pw-1 E2E_PASSWORD
 step_base_install() {
     if [[ -e $ENV_FILE ]]; then fail "host nao esta limpo: $ENV_FILE ja existe"; return; fi
     checkout "$BASE_SHA" "$work/base"
-    check 'install.sh base aa29685' bash "$work/base/install.sh" \
+    check "install.sh base ${BASE_SHA:0:7}" bash "$work/base/install.sh" \
         --subnet "$E2E_SUBNET" --interface "$E2E_INTERFACE" --ipv4 "$E2E_IPV4" || return
     check 'API base respondendo' wait_api
 }
