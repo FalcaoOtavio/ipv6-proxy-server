@@ -2,138 +2,611 @@
 set -Eeuo pipefail
 umask 077
 
+REPO_URL=https://github.com/FalcaoOtavio/ipv6-proxy-server.git
+RAW_URL=https://raw.githubusercontent.com/FalcaoOtavio/ipv6-proxy-server
+THREEPROXY_TAG=0.9.4
+THREEPROXY_SHA=346880eb2e73836385e5f7648f738efcece580ac
+API_URL=http://127.0.0.1:8000
+
 usage() {
     cat <<'EOF'
-Instala IPv6 Proxy Server API e o cliente CLI no Ubuntu 22.04+ / Debian 12+.
+Instala ou atualiza o IPv6 Proxy Server (API, proxies por instancia systemd, CLI e TUI)
+no Ubuntu 22.04/24.04/26.04 ou Debian 12/13. Fonte: FalcaoOtavio/ipv6-proxy-server.
 
-  sudo bash install.sh
-  sudo bash install.sh --subnet 2001:db8:1234::/64 --interface eth0 --ipv4 192.0.2.10
-  sudo bash install.sh --cli-only
+Uso:
+  sudo bash install.sh [--ref REF] [--subnet CIDR --interface IF --ipv4 IP] [--self-test] [--yes]
+  sudo bash install.sh --update [--ref REF] [--self-test] [--yes]
+  sudo bash install.sh --cli-only | --tui-only
 
-Sem argumentos, pergunta a subnet e sugere interface/IPv4 locais.
---cli-only requer checkout completo; instala/atualiza apenas o CLI em uma API existente.
+Opcoes:
+  --ref REF         Branch, tag ou SHA do fork (padrao: main). Resolvido para UM SHA,
+                    gravado em /opt/ipv6-proxy-server/VERSION. Sem --ref, um checkout
+                    local completo instala os proprios arquivos (registra o SHA dele).
+  --subnet CIDR     Subnet IPv6 dedicada e roteada (prefixo <= 126).
+  --interface IF    Interface de rede (padrao: a da rota IPv4 padrao).
+  --ipv4 IP         IPv4 local onde os proxies escutam (deve existir na interface).
+  --update          Atualiza instalacao existente: backup em /var/backups/ipv6-proxy-<data>/,
+                    nova revisao, healthcheck e rollback automatico em falha. Migra a
+                    versao base (aa29685/main ou bdfe9c7/ashford) para um servico por
+                    proxy; essa migracao interrompe todos os proxies UMA vez e pede
+                    confirmacao. Atualizacoes seguintes reiniciam so a API.
+  --yes             Confirma a migracao sem perguntar (obrigatorio sem terminal).
+  --self-test       Ao final, cria um proxy de teste com senha aleatoria, confere e o remove.
+                    Nao toca proxies existentes.
+  --cli-only        Instala/atualiza so o CLI (checkout completo). Nao reinicia nada.
+  --tui-only        Instala/atualiza so a TUI (checkout completo). Nao reinicia nada.
+  -h, --help        Esta ajuda.
+
+Reexecutar sem mudancas nao altera token, env, estado, unidades nem processos.
 A subnet deve ser dedicada e roteada pelo provedor. Nao configura NDP/firewall.
-Instalacoes existentes sao preservadas; o modo normal nao faz atualizacoes.
+Documentacao: docs/INSTALL.md e docs/MIGRATION.md.
 EOF
 }
+
 die() { printf 'Erro: %s\n' "$*" >&2; exit 1; }
-subnet='' interface='' ipv4='' cli_only=false
-while (($#)); do
-    case "$1" in
-        --help|-h) usage; exit 0 ;;
-        --cli-only) cli_only=true; shift ;;
-        --subnet|--interface|--ipv4)
-            if (($# < 2)) || [[ -z "$2" || "$2" == --* ]]; then
-                die "Falta valor para $1"
-            fi
-            case "$1" in
-                --subnet) subnet=$2 ;;
-                --interface) interface=$2 ;;
-                --ipv4) ipv4=$2 ;;
-            esac
-            shift 2 ;;
-        *) die "Opcao desconhecida: $1 (use --help)" ;;
-    esac
-done
+# /dev/tty can be readable with no controlling terminal; only opening it proves one.
+have_tty() { { : </dev/tty; } 2>/dev/null; }
+say() { printf '%s\n' "$*"; }
 
-[[ $(uname -s) == Linux ]] || die 'Execute na VPS Linux, nao no macOS/Windows.'
-[[ $EUID == 0 ]] || die 'Execute com sudo bash install.sh.'
-app_dir=/opt/ipv6-proxy-server
-env_file=/etc/ipv6-proxy-api.env
-unit_file=/etc/systemd/system/ipv6-proxy-api.service
-cli_file=/usr/local/bin/ipv6-proxy
-script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-
-if [[ $cli_only == true ]]; then
-    [[ -f "$script_dir/ipv6-proxy" ]] || die '--cli-only requer checkout completo deste repositorio (install.sh e ipv6-proxy juntos); consulte docs/INSTALL.md.'
-    [[ -z "$subnet$interface$ipv4" ]] || die '--cli-only nao aceita --subnet, --interface ou --ipv4.'
-    [[ -d "$app_dir" && -f "$env_file" && -f "$unit_file" ]] || die 'API existente nao reconhecida; use --cli-only somente apos a instalacao completa.'
-    if [[ -e "$cli_file" || -L "$cli_file" ]]; then
-        [[ -f "$cli_file" && ! -L "$cli_file" ]] || die "Destino inseguro: $cli_file"
-        [[ $(stat -c '%U:%G:%a' "$cli_file") == root:root:755 ]] || die "Destino nao reconhecido: $cli_file"
-        grep -q '^# ipv6-proxy-api-client$' "$cli_file" || die "Destino nao pertence a este projeto: $cli_file"
+set_paths() {
+    # Test-only prefix: honored only when the script is sourced as a library.
+    local root=''
+    if [[ ${IPV6_PROXY_INSTALL_LIB:-} == 1 ]]; then
+        root=${IPV6_PROXY_TEST_ROOT:-}
     fi
-    temporary=$(mktemp /usr/local/bin/.ipv6-proxy.XXXXXXXX)
-    trap 'rm -f -- "${temporary:-}"' EXIT
-    install -o root -g root -m 0755 "$script_dir/ipv6-proxy" "$temporary"
-    mv -f -- "$temporary" "$cli_file"
-    printf 'CLI instalado: sudo ipv6-proxy --help\n'
-    exit 0
-fi
+    app_dir=$root/opt/ipv6-proxy-server
+    env_file=$root/etc/ipv6-proxy-api.env
+    unit_dir=$root/etc/systemd/system
+    unit_file=$unit_dir/ipv6-proxy-api.service
+    template_file=$unit_dir/ipv6-proxy@.service
+    state_dir=$root/var/lib/ipv6-proxy-api
+    backup_root=$root/var/backups
+    bin_dir=$root/usr/local/bin
+    cli_file=$bin_dir/ipv6-proxy
+    tui_file=$bin_dir/ipv6-proxy-tui
+    threeproxy_file=$bin_dir/3proxy
+    proc_dir=$root/proc
+}
 
-[[ -f /etc/os-release ]] || die 'Distribuicao nao identificada.'
-# shellcheck disable=SC1091
-source /etc/os-release
-case "${ID:-}:${VERSION_ID:-}" in
-    ubuntu:22.04|ubuntu:24.04|ubuntu:26.04|debian:12|debian:13) ;;
-    *) die 'Use Ubuntu 22.04/24.04/26.04 ou Debian 12/13.' ;;
-esac
-[[ -d /run/systemd/system ]] || die 'systemd deve estar ativo (use uma VPS/VM).'
-for path in "$app_dir" "$env_file" "$unit_file" /var/lib/ipv6-proxy-api /usr/local/bin/3proxy "$cli_file"; do
-    [[ ! -e "$path" && ! -L "$path" ]] || die "Ja existe: $path. Instalacao preservada; consulte docs/INSTALL.md."
-done
-# Consume the whole crontab: grep -q can SIGPIPE crontab under pipefail.
-if [[ -d /root/proxyserver ]] || crontab -l 2>/dev/null | grep 'proxy-startup\.sh' >/dev/null; then
-    die 'Instalacao legada detectada. Migre e remova o cron legado antes de instalar a API.'
-fi
-if pgrep -x 3proxy >/dev/null; then
-    die '3proxy ja esta em execucao. Desative o gerenciador legado antes de instalar.'
-fi
-
-export DEBIAN_FRONTEND=noninteractive
-apt-get update
-apt-get install -y ca-certificates curl git python3 python3-venv build-essential iproute2 openssl
-default_interface=$(ip -j -4 route show default | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r[0].get("dev", "") if r else "")')
-interface=${interface:-$default_interface}
-if [[ -z "$subnet" ]]; then
-    [[ -r /dev/tty ]] || die 'Informe --subnet, --interface e --ipv4 para instalacao sem terminal.'
-    read -r -p 'Subnet IPv6 dedicada (ex.: 2001:db8:1234::/64): ' subnet </dev/tty
-    read -r -p "Interface [$interface]: " answer </dev/tty
-    interface=${answer:-$interface}
-fi
-[[ "$interface" =~ ^[a-zA-Z0-9_.-]{1,15}$ ]] || die 'Interface invalida.'
-addresses=$(ip -j -4 addr show dev "$interface")
-default_ipv4=$(printf '%s' "$addresses" | python3 -c 'import json,sys; a=[i["local"] for d in json.load(sys.stdin) for i in d.get("addr_info",[]) if i["family"]=="inet"]; print(a[0] if a else "")')
-if [[ -z "$ipv4" ]]; then
-    ipv4=$default_ipv4
-    if [[ -t 0 ]]; then
-        read -r -p "IPv4 local [$ipv4]: " answer </dev/tty
-        ipv4=${answer:-$ipv4}
+parse_args() {
+    subnet='' interface='' ipv4='' ref='' mode=install assume_yes=false self_test=false
+    while (($#)); do
+        case "$1" in
+            --help|-h) usage; exit 0 ;;
+            --cli-only|--tui-only|--update)
+                [[ $mode == install ]] || die "Use somente um de --update, --cli-only, --tui-only."
+                mode=${1#--}; shift ;;
+            --yes) assume_yes=true; shift ;;
+            --self-test) self_test=true; shift ;;
+            --subnet|--interface|--ipv4|--ref)
+                if (($# < 2)) || [[ -z "$2" || "$2" == -* ]]; then
+                    die "Falta valor para $1"
+                fi
+                case "$1" in
+                    --subnet) subnet=$2 ;;
+                    --interface) interface=$2 ;;
+                    --ipv4) ipv4=$2 ;;
+                    --ref) ref=$2 ;;
+                esac
+                shift 2 ;;
+            *) die "Opcao desconhecida: $1 (use --help)" ;;
+        esac
+    done
+    if [[ -n $ref && ! $ref =~ ^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$ ]]; then
+        die "--ref invalido: use nome de branch/tag ou SHA."
     fi
-fi
-python3 - "$subnet" "$ipv4" "$addresses" <<'PY'
-import ipaddress, json, sys
-net = ipaddress.IPv6Network(sys.argv[1])
-assert net.prefixlen <= 126, 'Subnet deve ter prefixo <= 126'
-assert not net.is_multicast and not net.is_link_local, 'Use uma subnet roteada'
-ip = ipaddress.IPv4Address(sys.argv[2])
-assert not ip.is_unspecified and not ip.is_multicast, 'IPv4 invalido'
-assert str(ip) in [a['local'] for d in json.loads(sys.argv[3]) for a in d.get('addr_info', [])], 'IPv4 deve existir na interface'
-PY
+    if [[ $mode != install && -n "$subnet$interface$ipv4" ]]; then
+        die "--$mode nao aceita --subnet, --interface ou --ipv4 (a configuracao existente e mantida)."
+    fi
+    if [[ $mode == cli-only || $mode == tui-only ]] && [[ -n $ref || $self_test == true ]]; then
+        die "--$mode usa o checkout local; nao aceita --ref nem --self-test."
+    fi
+}
 
-work_dir=$(mktemp -d /tmp/ipv6-proxy-install.XXXXXXXX)
-trap 'rm -rf -- "$work_dir"' EXIT
-trap 'printf "Falha na linha %s. Consulte a mensagem acima e docs/INSTALL.md.\n" "$LINENO" >&2' ERR
-# A downloaded standalone installer has no adjacent CLI; clone the full source.
-if [[ -f "$script_dir/proxy_api/app.py" && -f "$script_dir/deploy/ipv6-proxy-api.service" && -f "$script_dir/ipv6-proxy" ]]; then
-    source_dir=$script_dir
-else
-    git clone --depth 1 --branch main https://github.com/FalcaoOtavio/ipv6-proxy-server.git "$work_dir/app"
+# --- Source ------------------------------------------------------------------
+
+is_full_checkout() {
+    [[ -f "$1/proxy_api/app.py" && -f "$1/deploy/ipv6-proxy-api.service" && -f "$1/ipv6-proxy" ]]
+}
+
+resolve_source() {
+    # Sets source_dir, source_sha, source_ref. Local checkout only without --ref.
+    if [[ -z $ref ]] && is_full_checkout "$script_dir"; then
+        source_dir=$script_dir
+        source_ref=local
+        source_sha=$(git -C "$script_dir" rev-parse --verify 'HEAD^{commit}' 2>/dev/null) || source_sha=unknown
+        if [[ $source_sha != unknown ]] && [[ -n $(git -C "$script_dir" status --porcelain 2>/dev/null) ]]; then
+            source_sha="$source_sha-dirty"
+        fi
+        return
+    fi
+    source_ref=${ref:-main}
     source_dir=$work_dir/app
-fi
-git clone --depth 1 --branch 0.9.4 https://github.com/3proxy/3proxy.git "$work_dir/3proxy"
-[[ $(git -C "$work_dir/3proxy" rev-parse HEAD) == 346880eb2e73836385e5f7648f738efcece580ac ]] || die 'Revisao inesperada do 3proxy.'
-make -C "$work_dir/3proxy" -f Makefile.Linux -j "$(nproc)"
+    git clone --quiet --filter=blob:none --no-checkout "$REPO_URL" "$source_dir"
+    local candidate
+    for candidate in "origin/$source_ref" "refs/tags/$source_ref" "$source_ref"; do
+        if source_sha=$(git -C "$source_dir" rev-parse --quiet --verify "$candidate^{commit}"); then
+            break
+        fi
+        source_sha=''
+    done
+    [[ -n $source_sha ]] || die "--ref $source_ref nao existe em $REPO_URL."
+    git -C "$source_dir" checkout --quiet --detach "$source_sha"
+    [[ $(git -C "$source_dir" rev-parse HEAD) == "$source_sha" ]] || die 'Checkout inconsistente do SHA resolvido.'
+    is_full_checkout "$source_dir" || die "A revisao $source_sha nao contem a API (proxy_api/deploy/ipv6-proxy)."
+}
 
-install -d -m 0755 "$app_dir" "$app_dir/proxy_api"
-install -m 0644 "$source_dir"/proxy_api/*.py "$app_dir/proxy_api/"
-install -m 0644 "$source_dir/requirements.txt" "$app_dir/requirements.txt"
-python3 -m venv "$app_dir/.venv"
-"$app_dir/.venv/bin/pip" install -r "$app_dir/requirements.txt"
-install -m 0755 "$work_dir/3proxy/bin/3proxy" /usr/local/bin/3proxy
-install -o root -g root -m 0755 "$source_dir/ipv6-proxy" "$cli_file"
-token=$(openssl rand -hex 32)
-cat >"$env_file" <<EOF
+# --- Detection and validation ---------------------------------------------------
+
+detect_version() {
+    # none | partial | main (aa29685) | ashford (bdfe9c7) | independent (per-proxy units)
+    local path found=() missing=()
+    for path in "$app_dir" "$env_file" "$unit_file" "$state_dir" "$threeproxy_file" "$cli_file"; do
+        if [[ -e $path || -L $path ]]; then found+=("$path"); else missing+=("$path"); fi
+    done
+    if ((${#found[@]} == 0)); then
+        echo none
+    elif [[ ! -f $app_dir/proxy_api/app.py || ! -f $env_file || ! -f $unit_file ]]; then
+        echo partial
+    elif [[ -f $app_dir/proxy_api/supervisor.py ]]; then
+        echo independent
+    elif grep -q 'ashford.proxy/1' "$app_dir/proxy_api/app.py"; then
+        echo ashford
+    else
+        echo main
+    fi
+}
+
+describe_existing() {
+    local path
+    for path in "$app_dir" "$env_file" "$unit_file" "$state_dir" "$threeproxy_file" "$cli_file"; do
+        if [[ -e $path || -L $path ]]; then printf '%s ' "$path"; fi
+    done
+}
+
+legacy_cron_present() {
+    # Consume the whole crontab: grep -q can SIGPIPE crontab under pipefail.
+    [[ -d /root/proxyserver ]] || crontab -l 2>/dev/null | grep 'proxy-startup\.sh' >/dev/null
+}
+
+foreign_3proxy_pids() {
+    # 3proxy processes that are neither our per-proxy units nor children of our API.
+    local dir pid
+    for dir in "$proc_dir"/[0-9]*; do
+        [[ -r $dir/comm && $(<"$dir/comm") == 3proxy ]] || continue
+        pid=${dir##*/}
+        if ! grep -qE '/(ipv6-proxy-api\.service|system-ipv6\\x2dproxy\.slice/ipv6-proxy@[0-9]+\.service)$' \
+                "$dir/cgroup" 2>/dev/null; then
+            printf '%s\n' "$pid"
+        fi
+    done
+}
+
+api_cgroup_3proxy_count() {
+    local dir count=0
+    for dir in "$proc_dir"/[0-9]*; do
+        [[ -r $dir/comm && $(<"$dir/comm") == 3proxy ]] || continue
+        if grep -q '/ipv6-proxy-api\.service$' "$dir/cgroup" 2>/dev/null; then count=$((count + 1)); fi
+    done
+    echo "$count"
+}
+
+check_platform() {
+    [[ $(uname -s) == Linux ]] || die 'Execute na VPS Linux, nao no macOS/Windows.'
+    [[ $EUID == 0 ]] || die 'Execute com: sudo bash install.sh'
+    [[ -f /etc/os-release ]] || die 'Distribuicao nao identificada.'
+    local os
+    # shellcheck disable=SC1091
+    os=$(. /etc/os-release && printf '%s:%s' "${ID:-}" "${VERSION_ID:-}")
+    case "$os" in
+        ubuntu:22.04|ubuntu:24.04|ubuntu:26.04|debian:12|debian:13) ;;
+        *) die "Sistema $os nao suportado. Use Ubuntu 22.04/24.04/26.04 ou Debian 12/13." ;;
+    esac
+    [[ -d /run/systemd/system ]] || die 'systemd deve estar ativo (use uma VPS/VM, nao container).'
+}
+
+check_foreign_3proxy() {
+    local pids
+    pids=$(foreign_3proxy_pids | tr '\n' ' ')
+    [[ -z $pids ]] || die "3proxy de outro gerenciador em execucao (PIDs: $pids). Nada foi encerrado; desative-o antes de instalar."
+}
+
+ask_network() {
+    local answer default_interface default_ipv4 addresses
+    default_interface=$(ip -j -4 route show default | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r[0].get("dev", "") if r else "")')
+    interface=${interface:-$default_interface}
+    if [[ -z $subnet ]]; then
+        have_tty || die 'Sem terminal: informe --subnet, --interface e --ipv4.'
+        read -r -p 'Subnet IPv6 dedicada (ex.: 2001:db8:1234::/64): ' subnet </dev/tty
+        read -r -p "Interface [$interface]: " answer </dev/tty
+        interface=${answer:-$interface}
+    fi
+    [[ $interface =~ ^[a-zA-Z0-9_.-]{1,15}$ ]] || die "Interface invalida: '$interface'."
+    ip link show dev "$interface" >/dev/null 2>&1 || die "Interface $interface nao existe (veja: ip -br link)."
+    addresses=$(ip -j -4 addr show dev "$interface")
+    default_ipv4=$(printf '%s' "$addresses" | python3 -c 'import json,sys; a=[i["local"] for d in json.load(sys.stdin) for i in d.get("addr_info",[]) if i["family"]=="inet"]; print(a[0] if a else "")')
+    if [[ -z $ipv4 ]]; then
+        ipv4=$default_ipv4
+        if have_tty && [[ -t 0 ]]; then
+            read -r -p "IPv4 local [$ipv4]: " answer </dev/tty
+            ipv4=${answer:-$ipv4}
+        fi
+    fi
+    validate_network "$subnet" "$ipv4" "$addresses"
+}
+
+validate_network() {
+    python3 - "$1" "$2" "$3" <<'PY' || die 'Corrija a rede e execute novamente (docs/INSTALL.md).'
+import ipaddress, json, sys
+def fail(message):
+    print(f"Erro: {message}", file=sys.stderr)
+    sys.exit(1)
+try:
+    net = ipaddress.IPv6Network(sys.argv[1])
+except ValueError:
+    fail(f"subnet IPv6 invalida: {sys.argv[1]!r} (ex.: 2001:db8:1234::/64)")
+if net.prefixlen > 126:
+    fail("subnet precisa de prefixo <= 126 para haver enderecos de rotacao")
+if net.is_multicast or net.is_link_local or net.is_loopback or net.is_unspecified:
+    fail("use uma subnet roteada (nao multicast/link-local/loopback)")
+try:
+    ip = ipaddress.IPv4Address(sys.argv[2])
+except ValueError:
+    fail(f"IPv4 invalido: {sys.argv[2]!r}")
+if ip.is_unspecified or ip.is_multicast:
+    fail("IPv4 deve ser um endereco especifico")
+local = [a["local"] for d in json.loads(sys.argv[3]) for a in d.get("addr_info", [])]
+if str(ip) not in local:
+    fail(f"IPv4 {ip} nao existe na interface (enderecos: {', '.join(local) or 'nenhum'})")
+PY
+}
+
+check_api_port_free() {
+    if ss -ltnH 'sport = :8000' 2>/dev/null | grep -q .; then
+        die 'Porta 127.0.0.1:8000 ja esta em uso por outro processo; libere-a antes de instalar.'
+    fi
+}
+
+confirm_migration() {
+    local count=$1 from=$2 answer
+    say ''
+    say "ATENCAO: migracao da versao $from para um servico systemd por proxy."
+    say "Os $count proxies atuais sao processos filhos da API e serao interrompidos UMA vez"
+    say '(alguns segundos) enquanto passam a rodar como ipv6-proxy@<porta>. Depois disso,'
+    say 'atualizacoes e reinicios da API nao interrompem mais os proxies.'
+    if [[ $assume_yes == true ]]; then
+        say 'Confirmado por --yes.'
+        return
+    fi
+    have_tty || die 'Sem terminal para confirmar: execute novamente com --yes.'
+    read -r -p 'Digite MIGRAR para continuar: ' answer </dev/tty
+    [[ $answer == MIGRAR ]] || die 'Migracao cancelada; nada foi alterado.'
+}
+
+# --- Staging and idempotent apply ----------------------------------------------
+
+stage_release() {
+    # Build the exact files to install under $stage; nothing outside it changes.
+    stage=$work_dir/stage
+    rm -rf -- "$stage"
+    install -d -m 0755 "$stage/app/proxy_api" "$stage/units" "$stage/bin"
+    install -m 0644 "$source_dir"/proxy_api/*.py "$stage/app/proxy_api/"
+    install -m 0644 "$source_dir/requirements.txt" "$stage/app/requirements.txt"
+    if [[ -d $source_dir/proxy_tui ]]; then
+        install -d -m 0755 "$stage/app/proxy_tui"
+        cp -R --no-preserve=ownership "$source_dir/proxy_tui/." "$stage/app/proxy_tui/"
+        find "$stage/app/proxy_tui" -name __pycache__ -prune -exec rm -rf {} +
+        chmod -R u=rwX,go=rX "$stage/app/proxy_tui"
+    fi
+    install -m 0644 "$source_dir/deploy/ipv6-proxy-api.service" "$stage/units/ipv6-proxy-api.service"
+    install -m 0644 "$source_dir/deploy/ipv6-proxy@.service" "$stage/units/ipv6-proxy@.service"
+    install -m 0755 "$source_dir/ipv6-proxy" "$stage/bin/ipv6-proxy"
+    if [[ -f $source_dir/ipv6-proxy-tui ]]; then
+        install -m 0755 "$source_dir/ipv6-proxy-tui" "$stage/bin/ipv6-proxy-tui"
+    fi
+}
+
+tree_digest() {
+    # Content + mode digest of a directory, ignoring caches and the venv.
+    [[ -d $1 ]] || { echo absent; return; }
+    (cd -- "$1" && find . -path ./.venv -prune -o -name __pycache__ -prune -o -type f -print0 \
+        | sort -z | xargs -0 -r stat -c '%a %n' | sha256sum; \
+        find . -path ./.venv -prune -o -name __pycache__ -prune -o -type f -print0 \
+        | sort -z | xargs -0 -r sha256sum | sha256sum) | sha256sum | cut -d' ' -f1
+}
+
+file_differs() { ! cmp -s -- "$1" "$2"; }
+
+plan_changes() {
+    # Sets app_changed, api_unit_changed, template_changed, cli_changed, tui_changed, version_changed.
+    local installed_app=$work_dir/installed-app
+    rm -rf -- "$installed_app"
+    mkdir -p "$installed_app"
+    if [[ -d $app_dir/proxy_api ]]; then cp -a "$app_dir/proxy_api" "$installed_app/"; fi
+    if [[ -d $app_dir/proxy_tui ]]; then cp -a "$app_dir/proxy_tui" "$installed_app/"; fi
+    if [[ -f $app_dir/requirements.txt ]]; then cp -a "$app_dir/requirements.txt" "$installed_app/"; fi
+    app_changed=false api_unit_changed=false template_changed=false cli_changed=false tui_changed=false
+    [[ $(tree_digest "$installed_app") == "$(tree_digest "$stage/app")" && -x $app_dir/.venv/bin/python ]] || app_changed=true
+    file_differs "$stage/units/ipv6-proxy-api.service" "$unit_file" && api_unit_changed=true
+    file_differs "$stage/units/ipv6-proxy@.service" "$template_file" && template_changed=true
+    file_differs "$stage/bin/ipv6-proxy" "$cli_file" && cli_changed=true
+    if [[ -f $stage/bin/ipv6-proxy-tui ]] && file_differs "$stage/bin/ipv6-proxy-tui" "$tui_file"; then
+        tui_changed=true
+    fi
+    version_changed=false
+    [[ $(sed -n 's/^sha=//p' "$app_dir/VERSION" 2>/dev/null) == "$source_sha" ]] || version_changed=true
+}
+
+anything_changes() {
+    [[ $app_changed == true || $api_unit_changed == true || $template_changed == true ||
+       $cli_changed == true || $tui_changed == true || $version_changed == true ]]
+}
+
+replace_dir() {
+    # Atomic-ish swap of one app subdirectory (removes files dropped upstream).
+    local source=$1 destination=$2
+    rm -rf -- "$destination.new"
+    # Never keep the checkout owner's uid: these files run as root.
+    cp -R --no-preserve=ownership "$source" "$destination.new"
+    chown -R root:root "$destination.new"
+    chmod -R u=rwX,go=rX "$destination.new"
+    rm -rf -- "$destination.old"
+    if [[ -e $destination ]]; then mv -- "$destination" "$destination.old"; fi
+    mv -- "$destination.new" "$destination"
+    rm -rf -- "$destination.old"
+}
+
+apply_release() {
+    install -d -m 0755 "$app_dir" "$unit_dir" "$bin_dir"
+    if [[ $app_changed == true ]]; then
+        replace_dir "$stage/app/proxy_api" "$app_dir/proxy_api"
+        if [[ -d $stage/app/proxy_tui ]]; then replace_dir "$stage/app/proxy_tui" "$app_dir/proxy_tui"; fi
+        if [[ ! -x $app_dir/.venv/bin/python ]]; then
+            python3 -m venv "$app_dir/.venv"
+            run_pip=true
+        fi
+        if [[ ${run_pip:-false} == true ]] || file_differs "$stage/app/requirements.txt" "$app_dir/requirements.txt"; then
+            "$app_dir/.venv/bin/pip" install --quiet --disable-pip-version-check -r "$stage/app/requirements.txt"
+        fi
+        install -m 0644 "$stage/app/requirements.txt" "$app_dir/requirements.txt"
+    fi
+    if [[ $api_unit_changed == true ]]; then install -m 0644 "$stage/units/ipv6-proxy-api.service" "$unit_file"; fi
+    if [[ $template_changed == true ]]; then install -m 0644 "$stage/units/ipv6-proxy@.service" "$template_file"; fi
+    if [[ $cli_changed == true ]]; then install_client "$stage/bin/ipv6-proxy" "$cli_file" ipv6-proxy-api-client; fi
+    if [[ $tui_changed == true ]]; then install_client "$stage/bin/ipv6-proxy-tui" "$tui_file" ''; fi
+    if [[ $version_changed == true ]]; then
+        printf 'sha=%s\nref=%s\ndate=%s\n' "$source_sha" "$source_ref" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$app_dir/VERSION.tmp"
+        chmod 0644 "$app_dir/VERSION.tmp"
+        mv -f -- "$app_dir/VERSION.tmp" "$app_dir/VERSION"
+    fi
+}
+
+install_client() {
+    # Replace a client executable atomically; refuse to overwrite something not ours.
+    local source=$1 destination=$2 marker=$3 temporary
+    if [[ -e $destination || -L $destination ]]; then
+        [[ -f $destination && ! -L $destination ]] || die "Destino inseguro: $destination"
+        [[ $(stat -c '%U:%G:%a' "$destination") == root:root:755 ]] || die "Destino nao reconhecido: $destination"
+        if [[ -n $marker ]]; then
+            grep -q "^# $marker\$" "$destination" || die "Destino nao pertence a este projeto: $destination"
+        fi
+    fi
+    temporary=$(mktemp "$(dirname -- "$destination")/.$(basename -- "$destination").XXXXXXXX")
+    install -o root -g root -m 0755 "$source" "$temporary" || { rm -f -- "$temporary"; return 1; }
+    mv -f -- "$temporary" "$destination"
+}
+
+# --- Backup and rollback --------------------------------------------------------
+
+backup_installation() {
+    backup_dir=$backup_root/ipv6-proxy-$(date -u +%Y%m%dT%H%M%SZ)-$$
+    install -d -m 0700 "$backup_root" "$backup_dir"
+    local name path
+    for name in app env api-unit template state cli tui 3proxy; do
+        path=$(backup_target "$name")
+        if [[ -e $path || -L $path ]]; then
+            cp -a -- "$path" "$backup_dir/$name"
+        else
+            : >"$backup_dir/$name.absent"
+        fi
+    done
+    say "Backup: $backup_dir"
+}
+
+backup_target() {
+    case "$1" in
+        app) echo "$app_dir" ;;
+        env) echo "$env_file" ;;
+        api-unit) echo "$unit_file" ;;
+        template) echo "$template_file" ;;
+        state) echo "$state_dir" ;;
+        cli) echo "$cli_file" ;;
+        tui) echo "$tui_file" ;;
+        3proxy) echo "$threeproxy_file" ;;
+    esac
+}
+
+restore_installation() {
+    local source=$1 name path
+    for name in app env api-unit template state cli tui 3proxy; do
+        path=$(backup_target "$name")
+        if [[ -e $source/$name || -L $source/$name ]]; then
+            rm -rf -- "$path.rollback"
+            cp -a -- "$source/$name" "$path.rollback"
+            rm -rf -- "$path"
+            mv -- "$path.rollback" "$path"
+        elif [[ -e $source/$name.absent ]]; then
+            rm -rf -- "$path"
+        else
+            die "Backup incompleto em $source ($name); restaure manualmente (docs/MIGRATION.md)."
+        fi
+    done
+}
+
+# --- systemd / API helpers --------------------------------------------------------
+
+instance_ports() {
+    systemctl list-units --all --plain --no-legend --type=service 'ipv6-proxy@*.service' 2>/dev/null \
+        | sed -nE 's/^ipv6-proxy@([0-9]+)\.service.*/\1/p'
+}
+
+instance_snapshot() {
+    # port pid config-hash, one line per instance.
+    local port config
+    for port in $(instance_ports); do
+        config=$(sha256sum <"$state_dir/proxies/$port.cfg" 2>/dev/null | cut -d' ' -f1) || config=none
+        printf '%s %s %s\n' "$port" "$(systemctl show --property=MainPID --value "ipv6-proxy@$port.service")" "${config:-none}"
+    done
+}
+
+restarted_unchanged() {
+    # Ports whose config is unchanged between two snapshots but whose PID changed.
+    awk 'NR == FNR { before[$1] = $2 " " $3; next }
+         ($1 in before) && before[$1] != $2 " " $3 && substr(before[$1], index(before[$1], " ") + 1) == $3 { print $1 }' \
+        "$1" "$2"
+}
+
+state_ports() {
+    # Ports in the persisted state (state.json v2, or proxies.json before the API migrates it).
+    python3 - "$state_dir" <<'PY'
+import json, pathlib, sys
+base = pathlib.Path(sys.argv[1])
+for name in ("state.json", "proxies.json"):
+    path = base / name
+    if path.exists():
+        data = json.loads(path.read_text())
+        for item in data["proxies"] if isinstance(data, dict) else data:
+            print(int(item["port"]))
+        break
+PY
+}
+
+write_curl_config() {
+    # Keep the token out of argv, logs and the environment of child processes.
+    local token
+    token=$(sed -n 's/^PROXY_API_TOKEN=//p' "$env_file" | tail -n 1)
+    [[ -n $token ]] || die "PROXY_API_TOKEN ausente em $env_file."
+    curl_config=$work_dir/curl.conf
+    printf 'header = "Authorization: Bearer %s"\n' "$token" >"$curl_config"
+}
+
+api() {
+    curl --config "$curl_config" --noproxy '*' --silent --show-error --max-time 30 "$@"
+}
+
+wait_api() {
+    local attempt
+    for ((attempt = 0; attempt < 45; attempt++)); do
+        if api --fail --max-time 3 -o /dev/null "$API_URL/proxies" 2>/dev/null; then return 0; fi
+        sleep 1
+    done
+    return 1
+}
+
+healthcheck() {
+    # API answers authenticated; each required proxy ($1: ports, default all persisted)
+    # is its own active unit; no 3proxy left in the API cgroup.
+    local port ports=${1-$(state_ports)}
+    wait_api || { say 'Healthcheck: API nao respondeu 200 em GET /proxies.' >&2; return 1; }
+    for port in $ports; do
+        if ! systemctl is-active --quiet "ipv6-proxy@$port.service"; then
+            say "Healthcheck: ipv6-proxy@$port.service nao esta ativo." >&2
+            return 1
+        fi
+    done
+    if [[ $(api_cgroup_3proxy_count) != 0 ]]; then
+        say 'Healthcheck: ainda ha 3proxy dentro do cgroup da API (arquitetura antiga).' >&2
+        return 1
+    fi
+}
+
+run_self_test() {
+    local body port id password
+    password=$(openssl rand -hex 16)
+    printf '{"username":"selftest","password":"%s"}' "$password" >"$work_dir/self-test.json"
+    body=$(api --fail -X POST -H 'Content-Type: application/json' --data "@$work_dir/self-test.json" "$API_URL/proxies") \
+        || die 'Self-test: falha ao criar proxy de teste.'
+    read -r port id < <(printf '%s' "$body" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["port"], d["id"])')
+    local status='' attempt
+    for ((attempt = 0; attempt < 10; attempt++)); do
+        status=$(api --fail "$API_URL/proxies/$port" | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])') || true
+        [[ $status == running ]] && break
+        sleep 1
+    done
+    api --fail -o /dev/null -X DELETE -H "If-Match: $id" "$API_URL/proxies/$port" \
+        || die "Self-test: falha ao remover o proxy de teste na porta $port (remova com: sudo ipv6-proxy delete $port)."
+    [[ $status == running ]] || die "Self-test: proxy de teste na porta $port nao ficou running (status: ${status:-?})."
+    say "Self-test OK: proxy de teste na porta $port criado, ativo e removido."
+}
+
+reload_if_units_changed() {
+    if [[ $api_unit_changed == true || $template_changed == true ]]; then systemctl daemon-reload; fi
+}
+
+rollback() {
+    local reason=$1 port
+    trap - ERR
+    say "Falha: $reason. Restaurando $backup_dir ..." >&2
+    systemctl stop ipv6-proxy-api.service || true
+    if [[ $migrating == true ]]; then
+        # Undo the per-proxy units this migration created, one explicit instance at a time.
+        for port in $(instance_ports); do
+            systemctl disable --now "ipv6-proxy@$port.service" || true
+        done
+    fi
+    restore_installation "$backup_dir"
+    systemctl daemon-reload
+    systemctl start ipv6-proxy-api.service || true
+    if wait_api; then
+        say "Rollback concluido: versao anterior restaurada e respondendo." >&2
+    else
+        say "Rollback aplicado, mas a API nao respondeu. Veja: journalctl -u ipv6-proxy-api -n 100" >&2
+    fi
+    exit 1
+}
+
+# --- Modes ---------------------------------------------------------------------
+
+install_clients_only() {
+    local which=$1 source destination marker
+    if [[ $which == cli ]]; then
+        source=$script_dir/ipv6-proxy destination=$cli_file marker=ipv6-proxy-api-client
+        [[ -f $source ]] || die '--cli-only requer checkout completo deste repositorio (install.sh e ipv6-proxy juntos); consulte docs/INSTALL.md.'
+    else
+        source=$script_dir/ipv6-proxy-tui destination=$tui_file marker=''
+        [[ -f $source && -d $script_dir/proxy_tui && -f $script_dir/requirements.txt ]] \
+            || die '--tui-only requer checkout completo com ipv6-proxy-tui e proxy_tui/; consulte docs/INSTALL.md.'
+    fi
+    [[ -d $app_dir && -f $env_file && -f $unit_file ]] || die "API existente nao reconhecida; use --$which-only somente apos a instalacao completa."
+    if [[ $which == tui ]]; then
+        [[ -x $app_dir/.venv/bin/pip ]] || die "venv da API ausente em $app_dir/.venv; rode o instalador completo."
+        local pin
+        pin=$(grep -E '^textual==' "$script_dir/requirements.txt") || die 'requirements.txt sem pin de textual.'
+        "$app_dir/.venv/bin/pip" install --quiet --disable-pip-version-check "$pin"
+        replace_dir "$script_dir/proxy_tui" "$app_dir/proxy_tui"
+        find "$app_dir/proxy_tui" -name __pycache__ -prune -exec rm -rf {} +
+    fi
+    install_client "$source" "$destination" "$marker"
+    if [[ $which == cli ]]; then say 'CLI instalado: sudo ipv6-proxy --help'; else say 'TUI instalada: sudo ipv6-proxy-tui'; fi
+}
+
+fresh_install() {
+    ask_network
+    check_api_port_free
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y ca-certificates curl git python3 python3-venv build-essential iproute2 openssl
+    resolve_source
+    stage_release
+    git clone --quiet --depth 1 --branch "$THREEPROXY_TAG" https://github.com/3proxy/3proxy.git "$work_dir/3proxy"
+    [[ $(git -C "$work_dir/3proxy" rev-parse HEAD) == "$THREEPROXY_SHA" ]] || die 'Revisao inesperada do 3proxy.'
+    make -C "$work_dir/3proxy" -f Makefile.Linux -j "$(nproc)"
+    plan_changes
+    apply_release
+    install -m 0755 "$work_dir/3proxy/bin/3proxy" "$threeproxy_file"
+    local token
+    token=$(openssl rand -hex 32)
+    cat >"$env_file" <<EOF
 PROXY_IPV6_SUBNET=$subnet
 PROXY_BIND_IPV4=$ipv4
 PROXY_INTERFACE=$interface
@@ -142,25 +615,123 @@ PROXY_PORT_START=30000
 PROXY_PORT_END=39999
 PROXY_DATA_DIR=/var/lib/ipv6-proxy-api
 PROXY_3PROXY_BINARY=/usr/local/bin/3proxy
+PROXY_SUPERVISOR=systemd
 EOF
-chmod 0600 "$env_file"
-install -m 0644 "$source_dir/deploy/ipv6-proxy-api.service" "$unit_file"
-systemctl daemon-reload
-systemctl enable --now ipv6-proxy-api
-# Keep the token out of command-line arguments and process listings.
-printf 'header = "Authorization: Bearer %s"\n' "$token" >"$work_dir/curl.conf"
-ready=false
-for ((attempt=0; attempt<30; attempt++)); do
-    if curl --config "$work_dir/curl.conf" --noproxy '*' --fail --silent --max-time 2 http://127.0.0.1:8000/proxies > /dev/null; then
-        ready=true
-        break
+    chmod 0600 "$env_file"
+    systemctl daemon-reload
+    systemctl enable --now ipv6-proxy-api.service
+    write_curl_config
+    healthcheck || die 'API nao ficou saudavel. Execute: journalctl -u ipv6-proxy-api -n 50'
+    finish "Instalacao concluida"
+}
+
+check_env_compatible() {
+    # ipv6-proxy@.service hardcodes these paths; refuse before touching anything.
+    local data_dir binary
+    data_dir=$(sed -n 's/^PROXY_DATA_DIR=//p' "$env_file" | tail -n 1)
+    binary=$(sed -n 's/^PROXY_3PROXY_BINARY=//p' "$env_file" | tail -n 1)
+    [[ -z $data_dir || $data_dir == /var/lib/ipv6-proxy-api ]] \
+        || die "PROXY_DATA_DIR=$data_dir nao suportado pelas unidades por proxy (use /var/lib/ipv6-proxy-api; docs/MIGRATION.md)."
+    [[ -z $binary || $binary == /usr/local/bin/3proxy ]] \
+        || die "PROXY_3PROXY_BINARY=$binary nao suportado pelas unidades por proxy (use /usr/local/bin/3proxy; docs/MIGRATION.md)."
+}
+
+update_install() {
+    local version=$1 moved
+    check_env_compatible
+    resolve_source
+    stage_release
+    plan_changes
+    migrating=false
+    [[ $version == independent ]] || migrating=true
+    if [[ $migrating == false ]] && ! anything_changes; then
+        write_curl_config
+        say "Nada a atualizar: revisao $source_sha ja instalada; nenhum servico foi tocado."
+        if [[ $self_test == true ]]; then
+            wait_api || die 'API nao responde. Execute: journalctl -u ipv6-proxy-api -n 50'
+            run_self_test
+        fi
+        exit 0
     fi
-    sleep 1
-done
-[[ "$ready" == true ]] || die 'API nao iniciou. Execute: journalctl -u ipv6-proxy-api -n 50'
-printf '\nInstalacao concluida! API: http://127.0.0.1:8000/docs\n'
-printf 'Token salvo em %s (leitura: sudo cat %s).\n' "$env_file" "$env_file"
-printf 'CLI: sudo ipv6-proxy list (use --help para ver os comandos).\n'
-printf 'Status: sudo systemctl status ipv6-proxy-api\n'
-printf 'Acesso remoto: ssh usuario@IP_PUBLICO "sudo ipv6-proxy list"\n'
-printf 'Libere somente as portas dos proxies para clientes autorizados no firewall.\n'
+    [[ $mode == update ]] || die "Instalacao existente com mudancas pendentes; para aplicar use --update. Instalacao preservada."
+    if [[ $migrating == true ]]; then
+        confirm_migration "$(state_ports | wc -l)" "$version"
+    fi
+    backup_installation
+    # From here on, any failure restores the backup.
+    trap 'rollback "erro na linha $LINENO"' ERR
+    apply_release
+    reload_if_units_changed
+    write_curl_config
+    if [[ $migrating == true ]]; then
+        # Stopping the old API stops its child 3proxy (KillMode=control-group): the one interruption.
+        systemctl stop ipv6-proxy-api.service
+        systemctl start ipv6-proxy-api.service
+        healthcheck || rollback 'healthcheck apos migracao'
+        rm -f -- "$state_dir/3proxy.cfg"
+    elif [[ $app_changed == true || $api_unit_changed == true ]]; then
+        instance_snapshot >"$work_dir/instances.before"
+        # A proxy already down before the update is not this update's failure.
+        local active_before
+        active_before=$(systemctl list-units --plain --no-legend --type=service --state=active 'ipv6-proxy@*.service' \
+            | sed -nE 's/^ipv6-proxy@([0-9]+)\.service.*/\1/p' | tr '\n' ' ')
+        # Only the API restarts; ipv6-proxy@* are separate units. The API's
+        # reconciliation restarts an instance only if its rendered config changed.
+        systemctl restart ipv6-proxy-api.service
+        healthcheck "$active_before" || rollback 'healthcheck apos atualizacao'
+        instance_snapshot >"$work_dir/instances.after"
+        moved=$(restarted_unchanged "$work_dir/instances.before" "$work_dir/instances.after" | tr '\n' ' ')
+        [[ -z $moved ]] || rollback "proxies sem mudanca de config reiniciados durante a atualizacao: $moved"
+    else
+        wait_api || rollback 'API nao responde'
+    fi
+    if [[ $template_changed == true && $migrating == false ]]; then
+        say 'Nota: ipv6-proxy@.service mudou; cada proxy adota a nova unidade no proximo reinicio dele (editar/rotacionar/reboot). Nenhum proxy foi reiniciado.'
+    fi
+    trap - ERR
+    finish "Atualizacao concluida"
+}
+
+finish() {
+    if [[ $self_test == true ]]; then run_self_test; fi
+    say ''
+    say "$1: revisao $source_sha (ref: $source_ref)."
+    say "API: $API_URL/docs  |  versao em $app_dir/VERSION"
+    say "Token em $env_file (leitura: sudo cat $env_file)."
+    say 'CLI: sudo ipv6-proxy list   |   status: systemctl list-units "ipv6-proxy@*"'
+    if [[ $source_sha =~ ^[0-9a-f]{40}$ ]]; then
+        say "Reinstalar esta mesma revisao: curl -fsSLo install.sh $RAW_URL/$source_sha/install.sh && sudo bash install.sh --update --ref $source_sha"
+    fi
+    say 'Libere somente as portas dos proxies para clientes autorizados no firewall.'
+}
+
+main() {
+    set_paths
+    parse_args "$@"
+    script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-.}")" && pwd)
+    if [[ $mode == cli-only || $mode == tui-only ]]; then
+        [[ $EUID == 0 ]] || die 'Execute com: sudo bash install.sh'
+        install_clients_only "${mode%-only}"
+        exit 0
+    fi
+    check_platform
+    local version
+    version=$(detect_version)
+    if legacy_cron_present; then
+        die 'Instalacao legada (cron proxy-startup.sh) detectada. Migre e remova o cron legado antes de instalar a API (docs/MIGRATION.md).'
+    fi
+    check_foreign_3proxy
+    work_dir=$(mktemp -d /tmp/ipv6-proxy-install.XXXXXXXX)
+    trap 'rm -rf -- "$work_dir"' EXIT
+    case "$version:$mode" in
+        none:install) fresh_install ;;
+        none:update) die 'Nenhuma instalacao encontrada; execute sem --update.' ;;
+        partial:*) die "Instalacao incompleta ou desconhecida encontrada: $(describe_existing). Instalacao preservada; consulte docs/INSTALL.md." ;;
+        main:install|ashford:install) die "Versao base ($version) detectada. Use --update para migrar (interrompe os proxies uma vez). Instalacao preservada." ;;
+        *:install|*:update)
+            [[ -z "$subnet$interface$ipv4" ]] || die 'Instalacao existente: --subnet/--interface/--ipv4 nao sao alterados (veja docs/INSTALL.md).'
+            update_install "$version" ;;
+    esac
+}
+
+[[ ${IPV6_PROXY_INSTALL_LIB:-} == 1 ]] || main "$@"
