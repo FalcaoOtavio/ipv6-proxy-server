@@ -8,7 +8,7 @@ IPv6 Proxy Server
 │1 omitido(s): senha desconhecida (a API não devolve│
 │senhas).│
 │Arquivo (criado com permissão 0600; não sobrescreve)│
-│m/pytest-N/test_f07_reveal_and_export_siz1/out-60.txt│
+│out-60.txt│
 ││
 │ Confirmar Cancelar │
 ╰──────────────────────────────────────────────────────────╯

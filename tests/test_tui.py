@@ -415,7 +415,7 @@ async def test_f07_reveal_and_export(api, size, tmp_path, monkeypatch):
         await pilot.pause()
         assert "1 omitido(s): senha desconhecida" in str(app.screen.query(Static)[1].render())
         target = tmp_path / f"out-{size[0]}.txt"
-        await fill(pilot, app, path=str(target))
+        await fill(pilot, app, path=target.name)  # relative to the chdir: env-independent snapshot
         await snapshot(pilot, app, f"f07-export-{size[0]}x{size[1]}")
         await click_ok(pilot, app)
         await settle(pilot, app)
@@ -424,7 +424,7 @@ async def test_f07_reveal_and_export(api, size, tmp_path, monkeypatch):
         assert stat.S_IMODE(target.stat().st_mode) == 0o600
         await pilot.press("x")
         await pilot.pause()
-        await fill(pilot, app, path=str(target))
+        await fill(pilot, app, path=target.name)  # relative to the chdir: env-independent snapshot
         await click_ok(pilot, app)
         await settle(pilot, app)
         assert "já existe" in status(app)
