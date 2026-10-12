@@ -446,6 +446,7 @@ async def test_f08_small_terminal_with_many_rows(api):
         await pilot.press("tab", "tab", "tab", "tab", "tab", "tab", "tab")
         await pilot.pause()
 
+@pytest.mark.asyncio
 async def test_a6_export_to_unknown_user_home_shows_generic_error(api, tmp_path):
     """expanduser('~nobody/x') raises RuntimeError: must not reach Textual's show_locals traceback."""
     app = tui(api)
@@ -464,6 +465,7 @@ async def test_a6_export_to_unknown_user_home_shows_generic_error(api, tmp_path)
         assert app.is_running and app.screen is app.screen_stack[0]
         assert "caminho inválido" in status(app) and "TopS3cretPw" not in status(app)
 
+@pytest.mark.asyncio
 async def test_a6_unexpected_exception_in_action_is_generic(api, monkeypatch):
     def boom(payload):
         password = payload["password"]  # noqa: F841  (a local the traceback would print)
@@ -480,6 +482,7 @@ async def test_a6_unexpected_exception_in_action_is_generic(api, monkeypatch):
         assert app.is_running and "Erro inesperado" in status(app)
         assert "TopS3cretPw" not in status(app)
 
+@pytest.mark.asyncio
 async def test_a6_fatal_error_never_renders_locals(api):
     app = tui(api)
     async with app.run_test(size=(80, 24)) as pilot:
@@ -493,6 +496,7 @@ async def test_a6_fatal_error_never_renders_locals(api):
         assert "Erro inesperado" in rendered and password not in rendered and "crash" not in rendered
         app._exit_renderables.clear()
 
+@pytest.mark.asyncio
 async def test_batch_limit_follows_api_and_partial_is_sent(tmp_path):
     api = Api(tmp_path, batch_max=5)
     try:
@@ -526,6 +530,7 @@ async def test_batch_limit_follows_api_and_partial_is_sent(tmp_path):
     finally:
         api.stop()
 
+@pytest.mark.asyncio
 async def test_reload_is_blocked_during_mutation(api):
     api.client.create({"port": 30080})
     app = tui(api)

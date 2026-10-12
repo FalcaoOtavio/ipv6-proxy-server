@@ -15,6 +15,7 @@ IPv6 Proxy Server
 │cli│
 │Senha (só no modo comum)│
 ││
+│X Parcial: manter os criados se alguma porta falhar │
 │✕ Usuário: 1-64 caracteres entre letras, números, _ . -│
 │ Confirmar Cancelar │
 ╰──────────────────────────────────────────────────────────────╯
