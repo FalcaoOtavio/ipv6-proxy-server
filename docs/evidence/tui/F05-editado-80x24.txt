@@ -1,6 +1,6 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                                    
- 52552  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.32                       
- 52554  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.96                       
+ 53298  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.2                        
+ 53300  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.201                      
                                                                                 
                                                                                 
                                                                                 
@@ -19,6 +19,6 @@
                                                                                 
                                                                                 
                                                                                 
- ✓ Proxy 52553 atualizado: porta 52554, HTTP.                                   
+ ✓ Proxy 53299 atualizado: porta 53300, HTTP.                                   
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                          
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                

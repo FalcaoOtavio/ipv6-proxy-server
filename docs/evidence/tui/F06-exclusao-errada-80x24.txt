@@ -1,17 +1,17 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                                    
- 52552  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.32                       
- 52554  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.127                      
+ 53298  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.2                        
+ 53300  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.173                      
                                                                                 
                                                                                 
                                                                                 
                                                                                 
                                                                                 
         ╭──────────────────────────────────────────────────────────────╮        
-        │ Excluir o proxy da porta 52552?                              │        
+        │ Excluir o proxy da porta 53298?                              │        
         │ Só o 3proxy desta porta reinicia; as sessões dela caem.      │        
-        │ Digite 52552 para confirmar                                  │        
+        │ Digite 53298 para confirmar                                  │        
         │ 1234                                                         │        
-        │ ✕ Digite exatamente 52552; nada foi alterado.                │        
+        │ ✕ Digite exatamente 53298; nada foi alterado.                │        
         │    Confirmar         Cancelar                                │        
         ╰──────────────────────────────────────────────────────────────╯        
                                                                                 
@@ -19,6 +19,6 @@
                                                                                 
                                                                                 
                                                                                 
- ✓ Porta 52554: novo IPv6 ::ffff:127.0.0.127 (era ::ffff:127.0.0.96).           
+ ✓ Porta 53300: novo IPv6 ::ffff:127.0.0.173 (era ::ffff:127.0.0.201).          
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                          
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                

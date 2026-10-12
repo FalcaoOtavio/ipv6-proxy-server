@@ -1,6 +1,6 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                
- 55218  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.94   
- 55220  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.45   
+ 40097  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.229  
+ 40099  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.154  
                                                             
                                                             
                                                             
@@ -15,6 +15,6 @@
                                                             
                                                             
                                                             
- ✓ Proxy 55219 atualizado: porta 55220, HTTP.               
+ ✓ Proxy 40098 atualizado: porta 40099, HTTP.               
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            

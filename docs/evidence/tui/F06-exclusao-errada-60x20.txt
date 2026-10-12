@@ -1,20 +1,20 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                
- 55218  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.94   
- 55220  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.244  
+ 40097  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.229  
+ 40099  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.91   
                                                             
                                                             
                                                             
 ╭──────────────────────────────────────────────────────────╮
-│ Excluir o proxy da porta 55218?                          │
+│ Excluir o proxy da porta 40097?                          │
 │ Só o 3proxy desta porta reinicia; as sessões dela caem.  │
-│ Digite 55218 para confirmar                              │
+│ Digite 40097 para confirmar                              │
 │ 1234                                                     │
-│ ✕ Digite exatamente 55218; nada foi alterado.            │
+│ ✕ Digite exatamente 40097; nada foi alterado.            │
 │    Confirmar         Cancelar                            │
 ╰──────────────────────────────────────────────────────────╯
                                                             
                                                             
- ✓ Porta 55220: novo IPv6 ::ffff:127.0.0.244 (era           
- ::ffff:127.0.0.45).                                        
+ ✓ Porta 40099: novo IPv6 ::ffff:127.0.0.91 (era            
+ ::ffff:127.0.0.154).                                       
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            

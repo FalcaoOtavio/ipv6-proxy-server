@@ -1,5 +1,5 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                                    
- 52156  ● ativo  HTTP   —        —      2001:db8:abcd:1234:6994:2258:5932:9582  
+ 51375  ● ativo  HTTP   —        —      2001:db8:abcd:1234:2812:9244:2381:8d66  
                                                                                 
                                                                                 
                                                                                 
