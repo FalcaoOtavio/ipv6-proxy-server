@@ -22,6 +22,9 @@ class Settings(BaseModel):
     # local: detached processes with pidfiles, for dev/tests without systemd.
     supervisor: Literal["systemd", "local"] = "systemd"
     batch_max: int = Field(default=1000, ge=1, le=10000)
+    # Refuse proxy destinations on the host's loopback/internal ranges (SSRF).
+    # false only for tests whose targets/egress are loopback.
+    block_private_destinations: bool = True
 
     @model_validator(mode="after")
     def validate_ranges(self):
@@ -43,6 +46,6 @@ class Settings(BaseModel):
             "data_dir": "PROXY_DATA_DIR", "binary": "PROXY_3PROXY_BINARY",
             "port_start": "PROXY_PORT_START", "port_end": "PROXY_PORT_END",
             "client_tokens_file": "PROXY_CLIENT_TOKENS_FILE", "supervisor": "PROXY_SUPERVISOR",
-            "batch_max": "PROXY_BATCH_MAX",
+            "batch_max": "PROXY_BATCH_MAX", "block_private_destinations": "PROXY_BLOCK_PRIVATE_DESTINATIONS",
         }
         return cls(**{key: os.environ[name] for key, name in names.items() if name in os.environ})

@@ -17,7 +17,9 @@ pytestmark = pytest.mark.skipif(not BINARY, reason="Set TEST_3PROXY_BINARY for r
 def setup(tmp_path):
     from proxy_api.config import Settings
     ports = free_ports(4)
+    # loopback-only test harness: targets/egress are loopback, so the SSRF deny is off
     settings = Settings(subnet="::ffff:127.0.0.0/120", bind_ipv4="127.0.0.1", interface="lo",
+                        block_private_destinations=False,
                         api_token=ADMIN, data_dir=tmp_path, binary=BINARY,
                         port_start=min(ports), port_end=max(ports), supervisor="local")
     manager = Manager(settings, LoopbackBackend(settings))
@@ -95,7 +97,9 @@ def test_edit_batch_and_status_against_real_3proxy(tmp_path):
     from proxy_api.config import Settings
     from test_isolation_3proxy import EchoServer, tunnel, Heartbeat
     ports = sorted(free_ports(6))
+    # loopback-only test harness: targets/egress are loopback, so the SSRF deny is off
     settings = Settings(subnet="::ffff:127.0.0.0/120", bind_ipv4="127.0.0.1", interface="lo", api_token=ADMIN,
+                        block_private_destinations=False,
                         data_dir=tmp_path, binary=BINARY, port_start=ports[0], port_end=ports[-1], supervisor="local")
     echo = EchoServer()
     try:
@@ -137,4 +141,50 @@ def test_edit_batch_and_status_against_real_3proxy(tmp_path):
                 stream.close()
     finally:
         echo.close()
+        stop_all(settings)
+
+def bindable_ports(count, start=20000):
+    """Below the ephemeral range: free_ports() ports may be taken by any client during a long run."""
+    found = []
+    for port in range(start, 32768):
+        with socket.socket() as probe:
+            try:
+                probe.bind(("127.0.0.1", port))
+            except OSError:
+                continue
+        found.append(port)
+        if len(found) == count:
+            return found
+    raise RuntimeError("not enough free ports below 32768")
+
+def test_reconcile_of_200_proxies_is_measured_and_adopts_on_restart(tmp_path):
+    """A5: N=200 real instances. Cold start brings all up; an API restart
+    adopts them all (same PIDs, no restart). Timings are printed for the
+    installer's deadline (pytest -s)."""
+    from ipaddress import IPv6Address
+    from proxy_api.config import Settings
+    from proxy_api.models import ProxyRecord
+    ports = bindable_ports(200)
+    # loopback-only test harness: targets/egress are loopback, so the SSRF deny is off
+    settings = Settings(subnet="::ffff:127.0.0.0/120", bind_ipv4="127.0.0.1", interface="lo",
+                        block_private_destinations=False, api_token=ADMIN, data_dir=tmp_path,
+                        binary=BINARY, supervisor="local")
+    records = [ProxyRecord(port=port, ipv6=IPv6Address(f"::ffff:127.0.0.{i + 1}")) for i, port in enumerate(ports)]
+    try:
+        backend = LoopbackBackend(settings)
+        began = time.monotonic()
+        assert backend.reconcile(records) == set()
+        cold = time.monotonic() - began
+        assert backend.healthy(records)
+        before = {port: backend.supervisor.main_pid(port) for port in ports}
+        backend.close()
+        backend = LoopbackBackend(settings)
+        began = time.monotonic()
+        assert backend.reconcile(records) == set()
+        warm = time.monotonic() - began
+        assert {port: backend.supervisor.main_pid(port) for port in ports} == before
+        print(f"\nreconcile N=200: cold {cold:.2f}s ({cold / 200 * 1000:.0f} ms/proxy), warm {warm:.2f}s")
+        # Generous ceilings: catch O(N^2) or per-proxy sleeps, not machine noise.
+        assert cold < 60 and warm < 20, (cold, warm)
+    finally:
         stop_all(settings)

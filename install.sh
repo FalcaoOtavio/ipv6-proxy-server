@@ -325,6 +325,7 @@ stage_release() {
     install -d -m 0755 "$stage/app/proxy_api" "$stage/units" "$stage/bin"
     install -m 0644 "$source_dir"/proxy_api/*.py "$stage/app/proxy_api/"
     install -m 0644 "$source_dir/requirements.txt" "$stage/app/requirements.txt"
+    install -m 0644 "$source_dir/requirements.lock" "$stage/app/requirements.lock"
     if [[ -d $source_dir/proxy_tui ]]; then
         install -d -m 0755 "$stage/app/proxy_tui"
         cp -R --no-preserve=ownership "$source_dir/proxy_tui/." "$stage/app/proxy_tui/"
@@ -358,6 +359,7 @@ plan_changes() {
     if [[ -d $app_dir/proxy_api ]]; then cp -a "$app_dir/proxy_api" "$installed_app/"; fi
     if [[ -d $app_dir/proxy_tui ]]; then cp -a "$app_dir/proxy_tui" "$installed_app/"; fi
     if [[ -f $app_dir/requirements.txt ]]; then cp -a "$app_dir/requirements.txt" "$installed_app/"; fi
+    if [[ -f $app_dir/requirements.lock ]]; then cp -a "$app_dir/requirements.lock" "$installed_app/"; fi
     app_changed=false api_unit_changed=false template_changed=false cli_changed=false tui_changed=false
     [[ $(tree_digest "$installed_app") == "$(tree_digest "$stage/app")" && -x $app_dir/.venv/bin/python ]] || app_changed=true
     file_differs "$stage/units/ipv6-proxy-api.service" "$unit_file" && api_unit_changed=true
@@ -376,13 +378,17 @@ config_changes() {
     # it cannot tell (caller then asks as if all could restart).
     python3 -B - "$stage/app" "$state_dir" "$env_file" <<'PY' 2>/dev/null || echo '?'
 import json, pathlib, sys
-from ipaddress import IPv4Address, IPv6Address
+from ipaddress import IPv4Address, IPv6Address, IPv6Network
 from types import SimpleNamespace
 sys.path.insert(0, sys.argv[1])
 from proxy_api.backend import render_config
 state = pathlib.Path(sys.argv[2])
 env = dict(line.split("=", 1) for line in pathlib.Path(sys.argv[3]).read_text().splitlines() if "=" in line)
-settings = SimpleNamespace(bind_ipv4=IPv4Address(env["PROXY_BIND_IPV4"]))
+# Same fields and parsing as proxy_api.config.Settings uses for render_config.
+# System python3 (no pydantic): anything but an explicit false keeps the safe default.
+block = env.get("PROXY_BLOCK_PRIVATE_DESTINATIONS", "true").strip().lower() not in ("false", "0", "no", "off", "f", "n")
+settings = SimpleNamespace(bind_ipv4=IPv4Address(env["PROXY_BIND_IPV4"]),
+                           subnet=IPv6Network(env["PROXY_IPV6_SUBNET"]), block_private_destinations=block)
 changed = []
 for item in json.loads((state / "state.json").read_text())["proxies"]:
     record = SimpleNamespace(**{"username": None, "password": None, **item})
@@ -422,10 +428,13 @@ apply_release() {
             python3 -m venv "$app_dir/.venv"
             run_pip=true
         fi
-        if [[ ${run_pip:-false} == true ]] || file_differs "$stage/app/requirements.txt" "$app_dir/requirements.txt"; then
-            "$app_dir/.venv/bin/pip" install --quiet --disable-pip-version-check -r "$stage/app/requirements.txt"
+        # The lock pins the whole dependency closure with hashes: pip refuses
+        # anything else, so every install gets exactly the tested packages.
+        if [[ ${run_pip:-false} == true ]] || file_differs "$stage/app/requirements.lock" "$app_dir/requirements.lock"; then
+            "$app_dir/.venv/bin/pip" install --quiet --disable-pip-version-check --require-hashes -r "$stage/app/requirements.lock"
         fi
         install -m 0644 "$stage/app/requirements.txt" "$app_dir/requirements.txt"
+        install -m 0644 "$stage/app/requirements.lock" "$app_dir/requirements.lock"
     fi
     if [[ $api_unit_changed == true ]]; then install -m 0644 "$stage/units/ipv6-proxy-api.service" "$unit_file"; fi
     if [[ $template_changed == true ]]; then install -m 0644 "$stage/units/ipv6-proxy@.service" "$template_file"; fi
@@ -732,15 +741,14 @@ install_clients_only() {
         [[ -f $source ]] || die '--cli-only requer checkout completo deste repositorio (install.sh e ipv6-proxy juntos); consulte docs/INSTALL.md.'
     else
         source=$script_dir/ipv6-proxy-tui destination=$tui_file marker=''
-        [[ -f $source && -d $script_dir/proxy_tui && -f $script_dir/requirements.txt ]] \
+        [[ -f $source && -d $script_dir/proxy_tui && -f $script_dir/requirements.lock ]] \
             || die '--tui-only requer checkout completo com ipv6-proxy-tui e proxy_tui/; consulte docs/INSTALL.md.'
     fi
     [[ -d $app_dir && -f $env_file && -f $unit_file ]] || die "API existente nao reconhecida; use --$which-only somente apos a instalacao completa."
     if [[ $which == tui ]]; then
         [[ -x $app_dir/.venv/bin/pip ]] || die "venv da API ausente em $app_dir/.venv; rode o instalador completo."
-        local pin
-        pin=$(grep -E '^textual==' "$script_dir/requirements.txt") || die 'requirements.txt sem pin de textual.'
-        "$app_dir/.venv/bin/pip" install --quiet --disable-pip-version-check "$pin"
+        # Whole hashed lock (textual and its closure); already-installed pins are no-ops.
+        "$app_dir/.venv/bin/pip" install --quiet --disable-pip-version-check --require-hashes -r "$script_dir/requirements.lock"
         replace_dir "$script_dir/proxy_tui" "$app_dir/proxy_tui"
         find "$app_dir/proxy_tui" -name __pycache__ -prune -exec rm -rf {} +
     fi

@@ -67,10 +67,19 @@ class SystemdSupervisor:
         if Path(config_path) != self.config_dir / f"{_port(port)}.cfg":
             raise RuntimeError(f"ipv6-proxy@.service reads {self.config_dir}/<port>.cfg, not {config_path}")
         # enable: the instance comes back on boot without waiting for the API.
-        self._systemctl("enable", "--now", self.unit(port))
+        # --no-reload and only when needed: a plain enable makes PID1 reload
+        # every unit, which per proxy would make reconciling N proxies O(N^2).
+        if not self.is_enabled(port):
+            self._systemctl("enable", "--no-reload", self.unit(port))
+        self._systemctl("start", self.unit(port))
 
     def stop(self, port):
-        self._systemctl("disable", "--now", self.unit(port))
+        self._systemctl("stop", self.unit(port))
+        if self.is_enabled(port):
+            self._systemctl("disable", "--no-reload", self.unit(port))
+
+    def is_enabled(self, port):
+        return self._systemctl("is-enabled", "--quiet", self.unit(port), check=False).returncode == 0
 
     def restart(self, port):
         self._systemctl("restart", self.unit(port))
