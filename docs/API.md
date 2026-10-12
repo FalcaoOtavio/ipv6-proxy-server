@@ -145,9 +145,11 @@ sudo ipv6-proxy rotate 30000 --yes --output json
 sudo ipv6-proxy delete 30000 --yes --output json
 ```
 
-**Cada mutacao reinicia somente o 3proxy da porta afetada e desconecta as
-sessoes dessa porta**; o aviso aparece em stderr e o CLI pede confirmacao. `--yes` dispensa
-somente a pergunta, nao o aviso. CLI e HTTP/Swagger podem operar simultaneamente
+`edit`, `rotate` e `delete` **reiniciam somente o 3proxy da porta afetada e
+desconectam as sessoes dessa porta**; o aviso aparece em stderr e o CLI pede
+confirmacao. `create`/`batch` nao tocam sessoes existentes. `--yes` dispensa
+somente a pergunta, nao o aviso. Lotes, edicao, exportacao e o mapa de
+equivalencia com o script original: [`docs/CLI.md`](CLI.md). CLI e HTTP/Swagger podem operar simultaneamente
 no mesmo pool: um unico manager na API serializa operacoes e rejeita conflitos.
 Isso garante consistencia de estado, nao continuidade de conexoes.
 
@@ -171,6 +173,7 @@ segredos enviados ao servidor.
 | 4 | Erro HTTP 4xx, exceto 401 (ex.: 404, 409, 422) |
 | 5 | Erro do servidor, redirect ou resposta invalida |
 | 6 | Falha de transporte; resultado da mutacao pode ser desconhecido |
+| 7 | Lote parcial (`batch --partial`) |
 | 130 | Interrompido pelo usuario |
 
 Apos timeout ou interrupcao, consulte `list` antes de repetir uma mutacao: o
