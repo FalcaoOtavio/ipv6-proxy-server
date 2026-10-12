@@ -7,7 +7,7 @@ IPv6 Proxy Server
 │Exportar lista (IPv4:porta:usuário:senha)│
 │1 omitido(s): senha desconhecida (a API não devolve senhas).│
 │Arquivo (criado com permissão 0600; não sobrescreve)│
-│f-dpm/pytest-N/test_f07_reveal_and_export_siz0/out-80.txt│
+│out-80.txt│
 ││
 │ Confirmar Cancelar │
 ╰──────────────────────────────────────────────────────────────╯
