@@ -1,0 +1,104 @@
+{
+  "a_pid_after": 3846024,
+  "a_pid_before": 3846024,
+  "allowed_ports": [
+    21002,
+    21010,
+    21011,
+    21012,
+    21013,
+    21014,
+    21015,
+    21016,
+    21017,
+    21018,
+    21019,
+    21020
+  ],
+  "config_identical": {
+    "21000": true,
+    "21001": true
+  },
+  "egress_after": {
+    "21000": "::ffff:127.0.0.42",
+    "21001": "::ffff:127.0.0.20"
+  },
+  "egress_initial": {
+    "21000": "::ffff:127.0.0.42",
+    "21001": "::ffff:127.0.0.20"
+  },
+  "fault": "rollback-batch",
+  "generated_at": 1791766622.5015368,
+  "network_scope": "loopback v4-mapped (::ffff:127.0.0.0/120) - loopback/ULA complementar, NAO IPv6 roteado",
+  "pids_after": {
+    "21000": 3846030,
+    "21001": 3846036
+  },
+  "pids_before": {
+    "21000": 3846030,
+    "21001": 3846036
+  },
+  "result": {
+    "expect_ports": null,
+    "status": 503,
+    "writes_blocked": true
+  },
+  "streams": [
+    {
+      "bytes": 960,
+      "contiguous": true,
+      "duration_s": 3.699,
+      "egress": "::ffff:127.0.0.42",
+      "ended_at": 1791766622.5004675,
+      "error": null,
+      "frames": 60,
+      "max_gap_s": 0.261,
+      "name": "B-http-connect",
+      "started_at": 1791766618.7264328
+    },
+    {
+      "bytes": 1040,
+      "contiguous": true,
+      "duration_s": 3.673,
+      "egress": "::ffff:127.0.0.20",
+      "ended_at": 1791766622.5004904,
+      "error": null,
+      "frames": 65,
+      "max_gap_s": 0.123,
+      "name": "C-socks5",
+      "started_at": 1791766618.7711587
+    }
+  ],
+  "supervisor_mutations": [
+    {
+      "op": "start",
+      "port": 21010,
+      "t": 1791766619.2011924
+    },
+    {
+      "op": "start",
+      "port": 21011,
+      "t": 1791766619.394119
+    },
+    {
+      "op": "start",
+      "port": 21012,
+      "t": 1791766619.8384845
+    },
+    {
+      "op": "stop",
+      "port": 21012,
+      "t": 1791766620.0981815
+    },
+    {
+      "op": "stop",
+      "port": 21011,
+      "t": 1791766620.2870846
+    },
+    {
+      "op": "stop",
+      "port": 21010,
+      "t": 1791766620.852104
+    }
+  ]
+}

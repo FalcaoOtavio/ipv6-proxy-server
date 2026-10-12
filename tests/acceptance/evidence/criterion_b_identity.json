@@ -1,0 +1,11 @@
+{
+  "generated_at": 1791766648.493099,
+  "network_scope": "loopback v4-mapped (::ffff:127.0.0.0/120) - loopback/ULA complementar, NAO IPv6 roteado",
+  "new_id": "9c51fc467e3b836a44a7af81386653f9",
+  "old_id": "5092cdfc82af53563c5bf0306e15a199",
+  "pid_after": 3846401,
+  "pid_before": 3846401,
+  "port": 21005,
+  "stale_delete_status": 412,
+  "stale_rotate_status": 412
+}

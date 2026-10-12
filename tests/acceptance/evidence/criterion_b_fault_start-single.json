@@ -1,0 +1,102 @@
+{
+  "a_pid_after": 3845620,
+  "a_pid_before": 3845620,
+  "allowed_ports": [
+    21002,
+    21010,
+    21011,
+    21012,
+    21013,
+    21014,
+    21015,
+    21016,
+    21017,
+    21018,
+    21019,
+    21020
+  ],
+  "config_identical": {
+    "21000": true,
+    "21001": true
+  },
+  "egress_after": {
+    "21000": "::ffff:127.0.0.9",
+    "21001": "::ffff:127.0.0.230"
+  },
+  "egress_initial": {
+    "21000": "::ffff:127.0.0.9",
+    "21001": "::ffff:127.0.0.230"
+  },
+  "fault": "start-single",
+  "generated_at": 1791766593.1819742,
+  "network_scope": "loopback v4-mapped (::ffff:127.0.0.0/120) - loopback/ULA complementar, NAO IPv6 roteado",
+  "pids_after": {
+    "21000": 3845625,
+    "21001": 3845629
+  },
+  "pids_before": {
+    "21000": 3845625,
+    "21001": 3845629
+  },
+  "result": {
+    "expect_ports": [
+      21002
+    ],
+    "status": 503
+  },
+  "state_after": [
+    [
+      21000,
+      "91d546aeae86a9bb927e8a00aef0b62b",
+      "::ffff:127.0.0.9"
+    ],
+    [
+      21001,
+      "038c7e16b8bde68a15ee6272773cb060",
+      "::ffff:127.0.0.230"
+    ],
+    [
+      21002,
+      "c80497300f2d9b00988e305c46912230",
+      "::ffff:127.0.0.11"
+    ]
+  ],
+  "streams": [
+    {
+      "bytes": 1056,
+      "contiguous": true,
+      "duration_s": 3.901,
+      "egress": "::ffff:127.0.0.9",
+      "ended_at": 1791766592.917607,
+      "error": null,
+      "frames": 66,
+      "max_gap_s": 0.263,
+      "name": "B-http-connect",
+      "started_at": 1791766588.8537855
+    },
+    {
+      "bytes": 1072,
+      "contiguous": true,
+      "duration_s": 3.891,
+      "egress": "::ffff:127.0.0.230",
+      "ended_at": 1791766592.9176278,
+      "error": null,
+      "frames": 67,
+      "max_gap_s": 0.327,
+      "name": "C-socks5",
+      "started_at": 1791766588.9265144
+    }
+  ],
+  "supervisor_mutations": [
+    {
+      "op": "start",
+      "port": 21010,
+      "t": 1791766589.3529546
+    },
+    {
+      "op": "stop",
+      "port": 21010,
+      "t": 1791766589.4655607
+    }
+  ]
+}
