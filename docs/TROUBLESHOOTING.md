@@ -49,11 +49,23 @@ somente aquela porta: ela sai do ar, fica `fenced` e recusa mutações (503).
 O estado em disco fica no último commit; as demais portas seguem servindo e
 mutando.
 
+A porta também fica `fenced` quando o reconcile na partida da API não consegue
+subi-la no prazo. `GET /proxies` (sem `?include=status`) responde 503 citando
+a porta cercada.
+
 Recuperação:
 
 1. Corrija a causa no log (`journalctl -u ipv6-proxy-api` e
    `journalctl -u ipv6-proxy@<porta>`).
-2. Reinicie a API:
+2. Recupere só essa porta, sem reiniciar a API (token admin):
+   ```bash
+   curl -sS -X POST -H "Authorization: Bearer $PROXY_API_TOKEN" \
+     http://127.0.0.1:8000/proxies/<porta>/recover
+   ```
+   Se a instância já estiver no ar com a config gravada, é adotada (mesmo PID);
+   senão é iniciada. Nenhuma outra porta é tocada. 503 = ainda cercada: volte
+   ao passo 1.
+3. Alternativa: reinicie a API:
    ```bash
    sudo systemctl restart ipv6-proxy-api
    sudo ipv6-proxy list
@@ -61,7 +73,7 @@ Recuperação:
    Reiniciar a API **não derruba proxies**: na partida ela adota as instâncias
    saudáveis (mesmo PID) e recoloca só a porta cercada conforme o estado
    gravado. Se a porta continuar `fenced`/`failed`, repita o passo 1.
-3. Se todas as mutações responderem 503 `Recovery required; restart service
+4. Se todas as mutações responderem 503 `Recovery required; restart service
    and inspect logs`, a API falhou ao regravar o estado em disco (processos
    continuam servindo): verifique disco/permissões de
    `/var/lib/ipv6-proxy-api` e reinicie a API.
@@ -149,6 +161,11 @@ de 2 min para subir.
 - No instalador, aumente a espera pela API com `--api-timeout S` (padrão 180;
   soma 5 s por proxy). O `--max-time` das chamadas acompanha
   `PROXY_READY_TIMEOUT` + 30 s.
+- Chamadas `systemctl` da API têm prazo `max(30, PROXY_READY_TIMEOUT + 15)` s.
+  Se um `systemctl start` estoura esse prazo, a API não cerca a porta por isso:
+  ela reconsulta a unidade (ativa + PID dono do socket) e adota se subiu. Porta
+  que ainda assim ficou `fenced`: [recupere](#porta-fenced) com
+  `POST /proxies/<porta>/recover`.
 
 ## Ainda não validado
 

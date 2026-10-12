@@ -48,6 +48,14 @@ class TargetBackend:
     def existing_addresses(self):
         return {str(r.ipv6) for r in self.live.values()}
 
+    def recover(self, port, record=None):
+        self.ops.append(("recover", port))
+        self._maybe_fail(port)
+        if record is None:
+            self.live.pop(port, None)
+        else:
+            self.live[port] = record
+
     def statuses(self, records):
         return {r.port: "running" if self.live.get(r.port) == r else "failed" for r in records}
 
@@ -109,6 +117,33 @@ def test_get_one_reports_fenced(client):
     backend(client).fail_on[a["port"]] = 2  # rotate and its compensation both fail
     assert client.post(f"/proxies/{a['port']}/rotate").status_code == 503
     assert client.get(f"/proxies/{a['port']}").json()["status"] == "fenced"
+
+def test_fenced_port_recovers_without_restart(client):
+    a, b = client.post("/proxies", json={}).json(), client.post("/proxies", json={}).json()
+    port = a["port"]
+    backend(client).fail_on[port] = 2
+    assert client.post(f"/proxies/{port}/rotate").status_code == 503
+    # Legacy list keeps its 503 contract but names the port and the way out.
+    listing = client.get("/proxies")
+    assert listing.status_code == 503 and str(port) in listing.json()["detail"] and "recover" in listing.json()["detail"]
+    assert {i["port"]: i["status"] for i in client.get("/proxies?include=status").json()}[port] == "fenced"
+    mutation = client.post(f"/proxies/{port}/rotate")
+    assert mutation.status_code == 503 and "/recover" in mutation.json()["detail"]
+    # Admin only; a client token or a narrowed admin token cannot recover.
+    assert client.post(f"/proxies/{port}/recover", headers=as_tenant("tenant-a")).status_code == 403
+    assert client.post(f"/proxies/{port}/recover", headers={"X-Proxy-Owner": "tenant-a"}).status_code == 403
+    assert client.post(f"/proxies/{port}/recover", headers={"If-Match": "0" * 32}).status_code == 412
+    backend(client).fail_on[port] = 1  # still broken: stays fenced
+    assert client.post(f"/proxies/{port}/recover").status_code == 503
+    ops = len(backend(client).ops)
+    recovered = client.post(f"/proxies/{port}/recover", headers={"If-Match": f'"{a["id"]}"', "Idempotency-Key": "r1"})
+    assert recovered.status_code == 200 and recovered.json()["status"] == "running"
+    assert backend(client).ops[ops:] == [("recover", port)]  # no other port touched
+    assert client.post(f"/proxies/{port}/recover", headers={"Idempotency-Key": "r1"}).status_code == 200
+    assert backend(client).ops[ops + 1:] == []  # not fenced anymore: nothing re-done
+    assert client.get("/proxies").status_code == 200
+    assert client.post(f"/proxies/{port}/rotate").status_code == 200
+    assert client.post("/proxies/30019/recover").status_code == 404
 
 def test_patch_credentials_protocol_keep_identity(client, settings):
     a = client.post("/proxies", json={"username": "u", "password": "p"}).json()

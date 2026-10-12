@@ -36,7 +36,8 @@ class Host:
         elif verb == "is-enabled":
             return SimpleNamespace(returncode=0 if port in self.enabled else 1)
         elif verb == "is-active":
-            return SimpleNamespace(returncode=0 if port in self.active else 3)
+            return SimpleNamespace(returncode=0 if port in self.active else 3,
+                                   stdout="active\n" if port in self.active else "inactive\n")
         elif verb == "show":
             return SimpleNamespace(stdout=f"{1000 + port}\n")
         elif verb == "list-units":
@@ -345,3 +346,53 @@ def test_reconcile_deadline_counts_from_each_launch(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError):
         backend._wait_ready(30001, since=980.0)  # its own 30 s already elapsed: no extra wait
     assert clock.now < 1022
+
+def test_systemctl_timeout_derives_from_ready_timeout():
+    from proxy_api.supervisor import command_timeout
+    assert command_timeout(1) == 30 and command_timeout(30) == 45 and command_timeout(300) == 315
+
+def test_start_timeout_with_unit_up_later_is_adopted_not_fenced(tmp_path, monkeypatch):
+    """E2E #2: systemctl start outlives its timeout but the unit comes up: adopt it."""
+    import subprocess
+    clock = Clock()
+    monkeypatch.setattr("proxy_api.backend.time", clock)
+    host = Host()
+    real = host.systemctl
+
+    def slow(argv, check=True):
+        result = real(argv, check)
+        if argv[1] == "start":
+            raise subprocess.TimeoutExpired(argv, 45)  # job queued; unit becomes active anyway
+        return result
+
+    backend = LinuxBackend(settings_for(tmp_path), SystemdSupervisor(run=slow, config_dir=tmp_path / "proxies"))
+    backend._ip = host.ip
+    backend._refuse_foreign_port = lambda port: None
+    backend.ready = lambda port: port in host.active and clock.now >= 1005
+    a = record(30002, "2001:db8::2")
+    assert backend.reconcile([a]) == set()
+    assert backend.healthy([a]) and backend.statuses([a]) == {30002: "running"}
+
+def test_activating_unit_is_waited_for(tmp_path):
+    supervisor = SystemdSupervisor(run=lambda argv, check=True: SimpleNamespace(returncode=3, stdout="activating\n"))
+    assert supervisor.is_active(30000)
+
+def test_recover_adopts_or_starts_only_the_fenced_port(tmp_path):
+    host = Host()
+    backend = backend_for(tmp_path, host)
+    a, b = record(30000, "2001:db8::1"), record(30001, "2001:db8::2")
+    backend.ready = lambda port: port in host.active
+    backend.provision(a)
+    backend.provision(b)
+    host.commands.clear()
+    backend.serving.pop(a.port)  # as if fenced: adopted again, nothing restarted
+    backend.recover(a.port, a)
+    assert mutating(host.commands) == [] and backend.healthy([a, b])
+    host.active.discard(a.port)  # really down: only its own unit is started
+    backend.recover(a.port, a)
+    assert_targets_only(host.commands, a.port, {"2001:db8::1"})
+    assert backend.healthy([a, b])
+    host.commands.clear()
+    backend.recover(a.port, None)  # fenced mid-create: stopped and its address released
+    assert_targets_only(host.commands, a.port, {"2001:db8::1"})
+    assert a.port not in host.active and b.port in host.active and "2001:db8::1" not in host.addresses
