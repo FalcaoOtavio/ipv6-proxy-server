@@ -10,6 +10,11 @@ import sys
 from pathlib import Path
 
 import pytest
+from ipaddress import IPv4Address, IPv6Address
+from types import SimpleNamespace
+
+sys.path.insert(0, str(Path(__file__).parents[1]))
+from proxy_api.backend import render_config  # noqa: E402
 
 ROOT = Path(__file__).parents[1]
 INSTALLER = ROOT / "install.sh"
@@ -25,6 +30,7 @@ systemctl() {
               [[ -f $T/pids ]] || echo 0 ;;
         is-active) [[ -f $T/active ]] && grep -qx "$(sed -E 's/.*@([0-9]+).*/\1/' <<<"${*: -1}")" "$T/active"
                    return ;;
+        daemon-reload) [[ ! -f $T/reload-fails ]] || return 1 ;;
         start|restart) if [[ ${*: -1} == ipv6-proxy-api.service ]]; then
                            [[ ! -f $T/api-fails ]] || { rm -f "$T/api-fails"; :; }
                            [[ ! -f $T/on-api-start ]] || bash "$T/on-api-start"
@@ -36,6 +42,8 @@ curl() {
     log "curl $*"
     local url=${*: -1}
     [[ ! -f $T/api-down ]] || return 7
+    # Legacy GET /proxies answers 503 while any proxy is fenced; ?include=status does not.
+    if [[ -f $T/legacy-503 && $url == */proxies && " $* " == *" --fail "* ]]; then return 22; fi
     if [[ " $* " == *" -o /dev/null "* ]]; then return 0; fi
     case "$url" in
         */proxies) if [[ " $* " == *" -X POST "* ]]; then echo '{"port":30099,"id":"'"$(printf 'a%.0s' {1..32})"'"}'; else echo '[]'; fi ;;
@@ -72,7 +80,7 @@ set_paths
 {STUBS}
 work_dir="$2/work"
 script_dir="{ROOT}"
-mode=install assume_yes=false self_test=false subnet='' interface='' ipv4='' ref=''
+mode=install assume_yes=false self_test=false subnet='' interface='' ipv4='' ref='' keep_backups=5
 {body}
 '''
     result = subprocess.run(["bash", "-c", script, "t", str(root), str(tmp_path)], capture_output=True,
@@ -120,7 +128,8 @@ def fake_installation(tmp_path, flavor, ports=(30000, 30001)):
         (venv / name).chmod(0o755)
     etc = root / "etc"
     (etc / "systemd/system").mkdir(parents=True)
-    (etc / "ipv6-proxy-api.env").write_text(f"PROXY_API_TOKEN={TOKEN}\nPROXY_DATA_DIR=/var/lib/ipv6-proxy-api\n")
+    (etc / "ipv6-proxy-api.env").write_text(
+        f"PROXY_API_TOKEN={TOKEN}\nPROXY_BIND_IPV4=192.0.2.10\nPROXY_DATA_DIR=/var/lib/ipv6-proxy-api\n")
     (etc / "ipv6-proxy-api.env").chmod(0o600)
     unit = ROOT / "deploy/ipv6-proxy-api.service"
     (etc / "systemd/system/ipv6-proxy-api.service").write_text(
@@ -138,8 +147,8 @@ def fake_installation(tmp_path, flavor, ports=(30000, 30001)):
         (state / "state.json").write_text(json.dumps({"version": 2, "proxies": proxies, "idempotency": {}}))
     if flavor == "independent":
         (state / "proxies").mkdir()
-        for p in ports:
-            (state / "proxies" / f"{p}.cfg").write_text(f"config {p}\n")
+        for item in proxies:  # what the installed API rendered: an update with the same code changes nothing
+            (state / "proxies" / f"{item['port']}.cfg").write_text(rendered(item))
         (tmp_path / "active").write_text("".join(f"{p}\n" for p in ports))
         (tmp_path / "pids").write_text("".join(f"{p}.service {1000 + p}\n" for p in ports))
     bin_dir = root / "usr/local/bin"
@@ -154,6 +163,10 @@ def fake_installation(tmp_path, flavor, ports=(30000, 30001)):
         (app / "VERSION").write_text("sha=local\nref=local\ndate=x\n")
     return root
 
+def rendered(item):
+    record = SimpleNamespace(username=None, password=None, **{**item, "ipv6": IPv6Address(item["ipv6"])})
+    return render_config(SimpleNamespace(bind_ipv4=IPv4Address("192.0.2.10")), record)
+
 def stub_source(sha="local"):
     # The worktree is the source; its SHA comes from resolve_source unless pinned here.
     return f'resolve_source() {{ source_dir="{ROOT}"; source_ref=local; source_sha={sha}; }}\n'
@@ -167,6 +180,7 @@ def stub_source(sha="local"):
     ("--cli-only", "cli-only|false|false||"),
     ("--tui-only", "tui-only|false|false||"),
     ("--ref 0123456789abcdef0123456789abcdef01234567", "install|false|false|0123456789abcdef0123456789abcdef01234567|"),
+    ("--update --keep-backups 2", "update|false|false||"),
 ])
 def test_parse_args_accepts(tmp_path, argv, expected):
     result = run(tmp_path, f'parse_args {argv}\nprintf "%s|%s|%s|%s|%s\\n" "$mode" "$assume_yes" "$self_test" "$ref" "$subnet"')
@@ -177,6 +191,7 @@ def test_parse_args_accepts(tmp_path, argv, expected):
     ("--ref 'a;b'", "--ref invalido"), ("--ref ../x", "--ref invalido"), ("--bogus", "Opcao desconhecida"),
     ("--update --subnet 2001:db8::/64", "nao aceita --subnet"), ("--cli-only --ref main", "nao aceita --ref"),
     ("--tui-only --self-test", "nao aceita --ref nem --self-test"),
+    ("--keep-backups 0", "--keep-backups invalido"), ("--keep-backups x", "--keep-backups invalido"),
 ])
 def test_parse_args_rejects(tmp_path, argv, message):
     result = run(tmp_path, f"parse_args {argv}", check=False)
@@ -363,7 +378,7 @@ def test_update_restarts_only_the_api(tmp_path):
     assert not any("ipv6-proxy@" in c for c in mutating_systemctl(tmp_path))
     assert (root / "opt/ipv6-proxy-server/proxy_api/app.py").read_bytes() == (ROOT / "proxy_api/app.py").read_bytes()
     assert (root / "etc/ipv6-proxy-api.env").read_bytes() == env_before
-    backup = next((root / "var/backups").iterdir())
+    backup = next((root / "var/backups/ipv6-proxy").iterdir())
     assert stat.S_IMODE(backup.stat().st_mode) == 0o700
     assert (backup / "app/proxy_api/app.py").read_text() == "old\n"
 
@@ -547,3 +562,192 @@ def test_legacy_guard_fails_before_side_effects(tmp_path, generated, kind, marke
     assert result.returncode == 1
     assert not result.stdout
     assert "legacy manager disabled" in result.stderr
+
+
+# --- T17: transaction, rollback and review fixes ------------------------------------
+
+def old_app(root):
+    (root / "opt/ipv6-proxy-server/proxy_api/app.py").write_text("old\n")
+
+def test_unrelated_fenced_proxy_does_not_roll_back_update(tmp_path):
+    # A1: 30001 is down before the update; plain GET /proxies is 503, include=status is 200.
+    root = fake_installation(tmp_path, "independent")
+    old_app(root)
+    (tmp_path / "active").write_text("30000\n")
+    (tmp_path / "legacy-503").touch()
+    result = run(tmp_path, stub_source() + "mode=update\nupdate_install independent")
+    assert "Atualizacao concluida" in result.stdout, result.stderr
+    assert any("/proxies?include=status" in c for c in calls(tmp_path))
+    assert not any(c.endswith("/proxies") and "--fail" in c for c in calls(tmp_path) if c.startswith("curl"))
+
+def test_die_inside_transaction_rolls_back(tmp_path):
+    # A2: die => exit never fires ERR; the EXIT trap must still restore the backup.
+    root = fake_installation(tmp_path, "independent")
+    old_app(root)
+    result = run(tmp_path, stub_source() + "reload_if_units_changed() { die 'injected'; }\n"
+                 "mode=update\nupdate_install independent", check=False)
+    assert result.returncode == 1 and "Erro: injected" in result.stderr
+    assert "Restaurando" in result.stderr and "Rollback concluido" in result.stderr
+    assert (root / "opt/ipv6-proxy-server/proxy_api/app.py").read_text() == "old\n"
+
+def test_set_e_error_inside_transaction_rolls_back_with_line(tmp_path):
+    root = fake_installation(tmp_path, "independent")
+    old_app(root)
+    result = run(tmp_path, stub_source() + "reload_if_units_changed() { false; }\n"
+                 "mode=update\nupdate_install independent", check=False)
+    assert result.returncode == 1 and "na linha" in result.stderr
+    assert (root / "opt/ipv6-proxy-server/proxy_api/app.py").read_text() == "old\n"
+
+def test_rollback_keeps_going_and_always_starts_old_api(tmp_path):
+    # A3: an incomplete backup and a failing daemon-reload never skip 'systemctl start'.
+    root = fake_installation(tmp_path, "independent")
+    old_app(root)
+    (tmp_path / "on-api-start").write_text(f'touch "{tmp_path}/api-down" "{tmp_path}/reload-fails"\n'
+                                           f'rm -f "$(ls -d {root}/var/backups/ipv6-proxy/*)/cli"\n')
+    result = run(tmp_path, stub_source() + "mode=update\nupdate_install independent", check=False)
+    assert result.returncode == 1
+    assert "FALHOU: systemctl daemon-reload" in result.stderr and "FALHOU: restaurar arquivos" in result.stderr
+    mutations = mutating_systemctl(tmp_path)
+    assert mutations[-1] == "systemctl start ipv6-proxy-api.service"
+    assert (root / "opt/ipv6-proxy-server/proxy_api/app.py").read_text() == "old\n"  # other items restored
+
+def test_inactive_proxy_started_later_is_not_a_restart(tmp_path):
+    # A4: MainPID 0 before (inactive/failed) => a new PID after is not "restarted".
+    (tmp_path / "before").write_text("30000 100 aaa\n30001 0 bbb\n30002  ccc\n")
+    (tmp_path / "after").write_text("30000 100 aaa\n30001 201 bbb\n30002 202 ccc\n")
+    assert run(tmp_path, 'restarted_unchanged "$T/before" "$T/after"').stdout.split() == []
+
+def test_inactive_proxy_reconciled_does_not_roll_back(tmp_path):
+    root = fake_installation(tmp_path, "independent")
+    old_app(root)
+    (tmp_path / "active").write_text("30000\n")
+    (tmp_path / "pids").write_text("30000.service 31000\n30001.service 0\n")
+    (tmp_path / "on-api-start").write_text(f'printf "30000\\n30001\\n" > "{tmp_path}/active"; '
+                                           f'sed -i "s/^30001.service .*/30001.service 9999/" "{tmp_path}/pids"\n')
+    result = run(tmp_path, stub_source() + "mode=update\nupdate_install independent")
+    assert "Atualizacao concluida" in result.stdout, result.stderr
+
+def test_api_deadline_grows_with_proxy_count(tmp_path):
+    # A5: 45s base + 5s per persisted proxy.
+    fake_installation(tmp_path, "independent", ports=tuple(range(30000, 30100)))
+    (tmp_path / "api-down").touch()
+    result = run(tmp_path, 'api_deadline\nwrite_curl_config\nwait_api || echo DOWN')
+    assert result.stdout.split() == ["545", "DOWN"]
+    assert sum(c.startswith("curl") for c in calls(tmp_path)) == 545
+
+def changed_render(root, port=30000):
+    (root / f"var/lib/ipv6-proxy-api/proxies/{port}.cfg").write_text("config rendered by the old release\n")
+
+def test_update_changing_rendered_config_needs_confirmation(tmp_path):
+    # M3: announce exactly the proxies that will restart; nothing changes without --yes.
+    root = fake_installation(tmp_path, "independent")
+    old_app(root)
+    changed_render(root)
+    before = digest(root)
+    result = run(tmp_path, stub_source() + "mode=update\nupdate_install independent", check=False)
+    assert result.returncode == 1 and "--yes" in result.stderr
+    assert "1 proxies serao reiniciados uma vez (um por vez)" in result.stdout and "portas: 30000" in result.stdout
+    assert digest(root) == before and mutating_systemctl(tmp_path) == []
+
+def test_update_changing_rendered_config_with_yes(tmp_path):
+    root = fake_installation(tmp_path, "independent")
+    old_app(root)
+    changed_render(root)
+    # The new API restarts 30000 (config changed) and keeps 30001.
+    cfg = root / "var/lib/ipv6-proxy-api/proxies/30000.cfg"
+    (tmp_path / "on-api-start").write_text(f'printf "new\\n" > "{cfg}"; '
+                                           f'sed -i "s/^30000.service .*/30000.service 7777/" "{tmp_path}/pids"\n')
+    result = run(tmp_path, stub_source() + "mode=update\nassume_yes=true\nupdate_install independent")
+    assert "Confirmado por --yes" in result.stdout and "Atualizacao concluida" in result.stdout
+    assert mutating_systemctl(tmp_path) == ["systemctl restart ipv6-proxy-api.service"]  # never collective
+
+def test_failed_config_update_reverts_only_restarted_proxies(tmp_path):
+    root = fake_installation(tmp_path, "independent")
+    old_app(root)
+    changed_render(root)
+    cfg = root / "var/lib/ipv6-proxy-api/proxies"
+    # One-shot: the new API rewrites 30000.cfg, then 30000 fails to come up.
+    (tmp_path / "on-api-start").write_text(
+        f'printf "new\\n" > "{cfg}/30000.cfg"; printf "30001\\n" > "{tmp_path}/active"; rm -f "$0"\n')
+    result = run(tmp_path, stub_source() + "mode=update\nassume_yes=true\nupdate_install independent", check=False)
+    assert result.returncode == 1 and "ipv6-proxy@30000.service nao esta ativo" in result.stderr
+    restarts = [c for c in mutating_systemctl(tmp_path) if c.startswith("systemctl restart ipv6-proxy@")]
+    assert restarts == ["systemctl restart ipv6-proxy@30000.service"]
+    assert (cfg / "30000.cfg").read_text() == "config rendered by the old release\n"
+
+def test_rollback_never_runs_in_a_subshell(tmp_path):
+    # M4: the EXIT handler of a $(...)/( ) subshell must not restore anything.
+    fake_installation(tmp_path, "independent")
+    result = run(tmp_path, 'rollback() { echo ROLLBACK; }\nbegin_tx update\n'
+                 'v=$(false; echo x)\n( set +e; (exit 4); on_exit ) || true\nfor p in $(false); do :; done\n'
+                 'end_tx\necho DONE')
+    assert "ROLLBACK" not in result.stdout and result.stdout.strip().endswith("DONE")
+
+def test_backups_keep_var_backups_mode_and_are_pruned(tmp_path):
+    # M5: /var/backups keeps its mode; our dir is 0700; only the newest N are kept.
+    root = fake_installation(tmp_path, "independent")
+    shared = root / "var/backups"
+    shared.mkdir(mode=0o755)
+    shared.chmod(0o755)
+    (shared / "dpkg.status.0").write_text("not ours\n")
+    ours = shared / "ipv6-proxy"
+    ours.mkdir(mode=0o700)
+    for day in range(1, 8):
+        (ours / f"2026010{day}T000000Z-1").mkdir()
+    (ours / "keep-me").mkdir()  # not a backup name: never pruned
+    run(tmp_path, "keep_backups=3\nbackup_installation\nprune_backups")
+    assert stat.S_IMODE(shared.stat().st_mode) == 0o755 and (shared / "dpkg.status.0").exists()
+    assert stat.S_IMODE(ours.stat().st_mode) == 0o700
+    assert sorted(p.name for p in ours.iterdir()) == [
+        "20260106T000000Z-1", "20260107T000000Z-1", "20261011T000000Z-" + next(
+            p.name.split("-")[-1] for p in ours.iterdir() if p.name.startswith("20261011")), "keep-me"]
+
+FRESH = r"""
+ask_network() { subnet=2001:db8::/64 interface=eth0 ipv4=192.0.2.10; }
+check_api_port_free() { :; }
+make() { :; }
+git() {
+    if [[ $1 == clone ]]; then mkdir -p "${*: -1}/bin"; echo bin > "${*: -1}/bin/3proxy"; return; fi
+    if [[ $* == *rev-parse* ]]; then echo "$THREEPROXY_SHA"; return; fi
+    command git "$@"
+}
+python3() {
+    if [[ $1 == -m && $2 == venv ]]; then
+        mkdir -p "$3/bin"; printf '#!/bin/sh\n[ ! -f "%s/pip-fails" ]\n' "$T" > "$3/bin/pip"
+        cp "$3/bin/pip" "$3/bin/python"; chmod 755 "$3/bin/pip" "$3/bin/python"; return
+    fi
+    command python3 "$@"
+}
+"""
+
+def test_fresh_install_succeeds(tmp_path):
+    result = run(tmp_path, stub_source() + FRESH + 'trap on_exit EXIT\nfresh_install\necho VERSION=$(detect_version)')
+    assert "Instalacao concluida" in result.stdout and "VERSION=independent" in result.stdout
+    assert stat.S_IMODE((tmp_path / "root/etc/ipv6-proxy-api.env").stat().st_mode) == 0o600
+
+@pytest.mark.parametrize("failure", ["pip-fails", "api-down"])
+def test_failed_fresh_install_leaves_nothing_behind(tmp_path, failure):
+    # M6: a failed clean install removes what it created; the rerun starts from 'none'.
+    (tmp_path / failure).touch()
+    result = run(tmp_path, stub_source() + FRESH + 'trap on_exit EXIT\nfresh_install', check=False)
+    assert result.returncode == 1 and "Desfazendo a instalacao incompleta" in result.stderr
+    assert "execute o mesmo comando novamente" in result.stderr
+    assert run(tmp_path, "detect_version").stdout.strip() == "none"
+    # The API unit exists only once apply_release got that far; then it is disabled too.
+    assert ("systemctl disable --now ipv6-proxy-api.service" in calls(tmp_path)) == (failure == "api-down")
+
+def test_version_unknown_warns(tmp_path):
+    checkout = tmp_path / "checkout"
+    for name in ("proxy_api/app.py", "deploy/ipv6-proxy-api.service", "ipv6-proxy"):
+        (checkout / name).parent.mkdir(parents=True, exist_ok=True)
+        (checkout / name).write_text("")
+    result = run(tmp_path, f'script_dir="{checkout}"\nresolve_source\necho "sha=$source_sha"',
+                 env={"GIT_CEILING_DIRECTORIES": str(tmp_path)})
+    assert result.stdout.strip() == "sha=unknown" and "Aviso: nao foi possivel ler o SHA" in result.stderr
+
+def test_vm_e2e_shellcheck_clean():
+    found = Path("/data/projects/ipv6-proxy-server-independente/.tools/sc-venv/bin/shellcheck")
+    if not found.exists():
+        pytest.skip("shellcheck not installed")
+    result = subprocess.run([str(found), str(ROOT / "tests/e2e/vm_e2e.sh")], capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout

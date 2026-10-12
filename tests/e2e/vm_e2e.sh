@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2317  # step_* functions are invoked indirectly via "step_$current"
+# shellcheck disable=SC2317,SC2329  # step_* functions are invoked indirectly via "step_$current"
 # VM end-to-end: base aa29685 -> install.sh --update to the target SHA on a clean,
 # disposable Linux host with systemd. DESTRUCTIVE for that host's ipv6-proxy setup:
 # never run it on a production VPS.

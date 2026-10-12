@@ -24,7 +24,7 @@ Passos:
 
 1. Detecta a versao instalada (aa29685, bdfe9c7 ou nova) e confere que
    `PROXY_DATA_DIR`/`PROXY_3PROXY_BINARY` estao nos caminhos padrao.
-2. Backup completo em `/var/backups/ipv6-proxy-<data>-<pid>/` (0700): app,
+2. Backup completo em `/var/backups/ipv6-proxy/<data>-<pid>/` (0700): app,
    `/etc/ipv6-proxy-api.env`, `/var/lib/ipv6-proxy-api`, unidades, CLI/TUI e
    binario 3proxy.
 3. Instala a nova revisao (codigo, venv, `ipv6-proxy-api.service`,
@@ -50,33 +50,48 @@ Se qualquer passo falhar, o instalador:
 2. restaura app, env, estado, unidades, CLI/TUI e 3proxy do backup;
 3. recarrega o systemd e inicia a API anterior, que volta a subir seus 3proxy.
 
+Cada passo e tentado mesmo se o anterior falhar e aparece como `ok` ou
+`FALHOU`; a API anterior e sempre iniciada. Se algum passo falhar, conclua com
+o rollback manual abaixo.
+
 Os proxies voltam a funcionar na versao anterior (nova interrupcao curta).
 
 ## Rollback manual
 
-Use um backup listado em `/var/backups/` (o mais recente e o anterior a ultima
-atualizacao):
+Use um backup de `/var/backups/ipv6-proxy/` (o mais recente e o anterior a
+ultima atualizacao; atualizacoes antigas usavam `/var/backups/ipv6-proxy-<data>-<pid>`).
+Cada item do backup ou existe (copie de volta) ou aparece como `<nome>.absent`
+(o item nao existia: remova-o). O trecho abaixo trata os dois casos para todos
+os itens: app, env, unidades, estado, CLI, TUI e binario 3proxy.
 
 ```bash
-B=/var/backups/ipv6-proxy-<data>-<pid>
+B=/var/backups/ipv6-proxy/<data>-<pid>
 sudo systemctl stop ipv6-proxy-api
 for unit in $(systemctl list-units --all --plain --no-legend 'ipv6-proxy@*.service' | cut -d' ' -f1); do
     sudo systemctl disable --now "$unit"   # um proxy por vez, nome explicito
 done
-sudo rm -rf /opt/ipv6-proxy-server /var/lib/ipv6-proxy-api
-sudo cp -a "$B/app" /opt/ipv6-proxy-server
-sudo cp -a "$B/state" /var/lib/ipv6-proxy-api
-sudo cp -a "$B/env" /etc/ipv6-proxy-api.env
-sudo cp -a "$B/api-unit" /etc/systemd/system/ipv6-proxy-api.service
-[ -e "$B/template" ] && sudo cp -a "$B/template" /etc/systemd/system/ipv6-proxy@.service \
-    || sudo rm -f /etc/systemd/system/ipv6-proxy@.service
-sudo cp -a "$B/cli" /usr/local/bin/ipv6-proxy
+restore() {  # item-do-backup destino
+    sudo rm -rf "$2"
+    if [ -e "$B/$1" ]; then sudo cp -a "$B/$1" "$2"
+    elif [ ! -e "$B/$1.absent" ]; then echo "backup sem $1: verifique $2 manualmente" >&2; fi
+}
+restore app      /opt/ipv6-proxy-server
+restore env      /etc/ipv6-proxy-api.env
+restore api-unit /etc/systemd/system/ipv6-proxy-api.service
+restore template /etc/systemd/system/ipv6-proxy@.service
+restore state    /var/lib/ipv6-proxy-api
+restore cli      /usr/local/bin/ipv6-proxy
+restore tui      /usr/local/bin/ipv6-proxy-tui
+restore 3proxy   /usr/local/bin/3proxy
 sudo systemctl daemon-reload
 sudo systemctl start ipv6-proxy-api
+curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $(sudo sed -n 's/^PROXY_API_TOKEN=//p' /etc/ipv6-proxy-api.env)" \
+    'http://127.0.0.1:8000/proxies?include=status'   # 200 = API anterior respondendo
 ```
 
-Arquivos `<nome>.absent` no backup indicam que o item nao existia; nesse caso
-remova-o em vez de copiar.
+Na versao base (aa29685/bdfe9c7) a API anterior sobe os proprios 3proxy ao
+iniciar. Numa instalacao ja independente, a API restaurada recria as unidades
+`ipv6-proxy@<porta>` do estado restaurado.
 
 ## Depois da migracao
 

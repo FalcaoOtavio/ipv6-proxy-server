@@ -46,6 +46,18 @@ O instalador:
    `running` e o remove (com `If-Match`), sem tocar proxies existentes;
 7. imprime a revisao instalada e o comando para reinstalar a mesma revisao.
 
+Sem `--ref`, um checkout local registra o proprio SHA (o `git` roda com
+`safe.directory` limitado a esse checkout, por causa do `sudo`). Se o SHA nao
+puder ser lido, o instalador avisa e grava `sha=unknown`; use `--ref`.
+
+### Instalacao interrompida
+
+Se a instalacao limpa falhar depois de comecar a gravar arquivos (pip, unidade,
+healthcheck), o instalador desabilita a API e remove somente o que ele criou
+nesta execucao. Corrija a causa e rode o mesmo comando de novo. Se a limpeza
+falhar (listada como `FALHOU`), remova os itens indicados; enquanto restar algo,
+a reexecucao recusa com "Instalacao incompleta" e lista os caminhos.
+
 O token nunca aparece em argumentos de processo nem nos logs: o instalador o
 passa ao curl por arquivo de configuracao temporario.
 
@@ -71,15 +83,31 @@ sudo bash install-ipv6-proxy.sh --update --ref "$REF" --self-test
 ```
 
 - Faz backup de app, env, estado, unidades, CLI/TUI e binario 3proxy em
-  `/var/backups/ipv6-proxy-<data>-<pid>/` (0700) antes de mudar qualquer coisa.
+  `/var/backups/ipv6-proxy/<data>-<pid>/` antes de mudar qualquer coisa. So
+  `/var/backups/ipv6-proxy/` e seus backups sao 0700 (`/var/backups` nao muda).
+  Os backups contem token e senhas: apos uma atualizacao bem-sucedida ficam so
+  os 5 mais recentes (`--keep-backups N`, de 1 a 999).
 - Reinicia **somente a API**. A API reconcilia na partida: adota os proxies
   saudaveis (mesmo PID) e reinicia apenas um proxy cuja configuracao gerada
-  mudou. O instalador confere os PIDs antes e depois e faz rollback se um proxy
-  sem mudanca de configuracao for reiniciado.
+  mudou. O instalador confere os PIDs (so das unidades ativas antes) e faz
+  rollback se um proxy sem mudanca de configuracao for reiniciado. Um proxy
+  ja parado ou com falha antes da atualizacao nao causa rollback.
+- Se a nova revisao muda a configuracao gerada de proxies (ex.: nova ACL), o
+  instalador calcula antes quais portas mudam, anuncia "N proxies serao
+  reiniciados uma vez (um por vez)" e exige `REINICIAR` no terminal ou
+  `--yes`. Sem confirmacao nada e alterado. A API reinicia cada um em
+  sequencia, nunca em conjunto; se algum falhar, o rollback restaura a versao
+  anterior e reinicia, um a um, so os proxies que ja tinham a configuracao nova.
+- Prazo do healthcheck: 45 s + 5 s por proxy persistido (a API reconcilia
+  todos antes de responder; ate ~5 s por proxy que precise subir). Usa
+  `GET /proxies?include=status`, que responde mesmo com um proxy isolado.
 - Se `ipv6-proxy@.service` mudar, nenhum proxy e reiniciado; cada um adota a
   nova unidade no proximo reinicio dele (edicao, rotacao ou reboot).
-- Falha (erro, healthcheck ou PID trocado): restaura o backup automaticamente e
-  reinicia a API anterior.
+- Falha (qualquer erro, inclusive mensagens `Erro:`; healthcheck; PID trocado):
+  restaura o backup automaticamente e inicia a API anterior. O rollback tenta
+  todos os passos mesmo que um falhe e lista cada um (`ok`/`FALHOU`); a API
+  anterior e sempre iniciada. `--self-test` roda depois de confirmada a
+  atualizacao: falha nele e reportada, sem rollback.
 - Reexecutar sem mudancas nao altera nada (token, env, estado, unidades, PIDs)
   e nao reinicia servicos: imprime `Nada a atualizar`.
 - `--subnet/--interface/--ipv4` nao sao aceitos em instalacao existente; o
