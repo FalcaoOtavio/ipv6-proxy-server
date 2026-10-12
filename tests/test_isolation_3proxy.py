@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 from proxy_api.app import CAPABILITIES, create_app
 from proxy_api.backend import LinuxBackend
 from proxy_api.config import Settings
+from proxy_api.supervisor import LocalProcessSupervisor
 
 BINARY = os.environ.get("TEST_3PROXY_BINARY")
 pytestmark = pytest.mark.skipif(not BINARY, reason="Set TEST_3PROXY_BINARY for real integration")
@@ -160,11 +161,21 @@ def env(tmp_path):
     ports = free_ports(6)
     settings = Settings(subnet="::ffff:127.0.0.0/120", bind_ipv4="127.0.0.1", interface="lo",
                         api_token=ADMIN, data_dir=tmp_path / "data", binary=BINARY,
-                        port_start=min(ports), port_end=max(ports), client_tokens_file=tokens)
+                        port_start=min(ports), port_end=max(ports), client_tokens_file=tokens,
+                        supervisor="local")
     echo = EchoServer()
-    with TestClient(create_app(settings, LoopbackBackend)) as client:
-        yield client, ports, echo
-    echo.close()
+    try:
+        with TestClient(create_app(settings, LoopbackBackend)) as client:
+            yield client, ports, echo
+    finally:
+        echo.close()
+        stop_all(settings)
+
+def stop_all(settings):
+    # Proxies outlive the API object by design; the test owns their cleanup.
+    supervisor = LocalProcessSupervisor(settings.binary, settings.data_dir / "proxies")
+    for port in supervisor.list_managed():
+        supervisor.stop(port)
 
 def call(client, method, path, token, key=None, **kwargs):
     headers = {"Authorization": f"Bearer {token}"}
@@ -179,7 +190,7 @@ def make(client, token, port, protocol, user, key=None):
     return {**result.json(), "password": body["password"]}
 
 def pid(client, port):
-    return client.app.state.manager.backend.processes[port][1].pid
+    return client.app.state.manager.backend.supervisor.main_pid(port)
 
 def test_capabilities_are_exactly_the_proven_set(env):
     client, _, _ = env
@@ -218,7 +229,7 @@ def test_mutating_a_keeps_b_stream_and_process(env):
         assert pid(client, b["port"]) == b_pid
         assert beat.error is None and beat.count > 40
         # Control: the probe does detect a dropped B, so the passes above are real.
-        client.app.state.manager.backend._stop(b["port"])
+        client.app.state.manager.backend.supervisor.stop(b["port"])
         beat.join(timeout=5)
         assert beat.error is not None
     finally:
@@ -298,7 +309,7 @@ def test_failures_in_a_never_drop_b(env, monkeypatch):
     b_pid = pid(client, b["port"])
     try:
         # A's 3proxy dies: B keeps flowing; the next mutation of A restarts only A.
-        backend.processes[a["port"]][1].kill()
+        os.kill(pid(client, a["port"]), 9)
         assert beat.alive_for(0.3)
         # Health is owner-scoped: A sees its dead port, B is untouched, admin sees the pool degraded.
         assert call(client, "GET", "/proxies", TENANT_A).status_code == 503
@@ -318,7 +329,7 @@ def test_failures_in_a_never_drop_b(env, monkeypatch):
         failed = call(client, "POST", "/proxies", TENANT_A,
                       json={"port": ports[2], "protocol": "http", "username": "x", "password": "y"})
         assert failed.status_code == 503
-        assert ports[2] not in backend.processes
+        assert not backend.supervisor.is_active(ports[2])
         assert {p["port"] for p in call(client, "GET", "/proxies", ADMIN).json()} == {a["port"], b["port"]}
         assert not client.app.state.manager.broken
         assert beat.alive_for(0.3)

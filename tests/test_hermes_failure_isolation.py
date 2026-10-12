@@ -10,7 +10,7 @@ def test_failure_and_rollback_of_a_preserve_b(env, monkeypatch):
     beat = Heartbeat(stream)
     beat.start()
     backend = client.app.state.manager.backend
-    b_process = backend.processes[b["port"]][1]
+    b_pid = pid(client, b["port"])
     try:
         assert beat.alive_for(0.3)
         real = backend_module.render_config
@@ -19,8 +19,8 @@ def test_failure_and_rollback_of_a_preserve_b(env, monkeypatch):
         result = call(client, "POST", f"/proxies/{a['port']}/rotate", TENANT_A)
         assert result.status_code == 503
         survived = beat.alive_for(0.3)
-        assert survived and b_process.poll() is None, (
-            f"unrelated B lost after A update+rollback failure: B_alive={b_process.poll() is None}, "
+        assert survived and pid(client, b["port"]) == b_pid, (
+            f"unrelated B lost after A update+rollback failure: B_pid={pid(client, b['port'])}/{b_pid}, "
             f"heartbeat={beat.error!r}, manager_broken={client.app.state.manager.broken}")
     finally:
         beat.halt.set()

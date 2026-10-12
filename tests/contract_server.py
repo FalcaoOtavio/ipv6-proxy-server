@@ -24,7 +24,7 @@ import proxy_api.backend as backend_module  # noqa: E402
 import proxy_api.manager as manager_module  # noqa: E402
 from proxy_api.app import create_app  # noqa: E402
 from proxy_api.config import Settings  # noqa: E402
-from test_isolation_3proxy import LoopbackBackend  # noqa: E402
+from test_isolation_3proxy import LoopbackBackend, stop_all  # noqa: E402
 
 def free_range(count):
     for _ in range(200):
@@ -56,7 +56,7 @@ first, last = free_range(6)
 settings = Settings(subnet="::ffff:127.0.0.0/120", bind_ipv4="127.0.0.1", interface="lo",
                     api_token=os.environ["CONTRACT_ADMIN_TOKEN"], data_dir=scratch / "data",
                     binary=os.environ["TEST_3PROXY_BINARY"], port_start=first, port_end=last,
-                    client_tokens_file=tokens)
+                    client_tokens_file=tokens, supervisor="local")
 api = create_app(settings, LoopbackBackend)
 faults = {"delay": {}, "broken": set()}
 real_render = backend_module.render_config
@@ -83,8 +83,7 @@ async def app(scope, receive, send):
             body = {"ids": [r.id for r in manager.records], "fenced": sorted(manager.broken_ports),
                     "broken": manager.broken}
     elif parts[0] == "pid":
-        process = manager.backend.processes.get(int(parts[1]))
-        body = {"pid": process[1].pid if process and process[1].poll() is None else None}
+        body = {"pid": manager.backend.supervisor.main_pid(int(parts[1]))}
     await send({"type": "http.response.start", "status": 200,
                 "headers": [(b"content-type", b"application/json")]})
     await send({"type": "http.response.body", "body": json.dumps(body).encode()})
@@ -108,4 +107,7 @@ sock.bind(("127.0.0.1", 0))
 config = uvicorn.Config(delaying, fd=None, log_level="warning", lifespan="on")
 server = uvicorn.Server(config)
 print(f"READY {sock.getsockname()[1]} {first} {last}", flush=True)
-server.run(sockets=[sock])
+try:
+    server.run(sockets=[sock])
+finally:
+    stop_all(settings)
