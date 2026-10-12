@@ -1,6 +1,6 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                                    
- 52552  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.180                      
- 52554  ╭──────────────────────────────────────────────────────────────╮        
+ 53298  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.202                      
+ 53300  ╭──────────────────────────────────────────────────────────────╮        
         │ Criar lote                                                   │        
         │ Quantidade                                                   │        
         │ 0                                                            │        
@@ -19,6 +19,6 @@
         │ (PROXY_BATCH_MAX).                                           │        
         │    Confirmar         Cancelar                                │        
         ╰──────────────────────────────────────────────────────────────╯        
- ✓ Proxy da porta 52555 excluído.                                               
+ ✓ Proxy da porta 53301 excluído.                                               
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                          
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                

@@ -1,16 +1,16 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                                    
- 52552  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.180                      
- 52554  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.127                      
- 52562  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.181                      
- 52564  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.63                       
- 52566  ● ativo  HTTP   u52566   ••••   ::ffff:127.0.0.50                       
- 52567  ● ativo  HTTP   u52567   ••••   ::ffff:127.0.0.59                       
- 52572  ● ativo  HTTP   outro    n/d    ::ffff:127.0.0.203                      
+ 53298  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.202                      
+ 53300  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.173                      
+ 53308  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.123                      
+ 53310  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.169                      
+ 53312  ● ativo  HTTP   u53312   ••••   ::ffff:127.0.0.168                      
+ 53313  ● ativo  HTTP   u53313   ••••   ::ffff:127.0.0.19                       
+ 53318  ● ativo  HTTP   outro    n/d    ::ffff:127.0.0.41                       
         ╭──────────────────────────────────────────────────────────────╮        
         │ Exportar lista (IPv4:porta:usuário:senha)                    │        
         │ 1 omitido(s): senha desconhecida (a API não devolve senhas). │        
         │ Arquivo (criado com permissão 0600; não sobrescreve)         │        
-        │ /tmp/tui-val-80x24-h3bextim/proxies-20261012-050511.txt      │        
+        │ /tmp/tui-val-80x24-yhsrilgr/proxies-20261012-053132.txt      │        
         │                                                              │        
         │    Confirmar         Cancelar                                │        
         ╰──────────────────────────────────────────────────────────────╯        
@@ -19,6 +19,6 @@
                                                                                 
                                                                                 
                                                                                 
- ✓ Senha da porta 52562 oculta.                                                 
+ ✓ Senha da porta 53308 oculta.                                                 
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                          
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                

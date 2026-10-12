@@ -1,10 +1,10 @@
  Porta  Status    Proto   Usuário  Senha  IPv6              
- 55218  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.94 
- 55219  ✕ falhou  SOCKS5  —        —      ::ffff:127.0.0.45 
+ 40097  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.229
+ 40098  ✕ falhou  SOCKS5  —        —      ::ffff:127.0.0.154
 ╭──────────────────────────────────────────────────────────╮
-│ Editar proxy da porta 55219                              │
+│ Editar proxy da porta 40098                              │
 │ Porta                                                    │
-│ 55220                                                    │
+│ 40099                                                    │
 │ Protocolo                                                │
 │ HTTP                                                  ▼  │
 │ Usuário                                                  │

@@ -1,6 +1,6 @@
  Porta  Status   Proto   Usuário  Senha  IPv6               
- 55218  ● ativo  HTTP    alice    ••••   ::ffff:127.0.0.94  
- 55219  ● ativo  SOCKS5  —        —      ::ffff:127.0.0.45  
+ 40097  ● ativo  HTTP    alice    ••••   ::ffff:127.0.0.229 
+ 40098  ● ativo  SOCKS5  —        —      ::ffff:127.0.0.154 
                                                             
                                                             
                                                             
@@ -15,6 +15,6 @@
                                                             
                                                             
                                                             
- ✓ Proxy criado na porta 55219 com IPv6 ::ffff:127.0.0.45.  
+ ✓ Proxy criado na porta 40098 com IPv6 ::ffff:127.0.0.154. 
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            

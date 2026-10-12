@@ -1,11 +1,11 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                
- 55218  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.72   
- 55220  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.244  
- 55228  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.204  
- 55230  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.131  
- 55232  ● ativo  HTTP   u55232   ••••   ::ffff:127.0.0.45   
- 55233  ● ativo  HTTP   u55233   ••••   ::ffff:127.0.0.234  
- 55238  ● ativo  HTTP   outro    n/d    ::ffff:127.0.0.42   
+ 40097  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.81   
+ 40099  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.91   
+ 40107  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.2    
+ 40109  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.217  
+ 40111  ● ativo  HTTP   u40111   ••••   ::ffff:127.0.0.67   
+ 40112  ● ativo  HTTP   u40112   ••••   ::ffff:127.0.0.210  
+ 40117  ● ativo  HTTP   outro    n/d    ::ffff:127.0.0.139  
                                                             
                                                             
                                                             
@@ -14,7 +14,7 @@
                                                             
                                                             
  ✕ 6 linha(s) exportada(s) para                             
- /tmp/tui-val-60x20-vbf1bue_/proxies-20261012-050659.txt    
+ /tmp/tui-val-60x20-3hse2bp6/proxies-20261012-053323.txt    
  (0600). 1 omitido(s): senha desconhecida (a API não        
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            
