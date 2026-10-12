@@ -376,13 +376,17 @@ config_changes() {
     # it cannot tell (caller then asks as if all could restart).
     python3 -B - "$stage/app" "$state_dir" "$env_file" <<'PY' 2>/dev/null || echo '?'
 import json, pathlib, sys
-from ipaddress import IPv4Address, IPv6Address
+from ipaddress import IPv4Address, IPv6Address, IPv6Network
 from types import SimpleNamespace
 sys.path.insert(0, sys.argv[1])
 from proxy_api.backend import render_config
 state = pathlib.Path(sys.argv[2])
 env = dict(line.split("=", 1) for line in pathlib.Path(sys.argv[3]).read_text().splitlines() if "=" in line)
-settings = SimpleNamespace(bind_ipv4=IPv4Address(env["PROXY_BIND_IPV4"]))
+# Same fields and parsing as proxy_api.config.Settings uses for render_config.
+# System python3 (no pydantic): anything but an explicit false keeps the safe default.
+block = env.get("PROXY_BLOCK_PRIVATE_DESTINATIONS", "true").strip().lower() not in ("false", "0", "no", "off", "f", "n")
+settings = SimpleNamespace(bind_ipv4=IPv4Address(env["PROXY_BIND_IPV4"]),
+                           subnet=IPv6Network(env["PROXY_IPV6_SUBNET"]), block_private_destinations=block)
 changed = []
 for item in json.loads((state / "state.json").read_text())["proxies"]:
     record = SimpleNamespace(**{"username": None, "password": None, **item})

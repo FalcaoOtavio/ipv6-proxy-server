@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from ipaddress import IPv4Address, IPv6Address
+from ipaddress import IPv4Address, IPv6Address, IPv6Network
 from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
@@ -19,6 +19,7 @@ from proxy_api.backend import render_config  # noqa: E402
 ROOT = Path(__file__).parents[1]
 INSTALLER = ROOT / "install.sh"
 TOKEN = "f" * 64
+SUBNET = "2001:db8::/64"
 
 STUBS = r'''
 log() { printf '%s\n' "$*" >>"$T/calls"; }
@@ -129,7 +130,8 @@ def fake_installation(tmp_path, flavor, ports=(30000, 30001)):
     etc = root / "etc"
     (etc / "systemd/system").mkdir(parents=True)
     (etc / "ipv6-proxy-api.env").write_text(
-        f"PROXY_API_TOKEN={TOKEN}\nPROXY_BIND_IPV4=192.0.2.10\nPROXY_DATA_DIR=/var/lib/ipv6-proxy-api\n")
+        f"PROXY_API_TOKEN={TOKEN}\nPROXY_BIND_IPV4=192.0.2.10\nPROXY_IPV6_SUBNET={SUBNET}\n"
+        "PROXY_DATA_DIR=/var/lib/ipv6-proxy-api\n")
     (etc / "ipv6-proxy-api.env").chmod(0o600)
     unit = ROOT / "deploy/ipv6-proxy-api.service"
     (etc / "systemd/system/ipv6-proxy-api.service").write_text(
@@ -165,7 +167,9 @@ def fake_installation(tmp_path, flavor, ports=(30000, 30001)):
 
 def rendered(item):
     record = SimpleNamespace(username=None, password=None, **{**item, "ipv6": IPv6Address(item["ipv6"])})
-    return render_config(SimpleNamespace(bind_ipv4=IPv4Address("192.0.2.10")), record)
+    settings = SimpleNamespace(bind_ipv4=IPv4Address("192.0.2.10"), subnet=IPv6Network(SUBNET),
+                               block_private_destinations=True)
+    return render_config(settings, record)
 
 def stub_source(sha="local"):
     # The worktree is the source; its SHA comes from resolve_source unless pinned here.
