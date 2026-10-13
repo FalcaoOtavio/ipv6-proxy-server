@@ -116,3 +116,32 @@ Push e PR **não executados**: aguardam autorização (#152). Comandos propostos
 artefatos em `dist/` (fora do git) gerados a partir do commit desta seção.
 
 O projeto **não** é declarado 100% funcional: ver pendências acima.
+
+## Release CR-1 (T39)
+
+Data: 2026-10-13. Main `39d070837d8e6c86701a00aa688228884cfd7f39` (merge agent/vm; inclui T37 `ipv6-proxy update` e
+T38 E2E do update em VM). Mesmo host compartilhado, loopback e systemctl simulado.
+
+### Suítes locais
+
+| Suíte | Comando | Linha final |
+|---|---|---|
+| Sem 3proxy | `.venv/bin/python -m pytest -q` | `441 passed, 30 skipped, 2 warnings in 74.48s` (skips: falta de `TEST_3PROXY_BINARY`) |
+| 3proxy real, 1x | `TEST_3PROXY_BINARY=.../.tools/3proxy .venv/bin/python -m pytest -q` | `471 passed, 3 warnings in 156.91s` |
+| TUI 1x | `.venv/bin/python -m pytest -q tests/test_tui.py` | `28 passed, 1 warning in 29.60s` |
+| shellcheck 0.9.0 / 0.11.0 | `shellcheck install.sh tests/e2e/vm_e2e.sh` | rc=0, limpo nas duas versões |
+| bash -n | `install.sh ipv6-proxy-server.sh` | rc=0 |
+| pip-audit 2.10.1 | `pip-audit -r requirements.lock --require-hashes` | `No known vulnerabilities found` (rc=0) |
+| pip-audit 2.10.1 | `pip-audit -r requirements-dev.txt` | `No known vulnerabilities found` (rc=0) |
+
+Achado não bloqueante: os scripts de teste novos da T38 (`tests/e2e/vm_update.sh`, `vm_update_driver.sh`) não passam
+limpos no shellcheck (SC2155 warning, SC2015 info; SC2002 style só na 0.9). Não são instalados nem rodam no produto.
+
+### `ipv6-proxy update` (T37/T38)
+
+- Testes unitários em `tests/test_cli_update.py` (incluídos nas suítes acima).
+- E2E em VM Ubuntu 24.04 TCG: `PASS=22 FAIL=0` ([e2e/update/README.md](e2e/update/README.md)): `--check` exit 10 sem
+  alterar nada; `--self-test` grava o SHA novo em `VERSION` com os mesmos MainPID dos 2 proxies e API saudável; 2ª
+  execução "Nada a atualizar"; `--ref` inexistente, SHA inexistente, `a;b` e SHA abreviado falham sem mudar nada.
+- **Não validado**: download do GitHub real (a fonte foi espelhada na VM; nada foi publicado). Demais pendências da
+  T36 seguem valendo (IPv6 roteado, Debian 12/13 e Ubuntu 22.04/26.04, tempos sob TCG).
