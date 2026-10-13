@@ -1,0 +1,42 @@
+# UI = TUI (terminal). Viewport = dimensões de pty (80x24 e 60x20), não browser. Evidência = capturas SVG/texto do pty.
+items:
+  - key: F01
+    title: TUI — lista de proxies, estado vazio e atualização de status
+    path: ipv6-proxy-tui
+    criteria: ["sem proxies mostra estado vazio com instrução de criar", "tabela mostra porta, protocolo, IPv6 e status em texto/símbolo (não só cor)", "status atualiza após operação e por atalho de recarregar"]
+    viewports: ["pty 80x24", "pty 60x20"]
+  - key: F02
+    title: TUI — ajuda e navegação por teclado
+    path: ipv6-proxy-tui (tecla ?)
+    criteria: ["atalhos visíveis no rodapé", "? abre ajuda PT-BR com todos os atalhos", "Esc fecha diálogos sem efeito colateral"]
+    viewports: ["pty 80x24", "pty 60x20"]
+  - key: F03
+    title: TUI — criar proxy individual
+    path: ipv6-proxy-tui (criar)
+    criteria: ["formulário valida porta/protocolo/credenciais com erro inline", "senha digitada mascarada", "feedback de sucesso e novo item na lista"]
+    viewports: ["pty 80x24", "pty 60x20"]
+  - key: F04
+    title: TUI — criar lote
+    path: ipv6-proxy-tui (lote)
+    criteria: ["quantidade, porta inicial, protocolo e modo de credenciais (comum/aleatória/sem)", "validação antes de aplicar", "resultado mostra criados e falhas"]
+    viewports: ["pty 80x24", "pty 60x20"]
+  - key: F05
+    title: TUI — editar proxy
+    path: ipv6-proxy-tui (editar)
+    criteria: ["altera credenciais/protocolo/porta", "conflito de porta mostra erro sem alterar nada", "demais proxies inalterados"]
+    viewports: ["pty 80x24", "pty 60x20"]
+  - key: F06
+    title: TUI — rotacionar e excluir com confirmação
+    path: ipv6-proxy-tui (rotacionar/excluir)
+    criteria: ["rotação mostra novo IPv6 só do alvo", "exclusão exige confirmar o alvo (porta)", "cancelar não altera nada", "navegar/cancelar/mudar seleção durante requisição em andamento nunca aplica a operação a outro proxy (alvo fixado por id+porta)"]
+    viewports: ["pty 80x24", "pty 60x20"]
+  - key: F07
+    title: TUI — exportar lista e revelar senha
+    path: ipv6-proxy-tui (exportar)
+    criteria: ["senhas mascaradas por padrão", "revelar só por ação explícita", "exporta IPv4:porta:usuario:senha em arquivo 0600 com feedback do caminho"]
+    viewports: ["pty 80x24", "pty 60x20"]
+  - key: F08
+    title: TUI — erros e terminal pequeno
+    path: ipv6-proxy-tui
+    criteria: ["API indisponível/token inválido mostra erro acionável sem traceback", "80x24 legível", "terminal pequeno (60x20) sem quebra/crash"]
+    viewports: ["pty 80x24", "pty 60x20"]

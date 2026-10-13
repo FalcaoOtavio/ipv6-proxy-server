@@ -1,0 +1,3 @@
+items:
+  - {key: R04b, title: "Correções de QA/revisão/segurança (estimativa de retrabalho)", points: 8, phase: qa}
+  - {key: R08, title: "Docs finais (MAP, ISSUES, LEARNINGS)", points: 2, phase: docs}
