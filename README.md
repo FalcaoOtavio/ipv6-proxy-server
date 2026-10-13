@@ -224,7 +224,11 @@ sudo tests/e2e/vm_e2e.sh --dry-run --phase pre-reboot                 # plano do
 ```
 
 - [docs/evidence/qa-final.md](docs/evidence/qa-final.md): QA final de release
-  (T36 e release CR-1 T39): suíte com 3proxy real, TUI, shellcheck, pip-audit.
+  (T36, release CR-1 T39 e release final T42): suíte com 3proxy real, TUI,
+shellcheck, pip-audit.
+- [docs/evidence/visual/](docs/evidence/visual/README.md): crítica visual da TUI
+em pty 80x24/120x40/60x20 (T40), com V-01/V-02/V-06 corrigidos na T41; direção
+visual em [docs/DESIGN.md](docs/DESIGN.md).
 - [docs/evidence/e2e/ubuntu-24.04/](docs/evidence/e2e/ubuntu-24.04/README.md):
   E2E em VM real Ubuntu 24.04 (systemd real, upgrades, reboot real, bloqueio).
 - [docs/evidence/e2e/update/](docs/evidence/e2e/update/README.md): E2E do

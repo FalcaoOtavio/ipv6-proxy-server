@@ -1,6 +1,6 @@
 # Proposta de PR — proxies IPv6 independentes (supervisão por proxy)
 
-> Documento de entrega local (T15, atualizado nas releases T36 e CR-1/T39). **Nada foi enviado ao GitHub.** Push, PR e CI dependem do gate #152.
+> Documento de entrega local (T15, atualizado nas releases T36, CR-1/T39 e final/T42). **Nada foi enviado ao GitHub.** Push, PR e CI dependem do gate #152.
 
 ## Título proposto
 
@@ -22,12 +22,14 @@ fixadas com hash.
 | Base do PR (`main` do fork) | `aa2968556f861f56c7e5d37c70a859797a8d8772` |
 | Origem (branch do fork `ashford/isolated-mutations`) | `bdfe9c7634691f51e893f6e53b6137f95792e4f5` |
 | Release T36 (main do DPM com T29–T35 e E2E em VM) | `1402bdc05f519a8a09a2119972156215f1bb572b` |
-| Final do código (CR-1: + `ipv6-proxy update` T37 e E2E T38) | `39d070837d8e6c86701a00aa688228884cfd7f39` |
+| Release CR-1 (+ `ipv6-proxy update` T37 e E2E T38) | `39d070837d8e6c86701a00aa688228884cfd7f39` |
+| Final do código (+ T39 docs, T40 `docs/DESIGN.md`/crítica visual, T41 CSS da TUI) | `ee69212c87fd2b8ca20f78e2629a2ee42ff1a39a` |
 
-- `bdfe9c7` é ancestral de `39d0708` (verificado com `git merge-base --is-ancestor`), e `aa29685` é ancestral de `bdfe9c7`.
-- Diff `bdfe9c7..39d0708`: 319 arquivos, +20738/−733 (`1402bdc..39d0708`: 34 arquivos, +1692/−49).
-- O commit de docs da release CR-1 (T39: este arquivo, README e qa-final) fica logo acima de `39d0708`, sem mudar código.
-  Um commit não consegue conter o próprio SHA: ele aparece no `dpm report` da T39, no `dist/` (bundle e patches) e
+- `bdfe9c7` é ancestral de `ee69212` (verificado com `git merge-base --is-ancestor`), e `aa29685` é ancestral de `bdfe9c7`.
+- Diff `bdfe9c7..ee69212`: 496 arquivos, +24283/−733 (`39d0708..ee69212`: 184 arquivos, +3569/−24, quase tudo
+  evidência visual; fora de `docs/evidence/`: 7 arquivos, +271/−24).
+- O commit de docs da release final (T42: este arquivo, README e qa-final) fica logo acima de `ee69212`, sem mudar código.
+  Um commit não consegue conter o próprio SHA: ele aparece no `dpm report` da T42, no `dist/` (bundle e patches) e
   é o SHA da branch local `dpm/independent-proxies`.
 
 ### Commits da release CR-1 (`1402bdc..39d0708`, sem merges)
@@ -39,7 +41,14 @@ fixadas com hash.
 | `8d75c15` | feat(cli): add ipv6-proxy update command wrapping install.sh --update |
 | `2253907` | test(e2e): ipv6-proxy update on Ubuntu 24.04 VM (T38) with evidence |
 
-Mais o commit de docs da T39. Lista completa (62 commits sem merge desde a importação do fork, `7f5c71e..39d0708`):
+### Commits da release final (`39d0708..ee69212`, sem merges)
+| SHA | Commit |
+|---|---|
+| `03c6436` | docs(release): CR-1 QA, ipv6-proxy update docs and PR proposal (T39) |
+| `050835d` | docs(design): TUI DESIGN.md and pty visual critique at 80x24/120x40/60x20 (T40) |
+| `54ac965` | fix(tui): AA inline errors, visible compact inputs, theme status colors (T41) |
+
+Mais o commit de docs da T42. Lista completa (66 commits sem merge desde a importação do fork, `7f5c71e..<SHA final>`):
 `git log --no-merges --oneline 7f5c71e..dpm/independent-proxies`, ou os nomes em `dist/patches/`.
 
 ## Mudanças por área
@@ -58,6 +67,8 @@ Mais o commit de docs da T39. Lista completa (62 commits sem merge desde a impor
   confirmação e exit code; não depende da API. `--check` sem sudo (exit 10 = há atualização). Sem reinício coletivo:
   só a API, proxies afetados um a um. Exit: 0 ok/nada a fazer, 1 rede/download, 2 ref inválida, 3 sem sudo, 130 Ctrl+C.
 - **TUI** (`ipv6-proxy-tui`, `proxy_tui/`): operações com alvo fixo, exportação, dados da API renderizados literalmente.
+  Direção visual em `docs/DESIGN.md` (T40); crítica visual em pty 80x24/120x40/60x20 em `docs/evidence/visual/`; T41 corrigiu
+  V-01 (erro inline AA 5,6:1), V-02 (campos `compact` visíveis) e V-06 (cores de status do tema, 6,3–12:1).
 - **Docs**: README reescrito, `docs/INSTALL.md`, `API.md`, `CLI.md`, `TUI.md`, `MIGRATION.md`, `TROUBLESHOOTING.md`.
 - **CI**: `.github/workflows/tests.yml` alinhado; `.github/workflows/vm-e2e.yml` (manual, `workflow_dispatch`).
 - **Host lento (T30/T32)**: `PROXY_READY_TIMEOUT` (prontidão por proxy, 1..300 s, padrão 30), `install.sh --api-timeout S`
@@ -83,14 +94,17 @@ Mais o commit de docs da T39. Lista completa (62 commits sem merge desde a impor
 - E2E do `ipv6-proxy update` em VM Ubuntu 24.04 (T38, 22/22 PASS, fonte de update espelhada na VM):
   [docs/evidence/e2e/update/](evidence/e2e/update/README.md).
 - QA da release CR-1 no main `39d0708` (T39): [docs/evidence/qa-final.md](evidence/qa-final.md#release-cr-1-t39).
+- QA da release final no main `ee69212` (T42): [docs/evidence/qa-final.md](evidence/qa-final.md#release-final-t42).
+- Crítica visual da TUI em pty (T40/T41, 111 ok, 0 falhas; baixas V-03/V-04/V-05 abertas, sem tarefa):
+  [docs/evidence/visual/](evidence/visual/README.md), direção em [docs/DESIGN.md](DESIGN.md).
 - Segurança: [docs/reviews/T22-security.md](reviews/T22-security.md) (N1 e F01 fechados na verificação T27).
 - Limites medidos: [docs/evidence/limits.md](evidence/limits.md). TUI: [docs/evidence/tui/](evidence/tui/).
 - Aceitação com 3proxy real: `tests/acceptance/` (evidência em `tests/acceptance/evidence/`).
 
 ## Artefatos locais (fora do git)
 
-Em `/data/projects/ipv6-proxy-server-independente/dist/`, regenerados na T39 a partir do HEAD do commit de docs
-(SHA no `dpm report` da T39) e conferidos por `SHA256SUMS` (`sha256sum -c SHA256SUMS`; os hashes não ficam aqui porque
+Em `/data/projects/ipv6-proxy-server-independente/dist/`, regenerados na T42 a partir do HEAD do commit de docs
+(SHA no `dpm report` da T42) e conferidos por `SHA256SUMS` (`sha256sum -c SHA256SUMS`; os hashes não ficam aqui porque
 dependem desse commit):
 
 - `ipv6-proxy-server-independent.bundle` — `git bundle` de `bdfe9c7..dpm/independent-proxies`; `git bundle verify`
@@ -129,7 +143,7 @@ dependem desse commit):
 ## Comandos propostos (NÃO executados)
 
 O remote `fork` está com push desabilitado (`DISABLED`) neste repo. Após aprovação do #152, num clone com permissão
-(`<SHA final>` = SHA reportado na T39, igual ao da branch local `dpm/independent-proxies`):
+(`<SHA final>` = SHA reportado na T42, igual ao da branch local `dpm/independent-proxies`):
 
 ```bash
 # 1. Push da branch (a partir do repo do DPM, ou de um clone do fork + bundle)
@@ -151,11 +165,11 @@ gh run watch --repo FalcaoOtavio/ipv6-proxy-server "$(gh run list --repo FalcaoO
 
 ## Instalação com o SHA final
 
-Só funciona **depois do push** (o `raw.githubusercontent.com` e o `--ref` resolvem o SHA no fork). Tanto `39d0708`
+Só funciona **depois do push** (o `raw.githubusercontent.com` e o `--ref` resolvem o SHA no fork). Tanto `ee69212`
 (código) quanto o SHA final (código + docs da release) servem como `--ref`:
 
 ```bash
-REF=<SHA final>   # ou 39d070837d8e6c86701a00aa688228884cfd7f39
+REF=<SHA final>   # ou ee69212c87fd2b8ca20f78e2629a2ee42ff1a39a
 curl -fsSLo install-ipv6-proxy.sh "https://raw.githubusercontent.com/FalcaoOtavio/ipv6-proxy-server/$REF/install.sh"
 sudo bash install-ipv6-proxy.sh --ref "$REF" --self-test   # host lento: --api-timeout 600 --apt-lock-timeout 1800
 ```
