@@ -145,3 +145,25 @@ limpos no shellcheck (SC2155 warning, SC2015 info; SC2002 style só na 0.9). Nã
   execução "Nada a atualizar"; `--ref` inexistente, SHA inexistente, `a;b` e SHA abreviado falham sem mudar nada.
 - **Não validado**: download do GitHub real (a fonte foi espelhada na VM; nada foi publicado). Demais pendências da
   T36 seguem valendo (IPv6 roteado, Debian 12/13 e Ubuntu 22.04/26.04, tempos sob TCG).
+## Release final (T42)
+Data: 2026-10-13. Main `ee69212c87fd2b8ca20f78e2629a2ee42ff1a39a` (merge agent/design; inclui T40 `docs/DESIGN.md` e
+crítica visual em pty, T41 CSS da TUI: V-01, V-02, V-06). Mesmo host compartilhado, loopback e systemctl simulado.
+### Suítes locais
+| Suíte | Comando | Linha final |
+|---|---|---|
+| Sem 3proxy | `.venv/bin/python -m pytest -q` | `442 passed, 30 skipped, 2 warnings in 73.30s` (skips: falta de `TEST_3PROXY_BINARY`) |
+| 3proxy real, 1x | `TEST_3PROXY_BINARY=.../.tools/3proxy .venv/bin/python -m pytest -q` | `472 passed, 3 warnings in 159.09s` |
+| TUI | `.venv/bin/python -m pytest -q tests/test_tui.py` | `29 passed, 1 warning in 29.89s` |
+| shellcheck 0.9.0 e 0.11.0 | `shellcheck install.sh tests/e2e/vm_e2e.sh` | rc=0 nas duas versões |
+| Sintaxe | `bash -n install.sh ipv6-proxy-server.sh` | rc=0 |
+| pip-audit (lock) | `pip-audit -r requirements.lock --require-hashes` | `No known vulnerabilities found` |
+| pip-audit (dev) | `pip-audit -r requirements-dev.txt` | `No known vulnerabilities found` |
+
+Os scripts do E2E do update (`tests/e2e/vm_update.sh`, `vm_update_driver.sh`) mantêm os mesmos avisos de estilo já
+registrados na T39 (SC2155, SC2015; SC2002 só na 0.9), sem efeito no produto.
+### TUI
+- Crítica visual em pty: [visual/README.md](visual/README.md) (111 ok, 0 falhas após T41). V-01 (erro inline 5,6:1), V-02
+(campos `compact` visíveis) e V-06 (status com cores do tema) corrigidos; teste
+`tests/test_tui.py::test_visual_contrast_inline_error_inputs_and_status` falha com o CSS antigo.
+- Abertos, baixos e sem tarefa: V-03 (dica de rolagem do IPv6 em 60x20), V-04 (export parcial em estilo de erro), V-05 (copy de "Aguarde").
+- Limitações da T36/T39 seguem valendo (IPv6 roteado, Debian 12/13 e Ubuntu 22.04/26.04, tempos sob TCG, download real do GitHub).
