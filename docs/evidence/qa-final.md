@@ -49,3 +49,70 @@ Por desenho (`docs/CLI.md`): retry com a mesma chave devolve o resultado guardad
 ## Riscos restantes
 - Critério E (VM real com systemd, reboot, IPv6 roteado, `IPAddressDeny` via cgroup/BPF) não coberto localmente; só dry-run do `vm_e2e.sh`.
 - Limites em `docs/evidence/limits.md` não foram re-medidos nesta rodada.
+
+## Release final (T36)
+
+Data: 2026-10-13. Main `1402bdc05f519a8a09a2119972156215f1bb572b` (merge agent/vm; inclui T29–T35 e o E2E em VM).
+Host compartilhado sem root/systemd, 8 CPUs. As suítes locais continuam em loopback com systemctl simulado; o que exige
+systemd real foi coberto pela VM (abaixo).
+
+### Suítes locais
+
+| Suíte | Comando | Linha final |
+|---|---|---|
+| Sem 3proxy | `env -u TEST_3PROXY_BINARY .venv/bin/python -m pytest -q` | `430 passed, 30 skipped, 2 warnings in 71.12s` (skips: falta de `TEST_3PROXY_BINARY`) |
+| 3proxy real, execução 1 | `TEST_3PROXY_BINARY=.../.tools/3proxy .venv/bin/python -m pytest -q` | `460 passed, 3 warnings in 155.78s` |
+| 3proxy real, execução 2 | idem | `460 passed, 3 warnings in 155.18s` |
+| TUI 3x | `.venv/bin/python -m pytest -q tests/test_tui.py` | `28 passed, 1 warning` em 29.10 / 28.70 / 29.02 s |
+| Validação da TUI | `TEST_3PROXY_BINARY=... .venv/bin/python tests/tui_validation.py` | `74 ok, 0 falhas` (rc=0; os snapshots regravados não foram commitados, só portas/tempos mudam) |
+| shellcheck 0.9.0 | `.tools/sc09-venv/bin/shellcheck install.sh tests/e2e/*.sh` | rc=0, limpo |
+| shellcheck 0.11.0 | `.tools/sc11-venv/bin/shellcheck install.sh tests/e2e/*.sh` | rc=0, limpo |
+| bash -n | `install.sh ipv6-proxy-server.sh` | rc=0 |
+| pip-audit 2.10.1 | `pip-audit -r requirements.lock --require-hashes` | `No known vulnerabilities found` (rc=0) |
+| pip-audit 2.10.1 | `pip-audit -r requirements-dev.txt` | `No known vulnerabilities found` (rc=0) |
+
+Nenhuma falha intermitente nas execuções acima.
+
+### Validado em VM real Ubuntu 24.04 (T29–T35)
+
+Detalhes e logs: [e2e/ubuntu-24.04/README.md](e2e/ubuntu-24.04/README.md). QEMU **TCG** (sem KVM), systemd real.
+
+- Upgrade a partir de `aa29685` e de `bdfe9c7`: token/state preservados, state v2 com o mesmo IPv6, unidades por proxy,
+  harness A/B/C sem queda dos streams B/C nem troca de PID.
+- 2ª execução do `--update` idempotente (hashes e PIDs iguais).
+- Reboot REAL (boot_id mudou): API sobe sozinha, mesmos proxies/IPv6/id, cada `/128` restaurado pela própria instância.
+- Toggle de `PROXY_BLOCK_PRIVATE_DESTINATIONS` via `--update`: cfg re-renderizada, reinício um a um só dos afetados,
+  drop-in `IPAddressDeny` presente/ausente; bloqueio comprovado no cgroup da unidade e no ACL do 3proxy (403), também
+  após reboot real.
+- Instalação limpa logo após o 1º boot (`--self-test --apt-lock-timeout 3600`), sem intervenção, e reboot real depois.
+
+### Não validado
+
+- Tráfego por IPv6 **roteado** real (sem subnet de provedor; a VM usou ULA em `lo`).
+- Debian 12/13 e Ubuntu 22.04/26.04 não executados.
+- Tempos da VM não são representativos (TCG, host com load 18–33).
+- `--apt-lock-timeout`: com o padrão (600 s) sob TCG o apt do 1º boot não terminou a tempo e o instalador abortou sem
+  instalar nada; a espera pelo lock só aparece numa execução contaminada (dois instaladores em paralelo), não numa
+  válida.
+- `docs/evidence/limits.md` não foi re-medido.
+
+### Novas envs/flags desde a T26
+
+`PROXY_READY_TIMEOUT` (1..300 s, padrão 30), `install.sh --api-timeout S` (10..3600, padrão 180),
+`install.sh --apt-lock-timeout S` (0..7200, padrão 600), `POST /proxies/{port}/recover` (admin).
+
+### Bugs achados pelo E2E e corrigidos
+
+| Tarefa | Bug | Status |
+|---|---|---|
+| T30 | Prontidão fixa de 5 s: self-test/POST falhavam em host lento | corrigido (`PROXY_READY_TIMEOUT`, `--api-timeout`) |
+| T32 | `systemctl start` estourava 30 s na migração; porta `fenced` (503) com instalador reportando sucesso | corrigido (prazo derivado, adoção, `/recover`) |
+| T34 | Toggle do bloqueio via `--update` não re-renderizava cfg nem reiniciava: falso "protegido" | corrigido e verificado em VM |
+| T35 | Instalação limpa pós-1º boot falhava no lock do apt | corrigido (`--apt-lock-timeout`) |
+
+### Publicação
+
+Push e PR **não executados**: aguardam autorização (#152). Comandos propostos em [PR_PROPOSAL.md](../PR_PROPOSAL.md);
+artefatos em `dist/` (fora do git) gerados a partir do commit desta seção.
+
+O projeto **não** é declarado 100% funcional: ver pendências acima.
