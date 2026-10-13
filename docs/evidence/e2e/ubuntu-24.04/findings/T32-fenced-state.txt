@@ -1,0 +1,11 @@
+30001 running
+30002 fenced
+200
+MainPID=8099
+ActiveEnterTimestamp=Mon 2026-10-12 17:40:24 UTC
+
+MainPID=7839
+ActiveEnterTimestamp=Mon 2026-10-12 17:37:26 UTC
+Oct 12 17:39:58.009790 e2e-ubuntu systemd[1]: Starting ipv6-proxy@30002.service - IPv6 proxy instance on port 30002 (3proxy)...
+Oct 12 17:40:23.695792 e2e-ubuntu python[8063]: ipv6-proxy@30002: address present
+Oct 12 17:40:24.515695 e2e-ubuntu systemd[1]: Started ipv6-proxy@30002.service - IPv6 proxy instance on port 30002 (3proxy).

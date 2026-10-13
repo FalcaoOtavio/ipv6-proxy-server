@@ -1,0 +1,5 @@
+Warning: The unit file, source configuration file or drop-ins of ipv6-proxy-api.service changed on disk. Run 'systemctl daemon-reload' to reload units.
+GET /proxies=200 after 25s
+30001 running
+30002 running
+pids before 30001=8035 30002=8099 after 30001=8035 30002=8099

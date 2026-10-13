@@ -1,0 +1,46 @@
+Oct 13 03:29:15.490890 e2e-ubuntu systemd[1]: Started ipv6-proxy-api.service - IPv6 proxy management API.
+Oct 13 03:29:18.685455 e2e-ubuntu systemd[1]: Starting ipv6-proxy@30001.service - IPv6 proxy instance on port 30001 (3proxy)...
+Oct 13 03:29:20.293694 e2e-ubuntu systemd[1]: Starting ipv6-proxy@30002.service - IPv6 proxy instance on port 30002 (3proxy)...
+Oct 13 03:29:24.126424 e2e-ubuntu systemd[1]: Starting ipv6-proxy@30011.service - IPv6 proxy instance on port 30011 (3proxy)...
+Oct 13 03:29:27.860265 e2e-ubuntu systemd[1]: Starting ipv6-proxy@30012.service - IPv6 proxy instance on port 30012 (3proxy)...
+Oct 13 03:30:34.833063 e2e-ubuntu python[705]: ipv6-proxy@30001: address added
+Oct 13 03:31:07.040020 e2e-ubuntu python[706]: ipv6-proxy@30002: address added
+Oct 13 03:31:13.741028 e2e-ubuntu python[712]: ipv6-proxy@30012: address added
+Oct 13 03:31:14.333504 e2e-ubuntu python[708]: ipv6-proxy@30011: address added
+Oct 13 03:31:21.557524 e2e-ubuntu systemd[1]: Started ipv6-proxy@30001.service - IPv6 proxy instance on port 30001 (3proxy).
+Oct 13 03:31:26.832150 e2e-ubuntu systemd[1]: Started ipv6-proxy@30002.service - IPv6 proxy instance on port 30002 (3proxy).
+Oct 13 03:31:30.154663 e2e-ubuntu systemd[1]: Started ipv6-proxy@30011.service - IPv6 proxy instance on port 30011 (3proxy).
+Oct 13 03:31:35.758847 e2e-ubuntu systemd[1]: Started ipv6-proxy@30012.service - IPv6 proxy instance on port 30012 (3proxy).
+Oct 13 03:36:30.591904 e2e-ubuntu uvicorn[704]: INFO:     Started server process [704]
+Oct 13 03:36:30.654378 e2e-ubuntu uvicorn[704]: INFO:     Waiting for application startup.
+Oct 13 03:36:55.808195 e2e-ubuntu uvicorn[704]: INFO:     Application startup complete.
+Oct 13 03:36:55.847969 e2e-ubuntu uvicorn[704]: INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+===
+ipv6-proxy-api.service   loaded active running IPv6 proxy management API
+ipv6-proxy@30001.service loaded active running IPv6 proxy instance on port 30001 (3proxy)
+ipv6-proxy@30002.service loaded active running IPv6 proxy instance on port 30002 (3proxy)
+ipv6-proxy@30011.service loaded active running IPv6 proxy instance on port 30011 (3proxy)
+ipv6-proxy@30012.service loaded active running IPv6 proxy instance on port 30012 (3proxy)
+===
+Unit ipv6-proxy-api.service (/system.slice/ipv6-proxy-api.service):
+└─704 /opt/ipv6-proxy-server/.venv/bin/python3 /opt/ipv6-proxy-server/.venv/bin…
+Unit ipv6-proxy@30001.service (/system.slice/system-ipv6\x2dproxy.slice/ipv6-proxy@30001.service):
+└─753 /usr/local/bin/3proxy /var/lib/ipv6-proxy-api/proxies/30001.cfg
+Unit ipv6-proxy@30002.service (/system.slice/system-ipv6\x2dproxy.slice/ipv6-proxy@30002.service):
+└─758 /usr/local/bin/3proxy /var/lib/ipv6-proxy-api/proxies/30002.cfg
+Unit ipv6-proxy@30011.service (/system.slice/system-ipv6\x2dproxy.slice/ipv6-proxy@30011.service):
+└─759 /usr/local/bin/3proxy /var/lib/ipv6-proxy-api/proxies/30011.cfg
+Unit ipv6-proxy@30012.service (/system.slice/system-ipv6\x2dproxy.slice/ipv6-proxy@30012.service):
+└─761 /usr/local/bin/3proxy /var/lib/ipv6-proxy-api/proxies/30012.cfg
+===
+IDX BOOT ID                          FIRST ENTRY                 LAST ENTRY
+ -3 88cebf7738cc4687b9130f7d1a8ac89f Mon 2026-10-12 10:07:58 UTC Mon 2026-10-12 10:26:31 UTC
+ -2 e4e1df061ecb44e3b82a6fee738a1e99 Mon 2026-10-12 23:22:48 UTC Tue 2026-10-13 00:23:28 UTC
+ -1 e308fa93ee92410995c8fce2a07a159c Tue 2026-10-13 00:34:25 UTC Tue 2026-10-13 03:16:15 UTC
+  0 cc47f67832a141afae798d9f77cc6c20 Tue 2026-10-13 03:21:48 UTC Tue 2026-10-13 03:48:15 UTC
+harness_a	PASS	
+clients	PASS	
+snapshot	PASS	
+post_reboot	PASS	
+traffic_post	FAIL	streams B/C locais apos reboot
+traffic_post	NOT_TESTED	E2E_ROUTED_IPV6_TARGET nao definido: trafego IPv6 roteado nao verificado

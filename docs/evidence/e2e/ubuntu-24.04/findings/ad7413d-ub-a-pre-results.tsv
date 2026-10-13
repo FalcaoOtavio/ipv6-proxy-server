@@ -1,0 +1,7 @@
+base_install	PASS	
+base_proxies	PASS	
+update	PASS	
+migration	PASS	
+idempotency	PASS	
+harness_a	PASS	
+clients	FAIL	TUI renderiza em pty e lista B

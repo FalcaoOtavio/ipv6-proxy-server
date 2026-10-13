@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2015  # res() always returns 0: "cond && res PASS || res FAIL" is a safe if/else here
 # SSRF block ON on a disposable VM already set up by vm_e2e.sh (proxy B on 30011 running):
 # turns PROXY_BLOCK_PRIVATE_DESTINATIONS on via install.sh --update and proves both layers:
 #   - systemd drop-in IPAddressDeny: a process inside ipv6-proxy@B's cgroup cannot reach [::1]
@@ -45,7 +46,7 @@ control=$(python3 -c "$probe" 6) v6=$(in_unit 6) v4=$(in_unit 4)
 
 # 3proxy layer, seen by a client over IPv4.
 # curl reports a failed CONNECT tunnel as %{http_code}=000: read the proxy's status line instead.
-code=$(curl -sv --max-time 60 -x "http://$USER_B:$PASS_B@127.0.0.1:$PORT" -p http://[::1]:22/ -o /dev/null 2>&1 |
+code=$(curl -sv --max-time 60 -x "http://$USER_B:$PASS_B@127.0.0.1:$PORT" -p "http://[::1]:22/" -o /dev/null 2>&1 |
     sed -nE 's/^< HTTP\/[0-9.]+ ([0-9]{3}).*/\1/p' | head -n 1)
 code=${code:-000}
 [[ $code == 403 ]] && res PASS "CONNECT [::1] via proxy recusado pela ACL do 3proxy (HTTP 403 para o cliente IPv4)" \

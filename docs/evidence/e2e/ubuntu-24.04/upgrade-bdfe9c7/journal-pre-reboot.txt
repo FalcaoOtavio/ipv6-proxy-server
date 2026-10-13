@@ -1,0 +1,81 @@
+Oct 12 22:28:53.886912 e2e-ubuntu systemd[1]: Started ipv6-proxy-api.service - IPv6 proxy management API and 3proxy.
+Oct 12 22:32:25.046635 e2e-ubuntu uvicorn[7040]: INFO:     Started server process [7040]
+Oct 12 22:32:25.294674 e2e-ubuntu uvicorn[7040]: INFO:     Waiting for application startup.
+Oct 12 22:32:26.790957 e2e-ubuntu uvicorn[7040]: INFO:     Application startup complete.
+Oct 12 22:32:26.902858 e2e-ubuntu uvicorn[7040]: INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+Oct 12 22:32:46.640061 e2e-ubuntu uvicorn[7040]: INFO:     127.0.0.1:36292 - "POST /proxies HTTP/1.1" 201 Created
+Oct 12 22:33:09.587396 e2e-ubuntu uvicorn[7040]: INFO:     127.0.0.1:34448 - "POST /proxies HTTP/1.1" 201 Created
+Oct 12 22:47:11.922449 e2e-ubuntu systemd[1]: Stopping ipv6-proxy-api.service - IPv6 proxy management API...
+Oct 12 22:47:12.630227 e2e-ubuntu uvicorn[7040]: INFO:     Shutting down
+Oct 12 22:47:12.801184 e2e-ubuntu uvicorn[7040]: INFO:     Waiting for application shutdown.
+Oct 12 22:47:19.471677 e2e-ubuntu uvicorn[7040]: INFO:     Application shutdown complete.
+Oct 12 22:47:19.690042 e2e-ubuntu uvicorn[7040]: INFO:     Finished server process [7040]
+Oct 12 22:47:20.474175 e2e-ubuntu systemd[1]: ipv6-proxy-api.service: Deactivated successfully.
+Oct 12 22:47:20.518570 e2e-ubuntu systemd[1]: Stopped ipv6-proxy-api.service - IPv6 proxy management API.
+Oct 12 22:47:20.534521 e2e-ubuntu systemd[1]: ipv6-proxy-api.service: Consumed 4min 18.853s CPU time, 35.6M memory peak, 0B memory swap peak.
+Oct 12 22:47:23.481988 e2e-ubuntu systemd[1]: Started ipv6-proxy-api.service - IPv6 proxy management API.
+Oct 12 22:48:47.806863 e2e-ubuntu uvicorn[8044]: INFO:     Started server process [8044]
+Oct 12 22:48:48.353169 e2e-ubuntu uvicorn[8044]: INFO:     Waiting for application startup.
+Oct 12 22:48:59.727482 e2e-ubuntu systemd[1]: Starting ipv6-proxy@30001.service - IPv6 proxy instance on port 30001 (3proxy)...
+Oct 12 22:49:16.479974 e2e-ubuntu python[8191]: ipv6-proxy@30001: address present
+Oct 12 22:49:17.147919 e2e-ubuntu systemd[1]: Started ipv6-proxy@30001.service - IPv6 proxy instance on port 30001 (3proxy).
+Oct 12 22:49:24.724228 e2e-ubuntu systemd[1]: Starting ipv6-proxy@30002.service - IPv6 proxy instance on port 30002 (3proxy)...
+Oct 12 22:49:31.895389 e2e-ubuntu python[8242]: ipv6-proxy@30002: address present
+Oct 12 22:49:33.586999 e2e-ubuntu systemd[1]: Started ipv6-proxy@30002.service - IPv6 proxy instance on port 30002 (3proxy).
+Oct 12 22:49:48.758934 e2e-ubuntu uvicorn[8044]: INFO:     Application startup complete.
+Oct 12 22:49:48.895683 e2e-ubuntu uvicorn[8044]: INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+Oct 12 22:50:22.489037 e2e-ubuntu systemd[1]: Starting ipv6-proxy@30000.service - IPv6 proxy instance on port 30000 (3proxy)...
+Oct 12 22:50:34.129102 e2e-ubuntu python[8392]: ipv6-proxy@30000: address present
+Oct 12 22:50:34.998797 e2e-ubuntu systemd[1]: Started ipv6-proxy@30000.service - IPv6 proxy instance on port 30000 (3proxy).
+Oct 12 22:50:37.936250 e2e-ubuntu uvicorn[8044]: INFO:     127.0.0.1:40374 - "POST /proxies HTTP/1.1" 201 Created
+Oct 12 22:50:50.213129 e2e-ubuntu systemd[1]: Stopping ipv6-proxy@30000.service - IPv6 proxy instance on port 30000 (3proxy)...
+Oct 12 22:50:50.241058 e2e-ubuntu systemd[1]: ipv6-proxy@30000.service: Deactivated successfully.
+Oct 12 22:50:50.293675 e2e-ubuntu systemd[1]: Stopped ipv6-proxy@30000.service - IPv6 proxy instance on port 30000 (3proxy).
+Oct 12 22:50:50.361521 e2e-ubuntu systemd[1]: ipv6-proxy@30000.service: Consumed 9.856s CPU time, 6.2M memory peak, 0B memory swap peak.
+Oct 12 22:50:58.127849 e2e-ubuntu uvicorn[8044]: INFO:     127.0.0.1:46420 - "DELETE /proxies/30000 HTTP/1.1" 204 No Content
+Oct 12 22:52:22.812843 e2e-ubuntu systemd[1]: Starting ipv6-proxy@30011.service - IPv6 proxy instance on port 30011 (3proxy)...
+Oct 12 22:52:27.958535 e2e-ubuntu python[8635]: ipv6-proxy@30011: address present
+Oct 12 22:52:28.535167 e2e-ubuntu systemd[1]: Started ipv6-proxy@30011.service - IPv6 proxy instance on port 30011 (3proxy).
+Oct 12 22:52:39.482544 e2e-ubuntu uvicorn[8044]: INFO:     127.0.0.1:51576 - "POST /proxies HTTP/1.1" 201 Created
+Oct 12 22:52:48.867129 e2e-ubuntu systemd[1]: Starting ipv6-proxy@30012.service - IPv6 proxy instance on port 30012 (3proxy)...
+Oct 12 22:52:56.228449 e2e-ubuntu python[8678]: ipv6-proxy@30012: address present
+Oct 12 22:52:56.969045 e2e-ubuntu systemd[1]: Started ipv6-proxy@30012.service - IPv6 proxy instance on port 30012 (3proxy).
+Oct 12 22:53:09.028780 e2e-ubuntu uvicorn[8044]: INFO:     127.0.0.1:56826 - "POST /proxies HTTP/1.1" 201 Created
+Oct 12 22:53:48.463453 e2e-ubuntu systemd[1]: Starting ipv6-proxy@30010.service - IPv6 proxy instance on port 30010 (3proxy)...
+Oct 12 22:53:55.459161 e2e-ubuntu python[8796]: ipv6-proxy@30010: address present
+Oct 12 22:53:56.048802 e2e-ubuntu systemd[1]: Started ipv6-proxy@30010.service - IPv6 proxy instance on port 30010 (3proxy).
+Oct 12 22:54:03.609342 e2e-ubuntu uvicorn[8044]: INFO:     127.0.0.1:59502 - "POST /proxies HTTP/1.1" 201 Created
+Oct 12 22:54:16.600500 e2e-ubuntu systemd[1]: Stopping ipv6-proxy@30010.service - IPv6 proxy instance on port 30010 (3proxy)...
+Oct 12 22:54:16.704653 e2e-ubuntu systemd[1]: ipv6-proxy@30010.service: Deactivated successfully.
+Oct 12 22:54:16.927088 e2e-ubuntu systemd[1]: Stopped ipv6-proxy@30010.service - IPv6 proxy instance on port 30010 (3proxy).
+Oct 12 22:54:16.978668 e2e-ubuntu systemd[1]: ipv6-proxy@30010.service: Consumed 8.166s CPU time, 6.3M memory peak, 0B memory swap peak.
+Oct 12 22:54:17.545433 e2e-ubuntu systemd[1]: Starting ipv6-proxy@30010.service - IPv6 proxy instance on port 30010 (3proxy)...
+Oct 12 22:54:27.637119 e2e-ubuntu python[8818]: ipv6-proxy@30010: address present
+Oct 12 22:54:28.249484 e2e-ubuntu systemd[1]: Started ipv6-proxy@30010.service - IPv6 proxy instance on port 30010 (3proxy).
+Oct 12 22:54:41.447851 e2e-ubuntu uvicorn[8044]: INFO:     127.0.0.1:52408 - "PATCH /proxies/30010 HTTP/1.1" 200 OK
+Oct 12 22:54:49.746256 e2e-ubuntu systemd[1]: Stopping ipv6-proxy@30010.service - IPv6 proxy instance on port 30010 (3proxy)...
+Oct 12 22:54:49.985760 e2e-ubuntu systemd[1]: ipv6-proxy@30010.service: Deactivated successfully.
+Oct 12 22:54:50.052934 e2e-ubuntu systemd[1]: Stopped ipv6-proxy@30010.service - IPv6 proxy instance on port 30010 (3proxy).
+Oct 12 22:54:50.068992 e2e-ubuntu systemd[1]: ipv6-proxy@30010.service: Consumed 10.009s CPU time, 6.1M memory peak, 0B memory swap peak.
+Oct 12 22:54:50.518006 e2e-ubuntu systemd[1]: Starting ipv6-proxy@30010.service - IPv6 proxy instance on port 30010 (3proxy)...
+Oct 12 22:54:56.020071 e2e-ubuntu python[8895]: ipv6-proxy@30010: address present
+Oct 12 22:54:56.338373 e2e-ubuntu systemd[1]: Started ipv6-proxy@30010.service - IPv6 proxy instance on port 30010 (3proxy).
+Oct 12 22:55:06.602685 e2e-ubuntu uvicorn[8044]: INFO:     127.0.0.1:54264 - "POST /proxies/30010/rotate HTTP/1.1" 200 OK
+Oct 12 22:55:07.307107 e2e-ubuntu systemd[1]: Stopping ipv6-proxy-api.service - IPv6 proxy management API...
+Oct 12 22:55:07.389062 e2e-ubuntu uvicorn[8044]: INFO:     Shutting down
+Oct 12 22:55:07.510277 e2e-ubuntu uvicorn[8044]: INFO:     Waiting for application shutdown.
+Oct 12 22:55:07.521641 e2e-ubuntu uvicorn[8044]: INFO:     Application shutdown complete.
+Oct 12 22:55:07.531613 e2e-ubuntu uvicorn[8044]: INFO:     Finished server process [8044]
+Oct 12 22:55:07.703077 e2e-ubuntu systemd[1]: ipv6-proxy-api.service: Deactivated successfully.
+Oct 12 22:55:07.797951 e2e-ubuntu systemd[1]: Stopped ipv6-proxy-api.service - IPv6 proxy management API.
+Oct 12 22:55:07.812679 e2e-ubuntu systemd[1]: ipv6-proxy-api.service: Consumed 3min 30.310s CPU time, 32.2M memory peak, 0B memory swap peak.
+Oct 12 22:55:08.218577 e2e-ubuntu systemd[1]: Started ipv6-proxy-api.service - IPv6 proxy management API.
+Oct 12 22:56:58.836703 e2e-ubuntu uvicorn[8915]: INFO:     Started server process [8915]
+Oct 12 22:56:59.039779 e2e-ubuntu uvicorn[8915]: INFO:     Waiting for application startup.
+Oct 12 22:57:39.132960 e2e-ubuntu uvicorn[8915]: INFO:     Application startup complete.
+Oct 12 22:57:40.454625 e2e-ubuntu uvicorn[8915]: INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+Oct 12 22:57:55.473425 e2e-ubuntu systemd[1]: Stopping ipv6-proxy@30010.service - IPv6 proxy instance on port 30010 (3proxy)...
+Oct 12 22:57:55.600173 e2e-ubuntu systemd[1]: ipv6-proxy@30010.service: Deactivated successfully.
+Oct 12 22:57:55.612471 e2e-ubuntu systemd[1]: Stopped ipv6-proxy@30010.service - IPv6 proxy instance on port 30010 (3proxy).
+Oct 12 22:57:55.636513 e2e-ubuntu systemd[1]: ipv6-proxy@30010.service: Consumed 10.501s CPU time, 6.2M memory peak, 0B memory swap peak.
+Oct 12 22:58:05.232112 e2e-ubuntu uvicorn[8915]: INFO:     127.0.0.1:33068 - "DELETE /proxies/30010 HTTP/1.1" 204 No Content

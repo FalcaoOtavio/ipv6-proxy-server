@@ -1,0 +1,60 @@
+=== block1.log
+cat: block1.log: No such file or directory
+=== block4.log
+PASS	install.sh --update com bloqueio ligado
+PASS	drop-in presente: /etc/systemd/system/ipv6-proxy@.service.d/50-block-private.conf
+PASS	IPAddressDeny carregado em ipv6-proxy@30011: ::/128 fc00::/7 ::1/128 ff00::/8 fe80::/10 ::ffff:0.0.0.0/96
+INFO	MainPID ipv6-proxy@30011 antes=769 depois=769 (mudanca de ACL reinicia so os afetados)
+FAIL	kernel nao recusou [::1] no cgroup (TimeoutError:None)
+PASS	IPv4 127.0.0.1 alcancavel no mesmo cgroup (connected)
+FAIL	CONNECT [::1] via proxy: HTTP 000
+=== block5.log
+PASS	install.sh --update com bloqueio ligado
+PASS	drop-in presente: /etc/systemd/system/ipv6-proxy@.service.d/50-block-private.conf
+PASS	IPAddressDeny carregado em ipv6-proxy@30011: ::/128 fc00::/7 ::1/128 ff00::/8 fe80::/10 ::ffff:0.0.0.0/96
+INFO	MainPID ipv6-proxy@30011 antes=769 depois=769 (mudanca de ACL reinicia so os afetados)
+PASS	controle fora da unidade alcanca [::1]:22
+PASS	kernel bloqueia [::1] no cgroup de ipv6-proxy@30011 (TimeoutError)
+PASS	IPv4 127.0.0.1 alcancavel no mesmo cgroup (connected)
+FAIL	CONNECT [::1] via proxy: HTTP 000
+=== block6.txt
+PASS	install.sh --update com bloqueio ligado
+PASS	drop-in presente: /etc/systemd/system/ipv6-proxy@.service.d/50-block-private.conf
+PASS	IPAddressDeny carregado em ipv6-proxy@30011: ::/128 fc00::/7 ::1/128 ff00::/8 fe80::/10 ::ffff:0.0.0.0/96
+INFO	MainPID ipv6-proxy@30011 antes=769 depois=769 (mudanca de ACL reinicia so os afetados)
+PASS	controle fora da unidade alcanca [::1]:22
+PASS	kernel bloqueia [::1] no cgroup de ipv6-proxy@30011 (TimeoutError)
+PASS	IPv4 127.0.0.1 alcancavel no mesmo cgroup (connected)
+PASS	CONNECT [::1] via proxy recusado pela ACL do 3proxy (HTTP 403 para o cliente IPv4)
+=== dropin
+# Installed by install.sh only while PROXY_BLOCK_PRIVATE_DESTINATIONS is on
+# (removed when off). Kernel-level SSRF backstop (ADR 0007), TCP and UDP alike,
+# independent of the 3proxy ACL: host loopback, IPv4-mapped, link-local, ULA and
+# multicast IPv6. IPv4 is untouched, so clients reaching -i<bind_ipv4> are never
+# affected. The own subnet is not listed (a static file cannot know it); the
+# per-instance 3proxy "deny" ACL covers it. Needs cgroup v2 + BPF.
+[Service]
+IPAddressDeny=::/128 ::1/128 ::ffff:0:0/96 fe80::/10 fc00::/7 ff00::/8
+=== IPAddressDeny por unidade
+ipv6-proxy@30001 fe80::/10 ::/128 ::ffff:0.0.0.0/96 ::1/128 fc00::/7 ff00::/8
+ipv6-proxy@30002 fe80::/10 ff00::/8 ::ffff:0.0.0.0/96 ::/128 fc00::/7 ::1/128
+ipv6-proxy@30011 ::/128 fc00::/7 ::1/128 ff00::/8 fe80::/10 ::ffff:0.0.0.0/96
+ipv6-proxy@30012 fe80::/10 ::/128 ::ffff:0.0.0.0/96 ::1/128 ff00::/8 fc00::/7
+=== units
+ipv6-proxy-api.service   loaded active running IPv6 proxy management API
+ipv6-proxy@30001.service loaded active running IPv6 proxy instance on port 30001 (3proxy)
+ipv6-proxy@30002.service loaded active running IPv6 proxy instance on port 30002 (3proxy)
+ipv6-proxy@30011.service loaded active running IPv6 proxy instance on port 30011 (3proxy)
+ipv6-proxy@30012.service loaded active running IPv6 proxy instance on port 30012 (3proxy)
+=== boots
+Hint: You are currently not seeing messages from other users and the system.
+      Users in groups 'adm', 'systemd-journal' can see all messages.
+      Pass -q to turn off this notice.
+IDX BOOT ID                          FIRST ENTRY                 LAST ENTRY
+ -2 88cebf7738cc4687b9130f7d1a8ac89f Mon 2026-10-12 10:19:43 UTC Mon 2026-10-12 10:25:03 UTC
+ -1 e4e1df061ecb44e3b82a6fee738a1e99 Mon 2026-10-12 23:35:54 UTC Tue 2026-10-13 00:22:47 UTC
+  0 e308fa93ee92410995c8fce2a07a159c Tue 2026-10-13 00:51:16 UTC Tue 2026-10-13 01:15:55 UTC
+=== VERSION
+sha=1797601493521db85ab3335c46882536c024e87f
+ref=local
+date=2026-10-12T22:47:42Z

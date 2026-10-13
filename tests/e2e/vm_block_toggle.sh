@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2015  # res() always returns 0: "cond && res PASS || res FAIL" is a safe if/else here
 # Toggle PROXY_BLOCK_PRIVATE_DESTINATIONS via install.sh --update on a disposable VM already set up by
 # vm_e2e.sh, and record per-proxy evidence: cfg deny/UDPASSOC lines, MainPID before/after (only the
 # affected proxies restart), unit IPAddressDeny. With the block ON, vm_block_check.sh then proves

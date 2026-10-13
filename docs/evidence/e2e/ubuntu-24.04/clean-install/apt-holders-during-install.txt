@@ -1,0 +1,91 @@
+[03:22:33]    1473       06:16 bash -c cd /home/e2e/repo && PROXY_BLOCK_PRIVATE_DESTINATIONS=false setsid nohup bash -c "time bash install.sh --subnet fd00:1234:
+[03:22:33]    1474       06:17 bash -c time bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600; ec
+[03:22:33]    1476       06:18 bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600
+[03:22:33]    1511       06:06 apt-get -o DPkg::Lock::Timeout=3596 update
+[03:22:33]    1812       01:16 apt-get -o DPkg::Lock::Timeout=3596 update
+[03:22:33]    1910       00:16 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:22:33]    1911       00:18 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:25:19]    1473       09:01 bash -c cd /home/e2e/repo && PROXY_BLOCK_PRIVATE_DESTINATIONS=false setsid nohup bash -c "time bash install.sh --subnet fd00:1234:
+[03:25:19]    1474       09:02 bash -c time bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600; ec
+[03:25:19]    1476       09:03 bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600
+[03:25:19]    1511       08:54 apt-get -o DPkg::Lock::Timeout=3596 update
+[03:25:19]    1812       04:05 apt-get -o DPkg::Lock::Timeout=3596 update
+[03:25:19]    2083       01:12 /usr/lib/apt/apt-helper cat-file /var/lib/apt/lists/archive.ubuntu.com_ubuntu_dists_noble_universe_cnf_Commands-amd64
+[03:25:19]    2157       00:21 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:25:19]    2158       00:22 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:28:18]    1473       11:53 bash -c cd /home/e2e/repo && PROXY_BLOCK_PRIVATE_DESTINATIONS=false setsid nohup bash -c "time bash install.sh --subnet fd00:1234:
+[03:28:18]    1474       11:54 bash -c time bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600; ec
+[03:28:18]    1476       11:54 bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600
+[03:28:18]    1511       11:40 apt-get -o DPkg::Lock::Timeout=3596 update
+[03:28:18]    1812       06:48 apt-get -o DPkg::Lock::Timeout=3596 update
+[03:28:18]    2409       00:07 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:28:18]    2410       00:07 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:30:59]    1473       15:00 bash -c cd /home/e2e/repo && PROXY_BLOCK_PRIVATE_DESTINATIONS=false setsid nohup bash -c "time bash install.sh --subnet fd00:1234:
+[03:30:59]    1474       15:02 bash -c time bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600; ec
+[03:30:59]    1476       15:04 bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600
+[03:30:59]    1511       14:52 apt-get -o DPkg::Lock::Timeout=3596 update
+[03:30:59]    1812       10:02 apt-get -o DPkg::Lock::Timeout=3596 update
+[03:30:59]    2545       02:09 [apt-helper] <defunct>
+[03:30:59]    2627       00:23 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:30:59]    2628       00:28 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:34:26]    1473       18:08 bash -c cd /home/e2e/repo && PROXY_BLOCK_PRIVATE_DESTINATIONS=false setsid nohup bash -c "time bash install.sh --subnet fd00:1234:
+[03:34:26]    1474       18:08 bash -c time bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600; ec
+[03:34:26]    1476       18:09 bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600
+[03:34:26]    1511       17:55 apt-get -o DPkg::Lock::Timeout=3596 update
+[03:34:26]    1812       13:05 apt-get -o DPkg::Lock::Timeout=3596 update
+[03:34:26]    2746       01:20 /usr/lib/apt/apt-helper cat-file /var/lib/apt/lists/archive.ubuntu.com_ubuntu_dists_noble-updates_universe_cnf_Commands-amd64
+[03:34:26]    2864       00:12 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:34:26]    2865       00:14 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:37:21]    1473       21:41 bash -c cd /home/e2e/repo && PROXY_BLOCK_PRIVATE_DESTINATIONS=false setsid nohup bash -c "time bash install.sh --subnet fd00:1234:
+[03:37:21]    1474       21:43 bash -c time bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600; ec
+[03:37:21]    1476       21:45 bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600
+[03:37:21]    1511       21:33 apt-get -o DPkg::Lock::Timeout=3596 update
+[03:37:21]    1812       16:41 apt-get -o DPkg::Lock::Timeout=3596 update
+[03:37:21]    3015       02:08 /usr/bin/python3 /usr/lib/update-notifier/apt-check --human-readable
+[03:37:21]    3148       00:22 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:37:21]    3149       00:26 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:41:55]    1473       25:41 bash -c cd /home/e2e/repo && PROXY_BLOCK_PRIVATE_DESTINATIONS=false setsid nohup bash -c "time bash install.sh --subnet fd00:1234:
+[03:41:55]    1474       25:42 bash -c time bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600; ec
+[03:41:55]    1476       25:42 bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600
+[03:41:55]    1511       25:28 apt-get -o DPkg::Lock::Timeout=3596 update
+[03:41:55]    3416       00:07 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:41:55]    3417       00:07 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:45:37]    1473       30:48 bash -c cd /home/e2e/repo && PROXY_BLOCK_PRIVATE_DESTINATIONS=false setsid nohup bash -c "time bash install.sh --subnet fd00:1234:
+[03:45:37]    1474       30:50 bash -c time bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600; ec
+[03:45:37]    1476       30:51 bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600
+[03:45:37]    3544       03:13 apt-get -o DPkg::Lock::Timeout=1952 install -y ca-certificates curl git python3 python3-venv build-essential iproute2 openssl
+[03:45:37]    3730       00:08 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:45:37]    3731       00:09 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:49:50]    1473       34:01 bash -c cd /home/e2e/repo && PROXY_BLOCK_PRIVATE_DESTINATIONS=false setsid nohup bash -c "time bash install.sh --subnet fd00:1234:
+[03:49:50]    1474       34:03 bash -c time bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600; ec
+[03:49:50]    1476       34:03 bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600
+[03:49:50]    3544       06:27 apt-get -o DPkg::Lock::Timeout=1952 install -y ca-certificates curl git python3 python3-venv build-essential iproute2 openssl
+[03:49:50]    3859       02:26 /usr/bin/dpkg --status-fd 43 --no-triggers --unpack --auto-deconfigure --recursive /tmp/apt-dpkg-install-SjPoh6
+[03:49:50]    4072       00:14 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:49:50]    4075       00:17 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:53:11]    1473       37:14 bash -c cd /home/e2e/repo && PROXY_BLOCK_PRIVATE_DESTINATIONS=false setsid nohup bash -c "time bash install.sh --subnet fd00:1234:
+[03:53:11]    1474       37:18 bash -c time bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600; ec
+[03:53:11]    1476       37:19 bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600
+[03:53:11]    3544       09:41 apt-get -o DPkg::Lock::Timeout=1952 install -y ca-certificates curl git python3 python3-venv build-essential iproute2 openssl
+[03:53:11]    3859       05:39 /usr/bin/dpkg --status-fd 43 --no-triggers --unpack --auto-deconfigure --recursive /tmp/apt-dpkg-install-SjPoh6
+[03:53:11]    4473       00:16 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:53:11]    4474       00:18 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:56:19]    1473       40:44 bash -c cd /home/e2e/repo && PROXY_BLOCK_PRIVATE_DESTINATIONS=false setsid nohup bash -c "time bash install.sh --subnet fd00:1234:
+[03:56:19]    1474       40:44 bash -c time bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600; ec
+[03:56:19]    1476       40:43 bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600
+[03:56:19]    3544       13:05 apt-get -o DPkg::Lock::Timeout=1952 install -y ca-certificates curl git python3 python3-venv build-essential iproute2 openssl
+[03:56:19]    3859       09:01 /usr/bin/dpkg --status-fd 43 --no-triggers --unpack --auto-deconfigure --recursive /tmp/apt-dpkg-install-SjPoh6
+[03:56:19]    4801       00:01 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:56:19]    4803       00:01 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:59:07]    1473       42:22 bash -c cd /home/e2e/repo && PROXY_BLOCK_PRIVATE_DESTINATIONS=false setsid nohup bash -c "time bash install.sh --subnet fd00:1234:
+[03:59:07]    1474       42:22 bash -c time bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600; ec
+[03:59:07]    1476       42:21 bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600
+[03:59:07]    5454       00:00 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[03:59:07]    5455       00:00 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[04:00:43]    1473       44:04 bash -c cd /home/e2e/repo && PROXY_BLOCK_PRIVATE_DESTINATIONS=false setsid nohup bash -c "time bash install.sh --subnet fd00:1234:
+[04:00:43]    1474       44:04 bash -c time bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600; ec
+[04:00:43]    1476       44:03 bash install.sh --subnet fd00:1234::/64 --interface lo --ipv4 127.0.0.1 --self-test --yes --apt-lock-timeout 3600
+[04:00:43]    5907       00:00 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[04:00:43]    5908       00:00 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[04:02:25]    6341       00:00 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
+[04:02:25]    6342       00:00 bash -c for p in $(pgrep -f "apt|unattended"); do ps -o pid=,etime=,args= -p $p; done | cut -c1-150
