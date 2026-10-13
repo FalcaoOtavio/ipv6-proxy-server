@@ -80,6 +80,16 @@ Detalhes: [docs/INSTALL.md](docs/INSTALL.md).
 ### Atualizar
 
 ```bash
+ipv6-proxy update --check          # sem sudo: instalado x disponivel (exit 10 = ha atualizacao)
+sudo ipv6-proxy update --self-test # ref padrao: a de /opt/ipv6-proxy-server/VERSION (ou main)
+sudo ipv6-proxy update --ref "$REF"
+```
+
+O comando resolve o SHA remoto, baixa o `install.sh` desse SHA e roda
+`install.sh --update` (repassa `--yes`/`--self-test`, a confirmação `REINICIAR`
+e o exit code). Não depende da API estar no ar. Alternativa manual:
+
+```bash
 curl -fsSLo install-ipv6-proxy.sh "https://raw.githubusercontent.com/FalcaoOtavio/ipv6-proxy-server/$REF/install.sh"
 sudo bash install-ipv6-proxy.sh --update --ref "$REF" --self-test
 ```
