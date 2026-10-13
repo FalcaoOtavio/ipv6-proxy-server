@@ -1,0 +1,24 @@
+ Porta  Status   Proto  Usuário  Senha  IPv6                                    
+ 43857  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.224                      
+ 43859  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.200                      
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+        ╭──────────────────────────────────────────────────────────────╮        
+        │ Excluir o proxy da porta 43857?                              │        
+        │ Só o 3proxy desta porta reinicia; as sessões dela caem.      │        
+        │ Digite 43857 para confirmar                                  │        
+        │ 1234                                                         │        
+        │ ✕ Digite exatamente 43857; nada foi alterado.                │        
+        │    Confirmar         Cancelar                                │        
+        ╰──────────────────────────────────────────────────────────────╯        
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+ ✓ Porta 43859: novo IPv6 ::ffff:127.0.0.200 (era ::ffff:127.0.0.125).          
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                          
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                

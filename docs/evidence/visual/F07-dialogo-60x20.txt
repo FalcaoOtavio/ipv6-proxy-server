@@ -1,0 +1,20 @@
+ Porta  Status   Proto  Usuário  Senha  IPv6                
+ 59478  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.38   
+ 59480  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.6    
+ 59488  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.162  
+ 59490  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.192  
+╭──────────────────────────────────────────────────────────╮
+│ Exportar lista (IPv4:porta:usuário:senha)                │
+│ 1 omitido(s): senha desconhecida (a API não devolve      │
+│ senhas).                                                 │
+│ Arquivo (criado com permissão 0600; não sobrescreve)     │
+│ /tmp/tui-val-60x20-upd11qjf/proxies-20261013-110130.txt  │
+│                                                          │
+│    Confirmar         Cancelar                            │
+╰──────────────────────────────────────────────────────────╯
+                                                            
+                                                            
+                                                            
+ ✓ Senha da porta 59488 oculta.                             
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            

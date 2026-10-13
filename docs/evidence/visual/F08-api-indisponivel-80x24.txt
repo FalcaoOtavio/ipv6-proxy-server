@@ -1,0 +1,24 @@
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                       Não foi possível carregar a lista.                       
+                                                                                
+            Corrija o problema abaixo e pressione a para recarregar.            
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+ ✕ API indisponível em http://127.0.0.1:37905. Verifique: sudo systemctl status 
+ ipv6-proxy-api                                                                 
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                          
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                

@@ -31,9 +31,10 @@ from proxy_api.app import create_app  # noqa: E402
 from proxy_api.config import Settings  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-EVIDENCE = ROOT / "docs" / "evidence" / "tui"
+EVIDENCE = Path(os.environ.get("TUI_EVIDENCE_DIR", ROOT / "docs" / "evidence" / "tui")).absolute()
 TOKEN = "validation-admin-token-" + "v" * 20
-VIEWPORTS = {"80x24": (80, 24), "60x20": (60, 20)}
+# TUI_VIEWPORTS="80x24,120x40,60x20" (T40 visual critique); default keeps the T11 pair.
+VIEWPORTS = {v: tuple(map(int, v.split("x"))) for v in os.environ.get("TUI_VIEWPORTS", "80x24,60x20").split(",")}
 
 def free_port_block(size):
     """Contiguous free ports from a random high base: the acceptance suite (often run
@@ -224,7 +225,7 @@ import os, sys
 from playwright.sync_api import sync_playwright
 with sync_playwright() as p:
     import glob
-    shells = sorted(glob.glob(os.path.expanduser("~/.cache/ms-playwright/chromium_headless_shell-*/*/headless_shell")))
+    shells = sorted(glob.glob(os.path.expanduser("~/.cache/ms-playwright/chromium_headless_shell-*/*/*headless*shell")))
     b = p.chromium.launch(executable_path=shells[-1] if shells else None)
     page = b.new_page(device_scale_factor=1)
     for path in sys.argv[1:]:

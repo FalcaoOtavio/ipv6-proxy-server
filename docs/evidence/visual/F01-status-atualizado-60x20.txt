@@ -1,0 +1,20 @@
+ Porta  Status    Proto   Usuário  Senha  IPv6              
+ 59478  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.163
+ 59479  ✕ falhou  SOCKS5  —        —      ::ffff:127.0.0.3  
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                           ▏
+ ✕ 2 proxy(s). 1 fora do ar: sudo journalctl -u             
+ ipv6-proxy@<porta>                                         
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            

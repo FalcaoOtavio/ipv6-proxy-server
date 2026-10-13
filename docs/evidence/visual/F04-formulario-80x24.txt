@@ -1,0 +1,24 @@
+ Porta  Status   Proto  Usuário  Senha  IPv6                                    
+ 43857  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.33                       
+ 43859  ╭──────────────────────────────────────────────────────────────╮        
+        │ Criar lote                                                   │        
+        │ Quantidade                                                   │        
+        │ 3                                                            │        
+        │ Porta inicial (vazio = início da faixa)                      │        
+        │ 43867                                                        │        
+        │ Protocolo                                                    │        
+        │ HTTP                                                      ▼  │        
+        │ Credenciais                                                  │        
+        │ Comum (mesmo usuário/senha)                               ▼  │        
+        │ Usuário (comum) ou prefixo (aleatória, opcional)             │        
+        │ lote                                                         │        
+        │ Senha (só no modo comum)                                     │        
+        │ •••••••                                                      │        
+        │ ▐X▌ Parcial: manter os criados se alguma porta falhar        │        
+        │ ✕ Quantidade deve ser um número entre 1 e 1000               │        
+        │ (PROXY_BATCH_MAX).                                           │        
+        │    Confirmar         Cancelar                                │        
+        ╰──────────────────────────────────────────────────────────────╯        
+ ✓ Proxy da porta 43860 excluído.                                               
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                          
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                

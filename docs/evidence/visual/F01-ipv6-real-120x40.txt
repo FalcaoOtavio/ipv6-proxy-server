@@ -1,0 +1,40 @@
+ Porta  Status   Proto  Usuário  Senha  IPv6                                                                            
+ 52558  ● ativo  HTTP   —        —      2001:db8:abcd:1234:5edd:a3cc:fca5:64bd                                          
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+ ✓ 1 proxy(s).                                                                                                          
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                                                                  
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                                                        

@@ -1,0 +1,24 @@
+ Porta  Status   Proto  Usuário  Senha  IPv6                                    
+ 43857  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.224                      
+ 43859  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.125                      
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+        ╭──────────────────────────────────────────────────────────────╮        
+        │ Rotacionar o IPv6 da porta 43859?                            │        
+        │ Só o 3proxy desta porta reinicia; as sessões dela caem.      │        
+        │                                                              │        
+        │    Confirmar         Cancelar                                │        
+        ╰──────────────────────────────────────────────────────────────╯        
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+ ✓ Proxy 43858 atualizado: porta 43859, HTTP.                                   
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                          
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                

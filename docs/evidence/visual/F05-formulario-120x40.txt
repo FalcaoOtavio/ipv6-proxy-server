@@ -1,0 +1,40 @@
+ Porta  Status    Proto   Usuário  Senha  IPv6                                                                          
+ 56243  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.160                                                            
+ 56244  ✕ falhou  SOCKS5  —        —      ::ffff:127.0.0.159                                                            
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                            ╭──────────────────────────────────────────────────────────────╮                            
+                            │ Editar proxy da porta 56244                                  │                            
+                            │ Porta                                                        │                            
+                            │ 56245                                                        │                            
+                            │ Protocolo                                                    │                            
+                            │ HTTP                                                      ▼  │                            
+                            │ Usuário                                                      │                            
+                            │ bob                                                          │                            
+                            │ Nova senha (vazio = manter credenciais)                      │                            
+                            │ ••••••••                                                     │                            
+                            │ ▐X▌ Remover autenticação                                     │                            
+                            │                                                              │                            
+                            │    Confirmar         Cancelar                                │                            
+                            ╰──────────────────────────────────────────────────────────────╯                            
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+ ✕ Conflito: porta já em uso ou faixa de portas esgotada. Nada foi alterado.                                            
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                                                                  
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                                                        
