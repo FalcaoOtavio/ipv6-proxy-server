@@ -1,0 +1,22 @@
+base_version	PASS	VERSION is the OLD sha (fd99a99d273cd568fe53d7d7f1c896acdceb70bd)
+base_pids	PASS	both proxies have a MainPID
+base_respond	PASS	2 proxies respond (HTTP + SOCKS5 via local target)
+check_exit10	PASS	update --check exits 10
+check_shas	PASS	update --check shows old and new SHA
+check_readonly	PASS	update --check changed nothing
+update_rc0	PASS	update --self-test exits 0
+update_announce	PASS	announces OLD -> NEW
+new_version	PASS	VERSION has the NEW sha and ref=main
+same_pids	PASS	proxies keep the same MainPID
+respond_after	PASS	2 proxies respond after update
+api_healthy	PASS	API active and lists the same proxies
+no_fenced	PASS	no port fenced
+second_nothing	PASS	2nd run prints 'Nada a atualizar', exit 0
+second_unchanged	PASS	2nd run changed nothing (hash, PIDs)
+second_check0	PASS	update --check after update exits 0
+badref_nao-existe-xyz	PASS	--ref 'nao-existe-xyz' fails (rc=2 != 0)
+badref_0123456789abcdef0123456789abcdef01234567	PASS	--ref '0123456789abcdef0123456789abcdef01234567' fails (rc=1 != 0)
+badref_a;b	PASS	--ref 'a;b' fails (rc=2 != 0)
+badref_abc	PASS	--ref 'abc' fails (rc=2 != 0)
+badref_unchanged	PASS	invalid refs changed nothing (hash, VERSION, PIDs)
+respond_final	PASS	2 proxies still respond
