@@ -1,12 +1,12 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                
- 59478  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.38   
- 59480  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.6    
- 59488  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.162  
- 59490  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.192  
- 59492  ● ativo  HTTP   u59492   ••••   ::ffff:127.0.0.14   
+ 51945  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.153  
+ 51947  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.180  
+ 51955  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.112  
+ 51957  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.250  
+ 51959  ● ativo  HTTP   u51959   ••••   ::ffff:127.0.0.95   
 ╭──────────────────────────────────────────────────────────╮
 │ Resultado do lote                                        │
-│ Criados: 2 (portas 59492–59493)                          │
+│ Criados: 2 (portas 51959–51960)                          │
 │ Senhas aleatórias ficam só nesta sessão: exporte com x   │
 │ antes de sair.                                           │
 │   Fechar (Esc)                                           │

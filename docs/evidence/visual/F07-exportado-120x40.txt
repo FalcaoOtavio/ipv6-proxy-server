@@ -1,11 +1,11 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                                                                            
- 56243  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.49                                                               
- 56245  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.153                                                              
- 56253  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.244                                                              
- 56255  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.66                                                               
- 56257  ● ativo  HTTP   u56257   ••••   ::ffff:127.0.0.10                                                               
- 56258  ● ativo  HTTP   u56258   ••••   ::ffff:127.0.0.116                                                              
- 56263  ● ativo  HTTP   outro    n/d    ::ffff:127.0.0.155                                                              
+ 47577  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.150                                                              
+ 47579  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.165                                                              
+ 47587  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.202                                                              
+ 47589  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.62                                                               
+ 47591  ● ativo  HTTP   u47591   ••••   ::ffff:127.0.0.191                                                              
+ 47592  ● ativo  HTTP   u47592   ••••   ::ffff:127.0.0.141                                                              
+ 47597  ● ativo  HTTP   outro    n/d    ::ffff:127.0.0.69                                                               
                                                                                                                         
                                                                                                                         
                                                                                                                         
@@ -34,7 +34,7 @@
                                                                                                                         
                                                                                                                         
                                                                                                                         
- ✕ 6 exportada(s), 1 omitida(s) (senha desconhecida) para /tmp/tui-val-120x40-bod__bbj/proxies-20261013-105956.txt      
+ ✕ 6 exportada(s), 1 omitida(s) (senha desconhecida) para /tmp/tui-val-120x40-5h_g_nvf/proxies-20261013-111238.txt      
  (0600).                                                                                                                
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                                                                  
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                                                        

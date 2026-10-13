@@ -1,7 +1,7 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                                    
- 43857  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.224                      
- 43859  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.200                      
- 43860  ● ativo  HTTP   —        —      ::ffff:127.0.0.1                        
+ 45246  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.23                       
+ 45248  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.69                       
+ 45249  ● ativo  HTTP   —        —      ::ffff:127.0.0.144                      
                                                                                 
                                                                                 
                                                                                 
@@ -19,6 +19,6 @@
                                                                                 
                                                                                 
                                                                                 
- ✕ Aguarde: Rotacionando porta 43857 em andamento; a lista recarrega ao final.  
+ ✕ Aguarde: Rotacionando porta 45246 em andamento; a lista recarrega ao final.  
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                          
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                

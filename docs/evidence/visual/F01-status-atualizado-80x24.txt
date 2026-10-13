@@ -1,6 +1,6 @@
  Porta  Status    Proto   Usuário  Senha  IPv6                                  
- 43857  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.224                    
- 43858  ✕ falhou  SOCKS5  —        —      ::ffff:127.0.0.125                    
+ 45246  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.23                     
+ 45247  ✕ falhou  SOCKS5  —        —      ::ffff:127.0.0.226                    
                                                                                 
                                                                                 
                                                                                 

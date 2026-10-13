@@ -28,26 +28,27 @@ A TUI usa o tema padrão do Textual; não há paleta custom. Papéis efetivos (v
 |---|---|---|---|
 | Fundo | `$background` | `#121212` | tela |
 | Superfície | `$surface` | `#1E1E1E` | corpo dos diálogos |
-| Painel | `$panel` | `#242F38` | régua de atalhos (`#keys`) |
+| Painel | `$panel` | `#242F38` | régua de atalhos (`#keys`), fundo dos `Input` compactos |
 | Faixa de status | `$boost` | `#FFFFFF0A` | `#status` |
 | Texto | `$foreground` | `#E0E0E0` | tudo |
 | Ação / foco / seleção | `$primary` | `#0178D4` | borda de diálogo, botão primário, linha selecionada |
 | Sucesso (texto) | `$text-success` | `#8AD4A1` | linha de status `✓` |
 | Erro (status) | `$text-error` sobre `$error-muted` | `#D17E92` / `#441E27` | linha de status `✕` |
-| Erro (diálogo) | `$error` | `#B93C5B` | linha `✕` inline do formulário |
-| Status da linha | ANSI `green`/`yellow`/`red`/`magenta` | do terminal | coluna Status |
+| Erro (diálogo) | `$text-error` | `#D17E92` | linha `✕` inline do formulário (negrito) |
+| Status da linha | `$text-success`/`$text-warning`/`$text-error` | `#8AD4A1`/`#FFC473`/`#D17E92` | coluna Status (não ANSI: contraste previsível) |
 
 Contraste (WCAG, medido): texto/fundo 13,9:1 · régua 10,1:1 · sucesso 9,8:1 · erro na faixa de status 4,9:1 ·
-seleção (branco/`#0178D4`) 4,5:1 · **erro inline de diálogo 3,1:1 (abaixo de AA — ver V-01)**.
+seleção (branco/`#0178D4`) 4,5:1 · erro inline de diálogo 5,6:1 · status da linha ≥ 6,3:1 sobre o fundo.
+Campo compacto: `$panel` sobre `$surface` (1,2:1) só delimita o campo; o texto dentro fica em 10,3:1.
 
 Regra: **cor nunca é o único sinal.** Todo estado tem símbolo + palavra:
 
 | Estado | Render | Estilo |
 |---|---|---|
-| running | `● ativo` | green |
-| starting | `◐ subindo` | yellow |
-| failed | `✕ falhou` | bold red |
-| fenced | `■ isolado` | bold magenta |
+| running | `● ativo` | `$text-success` |
+| starting | `◐ subindo` | `$text-warning` |
+| failed | `✕ falhou` | bold `$text-error` |
+| fenced | `■ isolado` | bold `$text-error` (diferenciado pelo símbolo e palavra) |
 | desconhecido | `? —` | dim |
 | mensagem ok / erro | `✓ …` / `✕ …` | success / error + fundo |
 

@@ -1,7 +1,7 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                                                                            
- 56243  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.160                                                              
- 56245  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.153                                                              
- 56246  ● ativo  HTTP   —        —      ::ffff:127.0.0.201                                                              
+ 47577  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.189                                                              
+ 47579  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.165                                                              
+ 47580  ● ativo  HTTP   —        —      ::ffff:127.0.0.89                                                               
                                                                                                                         
                                                                                                                         
                                                                                                                         
@@ -35,6 +35,6 @@
                                                                                                                         
                                                                                                                         
                                                                                                                         
- ✕ Aguarde: Rotacionando porta 56243 em andamento; a lista recarrega ao final.                                          
+ ✕ Aguarde: Rotacionando porta 47577 em andamento; a lista recarrega ao final.                                          
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                                                                  
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                                                        

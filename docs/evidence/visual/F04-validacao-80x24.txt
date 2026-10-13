@@ -1,6 +1,6 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                                    
- 43857  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.33                       
- 43859  ╭──────────────────────────────────────────────────────────────╮        
+ 45246  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.96                       
+ 45248  ╭──────────────────────────────────────────────────────────────╮        
         │ Criar lote                                                   │        
         │ Quantidade                                                   │        
         │ 0                                                            │        
@@ -19,6 +19,6 @@
         │ (PROXY_BATCH_MAX).                                           │        
         │    Confirmar         Cancelar                                │        
         ╰──────────────────────────────────────────────────────────────╯        
- ✓ Proxy da porta 43860 excluído.                                               
+ ✓ Proxy da porta 45249 excluído.                                               
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                          
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                

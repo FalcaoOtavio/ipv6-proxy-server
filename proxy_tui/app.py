@@ -20,11 +20,13 @@ from .client import BATCH_MAX, ApiError, Client
 from .screens import (BatchDialog, ConfirmDialog, CreateDialog, EditDialog, ExportDialog, HelpDialog,
                       MessageDialog)
 
+# Theme roles (resolved at render time), not ANSI names: ANSI red/magenta depend on the user's
+# terminal palette and can drop below 3:1. Symbol + word keep the state readable without color.
 STATUS = {
-    "running": ("● ativo", "green"),
-    "starting": ("◐ subindo", "yellow"),
-    "failed": ("✕ falhou", "bold red"),
-    "fenced": ("■ isolado", "bold magenta"),
+    "running": ("● ativo", "", "text-success"),
+    "starting": ("◐ subindo", "", "text-warning"),
+    "failed": ("✕ falhou", "bold", "text-error"),
+    "fenced": ("■ isolado", "bold", "text-error"),
 }
 # IPv6 last: it is the widest column and the one cut first on narrow terminals.
 COLUMNS = [("Porta", "port"), ("Status", "status"), ("Proto", "protocol"), ("Usuário", "username"),
@@ -79,6 +81,8 @@ class ProxyTui(App):
     #status.error { color: $text-error; background: $error-muted; text-style: bold; }
     #status.ok { color: $text-success; }
     #keys { height: 2; padding: 0 1; background: $panel; }
+    /* Compact inputs have no border: without a fill an empty, unfocused field is invisible. */
+    Input.-textual-compact { background: $panel; }
     """
     BINDINGS = [
         Binding("question_mark", "help", "Ajuda", key_display="?"),
@@ -153,8 +157,10 @@ class ProxyTui(App):
         table = self.query_one("#table", DataTable)
         current = self.selected()
         rows = []
+        theme = self.get_css_variables()
         for proxy in self.proxies:
-            label, style = STATUS.get(proxy.get("status"), ("? —", "dim"))
+            label, weight, role = STATUS.get(proxy.get("status"), ("? —", "dim", None))
+            style = f"{weight} {theme[role]}".strip() if role else weight
             # Plain str cells are parsed as markup by DataTable (':1234:' in an IPv6 became an emoji).
             rows.append((proxy["id"], [Text(str(proxy["port"])), Text(label, style=style),
                                        Text(proxy["protocol"].upper()), Text(proxy.get("username") or "—"),

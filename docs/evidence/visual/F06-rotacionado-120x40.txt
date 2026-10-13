@@ -1,6 +1,6 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                                                                            
- 56243  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.160                                                              
- 56245  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.153                                                              
+ 47577  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.189                                                              
+ 47579  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.165                                                              
                                                                                                                         
                                                                                                                         
                                                                                                                         
@@ -35,6 +35,6 @@
                                                                                                                         
                                                                                                                         
                                                                                                                         
- ✓ Porta 56245: novo IPv6 ::ffff:127.0.0.153 (era ::ffff:127.0.0.159).                                                  
+ ✓ Porta 47579: novo IPv6 ::ffff:127.0.0.165 (era ::ffff:127.0.0.234).                                                  
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                                                                  
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                                                        

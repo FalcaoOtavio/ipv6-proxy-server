@@ -1,15 +1,15 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                                    
- 43857  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.33                       
- 43859  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.200                      
- 43867  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.153                      
- 43869  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.49                       
+ 45246  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.96                       
+ 45248  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.69                       
+ 45256  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.151                      
+ 45258  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.79                       
                                                                                 
                                                                                 
                                                                                 
         ╭──────────────────────────────────────────────────────────────╮        
         │ Resultado do lote                                            │        
-        │ Criados: 2 (portas 43867–43869)                              │        
-        │ Falhas: 1 — 43868                                            │        
+        │ Criados: 2 (portas 45256–45258)                              │        
+        │ Falhas: 1 — 45257                                            │        
         │ Veja: sudo journalctl -u ipv6-proxy@<porta>                  │        
         │   Fechar (Esc)                                               │        
         ╰──────────────────────────────────────────────────────────────╯        

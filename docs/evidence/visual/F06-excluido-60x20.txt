@@ -1,6 +1,6 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                
- 59478  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.38   
- 59480  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.6    
+ 51945  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.153  
+ 51947  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.180  
                                                             
                                                             
                                                             
@@ -15,6 +15,6 @@
                                                             
                                                             
                                                             
- ✓ Proxy da porta 59481 excluído.                           
+ ✓ Proxy da porta 51948 excluído.                           
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            

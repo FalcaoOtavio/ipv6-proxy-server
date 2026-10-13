@@ -1,6 +1,6 @@
  Porta  Status    Proto   Usuário  Senha  IPv6                                                                          
- 56243  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.160                                                            
- 56244  ✕ falhou  SOCKS5  —        —      ::ffff:127.0.0.159                                                            
+ 47577  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.189                                                            
+ 47578  ✕ falhou  SOCKS5  —        —      ::ffff:127.0.0.234                                                            
                                                                                                                         
                                                                                                                         
                                                                                                                         
@@ -12,9 +12,9 @@
                                                                                                                         
                                                                                                                         
                             ╭──────────────────────────────────────────────────────────────╮                            
-                            │ Editar proxy da porta 56244                                  │                            
+                            │ Editar proxy da porta 47578                                  │                            
                             │ Porta                                                        │                            
-                            │ 56245                                                        │                            
+                            │ 47579                                                        │                            
                             │ Protocolo                                                    │                            
                             │ HTTP                                                      ▼  │                            
                             │ Usuário                                                      │                            

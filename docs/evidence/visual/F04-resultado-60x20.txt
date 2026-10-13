@@ -1,13 +1,13 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                
- 59478  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.38   
- 59480  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.6    
- 59488  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.162  
- 59490  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.192  
+ 51945  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.153  
+ 51947  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.180  
+ 51955  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.112  
+ 51957  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.250  
                                                             
 ╭──────────────────────────────────────────────────────────╮
 │ Resultado do lote                                        │
-│ Criados: 2 (portas 59488–59490)                          │
-│ Falhas: 1 — 59489                                        │
+│ Criados: 2 (portas 51955–51957)                          │
+│ Falhas: 1 — 51956                                        │
 │ Veja: sudo journalctl -u ipv6-proxy@<porta>              │
 │   Fechar (Esc)                                           │
 ╰──────────────────────────────────────────────────────────╯
