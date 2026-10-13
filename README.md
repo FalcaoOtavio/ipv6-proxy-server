@@ -152,9 +152,6 @@ endereço declarado no ASSOCIATE, e o relay poderia entregar datagramas ao
 loopback do host. UDP só funciona com o bloqueio desligado, o que é inseguro.
 Clientes que dependem de UDP devem consultar `/capabilities`.
 
-> A implementação do bloqueio de UDP (T23) está em andamento; até ela entrar no
-> main, a auditoria T22 (achado N1) segue **aberta**.
-
 ## Configuração IPv6 (rota, NDP, ndppd)
 
 A API adiciona cada IPv6 como `/128` na interface (com `nodad`) e **não altera**
@@ -199,28 +196,42 @@ TEST_3PROXY_BINARY=/usr/local/bin/3proxy .venv/bin/python -m pytest -q # 3proxy 
 sudo tests/e2e/vm_e2e.sh --dry-run --phase pre-reboot                 # plano do E2E em VM
 ```
 
-- [docs/evidence/qa-final.md](docs/evidence/qa-final.md): re-QA final (409
-  testes com 3proxy real, 3 execuções; aceite A/B 5x; pip-audit limpo).
+- [docs/evidence/qa-final.md](docs/evidence/qa-final.md): QA final de release
+  (T36): 460 testes com 3proxy real 2x, TUI 3x, shellcheck 0.9/0.11, pip-audit.
+- [docs/evidence/e2e/ubuntu-24.04/](docs/evidence/e2e/ubuntu-24.04/README.md):
+  E2E em VM real Ubuntu 24.04 (systemd real, upgrades, reboot real, bloqueio).
 - [docs/evidence/limits.md](docs/evidence/limits.md): limites medidos.
 - [docs/reviews/T22-security.md](docs/reviews/T22-security.md): reauditoria de
-  segurança (N1 UDP ASSOCIATE).
+  segurança (N1 UDP ASSOCIATE, fechado na verificação T27).
 
 ## Limitações e gates
 
-Este projeto **não** está declarado 100% funcional. Pendências conhecidas:
+Este projeto **não** está declarado 100% funcional.
 
-- **Sem execução em Linux limpo com systemd**: instalador, unidades
-  `ipv6-proxy@`, upgrade e rollback foram testados com stubs e supervisor
-  local. O E2E em VM (`tests/e2e/vm_e2e.sh`) existe mas não rodou (T14).
-- **Sem reboot real**: a recolocação do IPv6 por instância no boot não foi
-  observada em host real (T14).
-- **Sem IPv6 roteado**: toda a evidência usa loopback/`::1`/v4-mapped. NDP,
-  rota do provedor e saída externa não foram comprovados (T14).
+**Validado em VM real Ubuntu 24.04** (QEMU TCG, systemd real; T29–T35, ver
+[evidência](docs/evidence/e2e/ubuntu-24.04/README.md)): upgrade a partir de
+`aa29685` e de `bdfe9c7` com token/state/IPv6 preservados; 2ª execução
+idempotente (PIDs iguais); reboot REAL com API, unidades e `/128` restaurados;
+toggle de `PROXY_BLOCK_PRIVATE_DESTINATIONS` via `--update` (cfg re-renderizada,
+reinício um a um, `IPAddressDeny` ativo e comprovado no cgroup da unidade);
+instalação limpa logo após o 1º boot.
+
+Pendências conhecidas:
+
+- **Sem IPv6 roteado real**: toda a evidência (inclusive a VM) usa ULA em `lo`,
+  loopback e v4-mapped. NDP, rota do provedor e saída externa não foram
+  comprovados (falta subnet de provedor).
+- **Distros não executadas**: Debian 12/13 e Ubuntu 22.04/26.04.
+- **Tempos não representativos**: a VM rodou em TCG (sem KVM, host carregado).
+  Os prazos padrão (`PROXY_READY_TIMEOUT`, `--api-timeout`) foram escolhidos
+  para VPS KVM; em host lento, aumente-os. Proxy que ficar `fenced` volta com
+  `POST /proxies/{port}/recover` (admin) ou reinício da API
+  ([TROUBLESHOOTING](docs/TROUBLESHOOTING.md)).
+- **`--apt-lock-timeout`**: sob TCG o apt do 1º boot passou dos 600 s padrão e
+  o instalador abortou sem instalar nada (mensagem clara); com 3600 s concluiu.
+  A espera em si não foi observada numa execução válida (só numa contaminada).
 - **Push/PR não autorizados** (pergunta #152, ADR-0004): o código fica em
-  branch local; o CI do GitHub não rodou. O passo de lint do CI usa
-  shellcheck 0.9 e acusa `SC2119/SC2120` em `install.sh` (qa-final Q1).
-- **UDP ASSOCIATE**: ver [Proteção anti-SSRF e UDP](#proteção-anti-ssrf-e-udp)
-  (N1 aberto até T23).
+  branch local; o CI do GitHub não rodou.
 - `PROXY_DATA_DIR` e `PROXY_3PROXY_BINARY` precisam ficar nos padrões; subnet e
   interface não mudam com proxies existentes.
 - Sem rotação periódica automática nem por requisição (IPv6 fixo por contrato).
