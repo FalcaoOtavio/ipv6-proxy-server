@@ -87,7 +87,24 @@ sudo ipv6-proxy update --ref "$REF"
 
 O comando resolve o SHA remoto, baixa o `install.sh` desse SHA e roda
 `install.sh --update` (repassa `--yes`/`--self-test`, a confirmação `REINICIAR`
-e o exit code). Não depende da API estar no ar. Alternativa manual:
+e o exit code). Não depende da API estar no ar. Sem `--ref`, usa a ref gravada
+em `/opt/ipv6-proxy-server/VERSION` (instalação de checkout local ou ref
+inválida: `main`); `--ref` aceita branch, tag ou SHA **completo** (abreviado é
+recusado). Com o SHA remoto igual ao instalado, sai com `Nada a atualizar`, a
+menos que `--yes` force a reinstalação. Nunca reinicia todos os proxies de uma
+vez: só a API, e proxies afetados um por vez (abaixo).
+
+| Exit | Significado |
+|---|---|
+| 0 | atualizado, ou nada a atualizar (`--check`: instalação em dia) |
+| 10 | só `--check`: há atualização |
+| 1 | falha de rede, `git ls-remote` ou download do `install.sh` |
+| 2 | `--ref` inexistente ou inválido |
+| 3 | sem sudo (exceto `--check`) |
+| 130 | interrompido (Ctrl+C) |
+| outro | exit code repassado do `install.sh --update` |
+
+Alternativa manual:
 
 ```bash
 curl -fsSLo install-ipv6-proxy.sh "https://raw.githubusercontent.com/FalcaoOtavio/ipv6-proxy-server/$REF/install.sh"
@@ -207,9 +224,13 @@ sudo tests/e2e/vm_e2e.sh --dry-run --phase pre-reboot                 # plano do
 ```
 
 - [docs/evidence/qa-final.md](docs/evidence/qa-final.md): QA final de release
-  (T36): 460 testes com 3proxy real 2x, TUI 3x, shellcheck 0.9/0.11, pip-audit.
+  (T36 e release CR-1 T39): suíte com 3proxy real, TUI, shellcheck, pip-audit.
 - [docs/evidence/e2e/ubuntu-24.04/](docs/evidence/e2e/ubuntu-24.04/README.md):
   E2E em VM real Ubuntu 24.04 (systemd real, upgrades, reboot real, bloqueio).
+- [docs/evidence/e2e/update/](docs/evidence/e2e/update/README.md): E2E do
+  `ipv6-proxy update` em VM Ubuntu 24.04 (T38, 22/22 PASS): `--check` exit 10,
+  `--self-test` com mesmos MainPID dos proxies, 2ª execução sem mudança, refs
+  inválidas recusadas sem alterar nada. Fonte de update espelhada na VM.
 - [docs/evidence/limits.md](docs/evidence/limits.md): limites medidos.
 - [docs/reviews/T22-security.md](docs/reviews/T22-security.md): reauditoria de
   segurança (N1 UDP ASSOCIATE, fechado na verificação T27).
@@ -224,7 +245,9 @@ Este projeto **não** está declarado 100% funcional.
 idempotente (PIDs iguais); reboot REAL com API, unidades e `/128` restaurados;
 toggle de `PROXY_BLOCK_PRIVATE_DESTINATIONS` via `--update` (cfg re-renderizada,
 reinício um a um, `IPAddressDeny` ativo e comprovado no cgroup da unidade);
-instalação limpa logo após o 1º boot.
+instalação limpa logo após o 1º boot. `ipv6-proxy update` (T38,
+[evidência](docs/evidence/e2e/update/README.md)): `--check`, `--self-test` sem
+reiniciar proxies saudáveis (mesmos MainPID), 2ª execução e refs inválidas.
 
 Pendências conhecidas:
 
@@ -240,6 +263,9 @@ Pendências conhecidas:
 - **`--apt-lock-timeout`**: sob TCG o apt do 1º boot passou dos 600 s padrão e
   o instalador abortou sem instalar nada (mensagem clara); com 3600 s concluiu.
   A espera em si não foi observada numa execução válida (só numa contaminada).
+- **`ipv6-proxy update` contra o GitHub real**: o E2E usou fonte espelhada na
+  VM (`git url.insteadOf` e `raw.githubusercontent.com` local com CA da VM),
+  porque nada foi publicado; o download real só roda depois do push.
 - **Push/PR não autorizados** (pergunta #152, ADR-0004): o código fica em
   branch local; o CI do GitHub não rodou.
 - `PROXY_DATA_DIR` e `PROXY_3PROXY_BINARY` precisam ficar nos padrões; subnet e
