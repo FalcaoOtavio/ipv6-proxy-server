@@ -82,7 +82,7 @@ set_paths
 {STUBS}
 work_dir="$2/work"
 script_dir="{ROOT}"
-mode=install assume_yes=false self_test=false subnet='' interface='' ipv4='' ref='' keep_backups=5
+mode=install assume_yes=false self_test=false subnet='' interface='' ipv4='' ref='' keep_backups=5 apt_lock_timeout=600
 {body}
 '''
     result = subprocess.run(["bash", "-c", script, "t", str(root), str(tmp_path)], capture_output=True,
@@ -205,6 +205,8 @@ def test_parse_args_accepts(tmp_path, argv, expected):
     ("--keep-backups 0", "--keep-backups invalido"), ("--keep-backups x", "--keep-backups invalido"),
     ("--api-timeout 9", "--api-timeout invalido"), ("--api-timeout 3601", "--api-timeout invalido"),
     ("--api-timeout 0180", "--api-timeout invalido"), ("--api-timeout x", "--api-timeout invalido"),
+    ("--apt-lock-timeout 7201", "--apt-lock-timeout invalido"), ("--apt-lock-timeout -1", "Falta valor"),
+    ("--apt-lock-timeout 060", "--apt-lock-timeout invalido"),
 ])
 def test_parse_args_rejects(tmp_path, argv, message):
     result = run(tmp_path, f"parse_args {argv}", check=False)
@@ -214,7 +216,7 @@ def test_help_documents_every_flag():
     result = subprocess.run(["bash", str(INSTALLER), "--help"], capture_output=True, text=True, timeout=10)
     assert result.returncode == 0
     for flag in ("--ref", "--subnet", "--interface", "--ipv4", "--update", "--yes", "--self-test", "--cli-only",
-                 "--tui-only", "FalcaoOtavio/ipv6-proxy-server"):
+                 "--tui-only", "--apt-lock-timeout", "FalcaoOtavio/ipv6-proxy-server"):
         assert flag in result.stdout
 
 # --- source / SHA ----------------------------------------------------------------
@@ -960,3 +962,56 @@ def test_block_toggle_not_applied_fails_and_rolls_back(tmp_path, failure):
     expected = "nao corresponde" if failure == "cfg-not-rewritten" else "nao foi reiniciado (MainPID"
     assert expected in result.stderr and "Rollback concluido" in result.stderr
     assert not dropin_path(root).exists()  # back to the pre-update state
+
+# --- apt lock (T35) -------------------------------------------------------------
+
+def hold_apt_lock(tmp_path, pid=1390):
+    # Mimic /proc/locks with a fcntl lock held by another apt on the lists lock inode.
+    lock = tmp_path / "root/var/lib/apt/lists/lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.touch()
+    (tmp_path / "root/proc").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "root/proc/locks").write_text(
+        f"1: FLOCK  ADVISORY  WRITE 77 08:01:999999 0 EOF\n2: POSIX  ADVISORY  WRITE {pid} 08:01:{lock.stat().st_ino} 0 EOF\n")
+
+# Each sleep advances bash's clock; the holder releases the lock after RELEASE_AFTER sleeps.
+CLOCK = r"""
+sleep() {
+    SECONDS=$((SECONDS + $1)); n=$(( $(cat "$T/sleeps" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$T/sleeps"
+    if [[ -n ${RELEASE_AFTER:-} ]] && ((n >= RELEASE_AFTER)); then rm -f "$T/root/proc/locks"; fi
+}
+"""
+
+def test_fresh_install_waits_for_apt_lock(tmp_path):
+    hold_apt_lock(tmp_path)
+    result = run(tmp_path, stub_source() + FRESH + CLOCK + 'trap on_exit EXIT\nfresh_install',
+                 env={"RELEASE_AFTER": "3"})
+    assert result.stdout.count("Aguardando apt de outro processo (PID 1390)") == 1
+    assert "Instalacao concluida" in result.stdout
+    apt = [c for c in calls(tmp_path) if c.startswith("apt-get")]
+    assert apt[0].startswith("apt-get -o DPkg::Lock::Timeout=") and apt[0].endswith(" update")
+    assert all("DPkg::Lock::Timeout=" in c for c in apt) and len(apt) == 2
+
+def test_fresh_install_apt_lock_timeout_is_clean(tmp_path):
+    hold_apt_lock(tmp_path)
+    result = run(tmp_path, stub_source() + FRESH + CLOCK + 'apt_lock_timeout=12\ntrap on_exit EXIT\nfresh_install',
+                 check=False)
+    assert result.returncode == 1
+    assert "PID 1390" in result.stderr and "apos 12 s" in result.stderr and "--apt-lock-timeout" in result.stderr
+    assert not [c for c in calls(tmp_path) if c.startswith(("apt-get", "systemctl", "kill"))]
+    assert run(tmp_path, "detect_version").stdout.strip() == "none"
+
+def test_apt_update_retries_when_lock_taken_after_check(tmp_path):
+    # Another apt grabs the lists lock between our check and our update: wait again, retry.
+    body = CLOCK + r"""
+apt-get() {
+    log "apt-get $*"
+    if [[ ! -f $T/raced ]]; then touch "$T/raced"; mkdir -p "$T/root/var/lib/apt/lists"; touch "$T/root/var/lib/apt/lists/lock"
+        mkdir -p "$T/root/proc"; echo "1: POSIX  ADVISORY  WRITE 4242 08:01:$(command stat -c %i "$T/root/var/lib/apt/lists/lock") 0 EOF" > "$T/root/proc/locks"
+        return 100; fi
+}
+apt_update $((SECONDS + 600))
+"""
+    result = run(tmp_path, body, env={"RELEASE_AFTER": "1"})
+    assert "PID 4242" in result.stdout
+    assert len([c for c in calls(tmp_path) if c.endswith(" update")]) == 2

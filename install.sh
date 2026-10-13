@@ -15,6 +15,7 @@ no Ubuntu 22.04/24.04/26.04 ou Debian 12/13. Fonte: FalcaoOtavio/ipv6-proxy-serv
 
 Uso:
   sudo bash install.sh [--ref REF] [--subnet CIDR --interface IF --ipv4 IP] [--self-test] [--yes] [--api-timeout S]
+                       [--apt-lock-timeout S]
   sudo bash install.sh --update [--ref REF] [--self-test] [--yes] [--keep-backups N] [--api-timeout S]
   sudo bash install.sh --cli-only | --tui-only
 
@@ -35,6 +36,9 @@ Opcoes:
   --keep-backups N  Backups mantidos em /var/backups/ipv6-proxy/ apos atualizar (padrao: 5).
   --api-timeout S   Espera base pela API apos (re)iniciar, em segundos (padrao: 180; 10..3600);
                     soma 5 s por proxy persistido. Aumente em hosts lentos.
+  --apt-lock-timeout S
+                    Espera maxima pelo lock do apt/dpkg de outro processo (ex.: apt-daily
+                    no 1o boot), em segundos (padrao: 600; 0..7200). Nao mata o processo.
   --self-test       Ao final, cria um proxy de teste com senha aleatoria, confere e o remove.
                     Nao toca proxies existentes.
   --cli-only        Instala/atualiza so o CLI (checkout completo). Nao reinicia nada.
@@ -73,10 +77,11 @@ set_paths() {
     tui_file=$bin_dir/ipv6-proxy-tui
     threeproxy_file=$bin_dir/3proxy
     proc_dir=$root/proc
+    apt_lists_lock=$root/var/lib/apt/lists/lock
 }
 
 parse_args() {
-    subnet='' interface='' ipv4='' ref='' mode=install assume_yes=false self_test=false keep_backups=5 api_timeout=180
+    subnet='' interface='' ipv4='' ref='' mode=install assume_yes=false self_test=false keep_backups=5 api_timeout=180 apt_lock_timeout=600
     while (($#)); do
         case "$1" in
             --help|-h) usage; exit 0 ;;
@@ -85,7 +90,7 @@ parse_args() {
                 mode=${1#--}; shift ;;
             --yes) assume_yes=true; shift ;;
             --self-test) self_test=true; shift ;;
-            --subnet|--interface|--ipv4|--ref|--keep-backups|--api-timeout)
+            --subnet|--interface|--ipv4|--ref|--keep-backups|--api-timeout|--apt-lock-timeout)
                 if (($# < 2)) || [[ -z "$2" || "$2" == -* ]]; then
                     die "Falta valor para $1"
                 fi
@@ -96,6 +101,7 @@ parse_args() {
                     --ref) ref=$2 ;;
                     --keep-backups) keep_backups=$2 ;;
                     --api-timeout) api_timeout=$2 ;;
+                    --apt-lock-timeout) apt_lock_timeout=$2 ;;
                 esac
                 shift 2 ;;
             *) die "Opcao desconhecida: $1 (use --help)" ;;
@@ -107,6 +113,9 @@ parse_args() {
     [[ $keep_backups =~ ^[1-9][0-9]{0,2}$ ]] || die "--keep-backups invalido: use um inteiro de 1 a 999."
     if [[ ! $api_timeout =~ ^[1-9][0-9]{1,3}$ ]] || ((api_timeout > 3600)); then
         die "--api-timeout invalido: use segundos de 10 a 3600."
+    fi
+    if [[ ! $apt_lock_timeout =~ ^(0|[1-9][0-9]{0,3})$ ]] || ((apt_lock_timeout > 7200)); then
+        die "--apt-lock-timeout invalido: use segundos de 0 a 7200."
     fi
     if [[ $mode != install && -n "$subnet$interface$ipv4" ]]; then
         die "--$mode nao aceita --subnet, --interface ou --ipv4 (a configuracao existente e mantida)."
@@ -833,12 +842,62 @@ install_clients_only() {
     if [[ $which == cli ]]; then say 'CLI instalado: sudo ipv6-proxy --help'; else say 'TUI instalada: sudo ipv6-proxy-tui'; fi
 }
 
+# --- apt lock ------------------------------------------------------------------
+
+apt_lock_holder() {
+    # Prints the PID holding the apt lists lock; fails when it is free. apt takes fcntl
+    # locks (invisible to flock), so read /proc/locks; '-1' means an OFD lock (no PID).
+    # ponytail: matches the inode only (lock file lives on one fs); add maj:min if that ever collides.
+    local inode
+    inode=$(stat -c %i -- "$apt_lists_lock" 2>/dev/null) || return 1
+    [[ -r $proc_dir/locks ]] || return 1
+    awk -v ino="$inode" '{
+        for (i = 2; i <= NF; i++) if ($i ~ /^[0-9a-f]+:[0-9a-f]+:[0-9]+$/) {
+            n = split($i, f, ":"); if (f[n] == ino) { print $(i - 1); found = 1; exit }
+        }
+    } END { exit !found }' "$proc_dir/locks"
+}
+
+apt_remaining() { local left=$(($1 - SECONDS)); printf '%s\n' $((left > 0 ? left : 0)); }
+
+apt_lock_timeout_error() {
+    die "apt de outro processo (PID $1) ainda segura $apt_lists_lock apos ${apt_lock_timeout} s. Nada foi instalado. Aguarde-o terminar (ps -o pid,cmd -p $1; em VPS nova costuma ser apt-daily/unattended-upgrades) e execute o mesmo comando novamente, ou use --apt-lock-timeout maior."
+}
+
+wait_apt_lists_lock() {
+    # Waits (never kills) until no other process holds the lists lock, up to deadline $1.
+    local pid announced=''
+    while pid=$(apt_lock_holder); do
+        ((SECONDS < $1)) || apt_lock_timeout_error "$pid"
+        if [[ $pid != "$announced" ]]; then
+            say "Aguardando apt de outro processo (PID $pid)... ate $(apt_remaining "$1") s"
+            announced=$pid
+        fi
+        sleep 5
+    done
+}
+
+apt_update() {
+    # Old apt ignores DPkg::Lock::Timeout for the lists lock, so wait for it ourselves and
+    # retry when another apt grabbed it between the check and our update.
+    local pid
+    while :; do
+        wait_apt_lists_lock "$1"
+        apt-get -o DPkg::Lock::Timeout="$(apt_remaining "$1")" update && return 0
+        pid=$(apt_lock_holder) || die 'apt-get update falhou (veja a mensagem acima). Corrija o apt e execute o mesmo comando novamente.'
+        ((SECONDS < $1)) || apt_lock_timeout_error "$pid"
+    done
+}
+
 fresh_install() {
     ask_network
     check_api_port_free
     export DEBIAN_FRONTEND=noninteractive
-    apt-get update
-    apt-get install -y ca-certificates curl git python3 python3-venv build-essential iproute2 openssl
+    local apt_deadline=$((SECONDS + apt_lock_timeout))
+    apt_update "$apt_deadline"
+    apt-get -o DPkg::Lock::Timeout="$(apt_remaining "$apt_deadline")" install -y \
+        ca-certificates curl git python3 python3-venv build-essential iproute2 openssl \
+        || die "apt-get install falhou (veja a mensagem acima). Se o lock do dpkg seguiu ocupado por mais de ${apt_lock_timeout} s, aguarde o outro apt terminar e execute o mesmo comando novamente (ou use --apt-lock-timeout maior)."
     resolve_source
     stage_release
     git clone --quiet --depth 1 --branch "$THREEPROXY_TAG" https://github.com/3proxy/3proxy.git "$work_dir/3proxy"
