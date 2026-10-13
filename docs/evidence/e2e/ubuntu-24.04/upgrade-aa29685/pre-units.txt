@@ -1,0 +1,5 @@
+ipv6-proxy-api.service   loaded active running IPv6 proxy management API
+ipv6-proxy@30001.service loaded active running IPv6 proxy instance on port 30001 (3proxy)
+ipv6-proxy@30002.service loaded active running IPv6 proxy instance on port 30002 (3proxy)
+ipv6-proxy@30011.service loaded active running IPv6 proxy instance on port 30011 (3proxy)
+ipv6-proxy@30012.service loaded active running IPv6 proxy instance on port 30012 (3proxy)

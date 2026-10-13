@@ -1,0 +1,9 @@
+boot_id changed: yes
+API ready after ~1s
+same proxies/ipv6/id after reboot: True
+ipv6-proxy@30021 active MainPID=711
+ipv6-proxy@30022 active MainPID=713
+/128 fd00:1234::3b0f:3e38:7be0:d4c6 restaurado (30021)
+/128 fd00:1234::aa33:ace8:3a53:785 restaurado (30022)
+Oct 13 07:04:28 e2e-ubuntu python[691]: ipv6-proxy@30021: address added
+Oct 13 07:04:28 e2e-ubuntu python[692]: ipv6-proxy@30022: address added

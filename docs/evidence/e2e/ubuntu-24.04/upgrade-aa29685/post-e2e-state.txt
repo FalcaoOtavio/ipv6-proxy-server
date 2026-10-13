@@ -1,0 +1,24 @@
+=== e2e-base-proxies.json
+[{"port":30001,"protocol":"http","ipv4":"127.0.0.1","ipv6":"fd00:1234::c3dc:6f73:1f5f:d941","username":null},{"port":30002,"protocol":"socks5","ipv4":"127.0.0.1","ipv6":"fd00:1234::443c:22e7:9c60:876e","username":"base"}]=== e2e-harness-a-streams.json
+{"B-http": {"egress": "fd00:1234::c93f:76ee:bd6a:4f55", "egress_ok": true, "max_gap": 0.605, "ok": true, "port": 30011}, "C-socks5": {"egress": "fd00:1234::7988:65d7:6bc5:6d7d", "egress_ok": true, "max_gap": 0.589, "ok": true, "port": 30012}}
+=== e2e-post-reboot-streams.json
+{"B-http": {"egress": "fd00:1234::c93f:76ee:bd6a:4f55", "egress_ok": true, "max_gap": 0.706, "ok": true, "port": 30011}, "C-socks5": {"egress": "fd00:1234::7988:65d7:6bc5:6d7d", "egress_ok": true, "max_gap": 0.731, "ok": true, "port": 30012}}
+=== e2e-pre-reboot-boot_id
+b4460111-cf91-4d0d-8b4b-cc538f2cc00e
+=== e2e-pre-reboot-hashes.txt
+4377adb06bdc07bcfd1b891346cd58fddfba584b15d22e5434ce233646131872  etc/ipv6-proxy-api.env
+25b9456e29f6f0d729bc76e06977df55235c70ce38b9afffc0c406133d9c2faf  var/lib/ipv6-proxy-api/state.json
+0c81d0dde7113a00379c23f2be88c18df5507ca0c920187ec1dd5159bf34e02e  etc/systemd/system/ipv6-proxy-api.service
+ea8a62743a210870d235c625de4c5c3cf3f6175afd40d82f207d9e57a2f63ab7  etc/systemd/system/ipv6-proxy@.service
+e1db672b23ed1aff15b73e7f0c15c70ead086ab9fee2eb416536aab90b396ea2  var/lib/ipv6-proxy-api/proxies/30001.cfg
+1b20e67d87a2bb4c258d09f7160f12cd7e9ff8cc10c545e42bafc5c684aee4b6  var/lib/ipv6-proxy-api/proxies/30002.cfg
+beccc74c850ddc4f32de28c19e108602974bb75b80511b84a29f25be76518e06  var/lib/ipv6-proxy-api/proxies/30011.cfg
+b86d45051f8c5de8996330905a02e889f7acbee4aaf08863124dbbf894101f05  var/lib/ipv6-proxy-api/proxies/30012.cfg
+=== e2e-pre-reboot-pids.txt
+ipv6-proxy-api 9154
+ipv6-proxy@30001.service 8459
+ipv6-proxy@30002.service 8486
+ipv6-proxy@30011.service 8843
+ipv6-proxy@30012.service 8858
+=== e2e-pre-reboot-proxies.json
+[{"id":"1755e9ac19bb50bbda7e456b12681cc6","port":30001,"protocol":"http","ipv4":"127.0.0.1","ipv6":"fd00:1234::c3dc:6f73:1f5f:d941","username":null,"owner":null},{"id":"afc32fdc52819760ac88baebdb1bf309","port":30002,"protocol":"socks5","ipv4":"127.0.0.1","ipv6":"fd00:1234::443c:22e7:9c60:876e","username":"base","owner":null},{"id":"ed79bebe3d86f22ceb3e67f881a54331","port":30011,"protocol":"http","ipv4":"127.0.0.1","ipv6":"fd00:1234::c93f:76ee:bd6a:4f55","username":"bob","owner":null},{"id":"7fba588789b84385de1afdec8b9e00e7","port":30012,"protocol":"socks5","ipv4":"127.0.0.1","ipv6":"fd00:1234::7988:65d7:6bc5:6d7d","username":"carol","owner":null}]

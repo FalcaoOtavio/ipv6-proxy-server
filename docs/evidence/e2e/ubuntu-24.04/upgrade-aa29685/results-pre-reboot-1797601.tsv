@@ -1,0 +1,9 @@
+base_install	PASS	
+base_proxies	PASS	
+update	PASS	
+migration	PASS	
+idempotency	PASS	
+harness_a	PASS	
+clients	PASS	
+traffic	NOT_TESTED	E2E_ROUTED_IPV6_TARGET nao definido: trafego IPv6 roteado nao verificado
+snapshot	PASS	

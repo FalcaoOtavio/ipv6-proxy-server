@@ -1,0 +1,7 @@
+1: lo    inet6 fd00:1234::1208:4aac:d721:320a/128 scope global nodad \       valid_lft forever preferred_lft forever
+1: lo    inet6 fd00:1234::ca49:812a:9f9e:8608/128 scope global nodad \       valid_lft forever preferred_lft forever
+1: lo    inet6 fd00:1234::2c0e:8e56:e0fc:9696/128 scope global nodad \       valid_lft forever preferred_lft forever
+1: lo    inet6 fd00:1234::5461:e31e:c7:6859/128 scope global nodad \       valid_lft forever preferred_lft forever
+1: lo    inet6 ::1/128 scope host noprefixroute \       valid_lft forever preferred_lft forever
+2: enp0s2    inet6 fec0::5054:ff:fe12:3456/64 scope site dynamic mngtmpaddr noprefixroute \       valid_lft 86014sec preferred_lft 14014sec
+2: enp0s2    inet6 fe80::5054:ff:fe12:3456/64 scope link \       valid_lft forever preferred_lft forever

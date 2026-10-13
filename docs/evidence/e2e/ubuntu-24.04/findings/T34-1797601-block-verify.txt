@@ -1,0 +1,28 @@
+nserver 1.1.1.1
+nscache 65536
+maxconn 200
+timeouts 1 5 30 60 180 1800 15 60
+users <redacted>
+auth strong
+deny * * * * UDPASSOC
+deny * * ::/128,::1/128,::ffff:0:0/96,fe80::/10,fc00::/7,ff00::/8,fd00:1234::/64
+allow <redacted>
+proxy -6 -n -a -p30011 -i127.0.0.1 -efd00:1234::c93f:76ee:bd6a:4f55
+== controle: scope transitorio SEM IPAddressDeny
+connected 0.04 s
+== scope transitorio COM IPAddressDeny=::1/128 (mesmo mecanismo do drop-in)
+TimeoutError 8.02 s
+== dentro do cgroup de ipv6-proxy@30011
+bash: line 1: /sys/fs/cgroup/system.slice/system-ipv6x2dproxy.slice/ipv6-proxy@30011.service/cgroup.procs: No such file or directory
+connected 0.04 s
+== bpftool/cgroup
+== CONNECT [::1]:22 via 3proxy (cliente IPv4)
+* CONNECT tunnel: HTTP/1.1 negotiated
+> CONNECT [::1]:22 HTTP/1.1
+< HTTP/1.0 403 Forbidden
+* CONNECT tunnel failed, response 403
+== CONNECT 127.0.0.1:22 via 3proxy (destino IPv4 permitido? ACL)
+< HTTP/1.0 502 Bad Gateway
+Oct 13 00:42:59 e2e-ubuntu systemd[1]: Starting ipv6-proxy@30011.service - IPv6 proxy instance on port 30011 (3proxy)...
+Oct 13 00:43:54 e2e-ubuntu python[711]: ipv6-proxy@30011: address added
+Oct 13 00:44:23 e2e-ubuntu systemd[1]: Started ipv6-proxy@30011.service - IPv6 proxy instance on port 30011 (3proxy).

@@ -1,0 +1,5 @@
+-rw------- 1 root root 188 22:53:25 /var/lib/ipv6-proxy-api/proxies/30011.cfg
+7:allow bob
+Mon Oct 12 23:32:17 2026
+control outside cgroup: connected
+10:PROXY_BLOCK_PRIVATE_DESTINATIONS=true

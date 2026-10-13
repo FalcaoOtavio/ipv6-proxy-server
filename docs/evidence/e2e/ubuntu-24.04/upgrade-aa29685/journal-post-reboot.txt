@@ -1,0 +1,17 @@
+Oct 12 23:30:04.033355 e2e-ubuntu systemd[1]: Started ipv6-proxy-api.service - IPv6 proxy management API.
+Oct 12 23:30:12.184998 e2e-ubuntu systemd[1]: Starting ipv6-proxy@30001.service - IPv6 proxy instance on port 30001 (3proxy)...
+Oct 12 23:30:18.273267 e2e-ubuntu systemd[1]: Starting ipv6-proxy@30002.service - IPv6 proxy instance on port 30002 (3proxy)...
+Oct 12 23:30:21.957267 e2e-ubuntu systemd[1]: Starting ipv6-proxy@30011.service - IPv6 proxy instance on port 30011 (3proxy)...
+Oct 12 23:30:25.116182 e2e-ubuntu systemd[1]: Starting ipv6-proxy@30012.service - IPv6 proxy instance on port 30012 (3proxy)...
+Oct 12 23:31:36.417299 e2e-ubuntu python[705]: ipv6-proxy@30001: address added
+Oct 12 23:31:39.540101 e2e-ubuntu python[709]: ipv6-proxy@30002: address added
+Oct 12 23:31:40.992901 e2e-ubuntu python[715]: ipv6-proxy@30012: address added
+Oct 12 23:31:43.833669 e2e-ubuntu python[713]: ipv6-proxy@30011: address added
+Oct 12 23:32:10.091524 e2e-ubuntu systemd[1]: Started ipv6-proxy@30001.service - IPv6 proxy instance on port 30001 (3proxy).
+Oct 12 23:32:12.784886 e2e-ubuntu systemd[1]: Started ipv6-proxy@30002.service - IPv6 proxy instance on port 30002 (3proxy).
+Oct 12 23:32:24.868412 e2e-ubuntu systemd[1]: Started ipv6-proxy@30011.service - IPv6 proxy instance on port 30011 (3proxy).
+Oct 12 23:32:31.877308 e2e-ubuntu systemd[1]: Started ipv6-proxy@30012.service - IPv6 proxy instance on port 30012 (3proxy).
+Oct 12 23:37:28.404597 e2e-ubuntu uvicorn[704]: INFO:     Started server process [704]
+Oct 12 23:37:28.468689 e2e-ubuntu uvicorn[704]: INFO:     Waiting for application startup.
+Oct 12 23:38:04.336701 e2e-ubuntu uvicorn[704]: INFO:     Application startup complete.
+Oct 12 23:38:05.783967 e2e-ubuntu uvicorn[704]: INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)

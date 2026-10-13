@@ -1,0 +1,8 @@
+Unit ipv6-proxy@30001.service (/system.slice/system-ipv6\x2dproxy.slice/ipv6-proxy@30001.service):
+└─755 /usr/local/bin/3proxy /var/lib/ipv6-proxy-api/proxies/30001.cfg
+Unit ipv6-proxy@30002.service (/system.slice/system-ipv6\x2dproxy.slice/ipv6-proxy@30002.service):
+└─756 /usr/local/bin/3proxy /var/lib/ipv6-proxy-api/proxies/30002.cfg
+Unit ipv6-proxy@30011.service (/system.slice/system-ipv6\x2dproxy.slice/ipv6-proxy@30011.service):
+└─757 /usr/local/bin/3proxy /var/lib/ipv6-proxy-api/proxies/30011.cfg
+Unit ipv6-proxy@30012.service (/system.slice/system-ipv6\x2dproxy.slice/ipv6-proxy@30012.service):
+└─763 /usr/local/bin/3proxy /var/lib/ipv6-proxy-api/proxies/30012.cfg

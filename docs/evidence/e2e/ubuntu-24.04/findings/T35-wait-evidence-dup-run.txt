@@ -1,0 +1,5 @@
+Aguardando apt de outro processo (PID 4308)... ate 3596 s
+Aguardando apt de outro processo (PID 5388)... ate 2534 s
+Aguardando apt de outro processo (PID 6219)... ate 1012 s
+Waiting for cache lock: Could not get lock /var/lib/dpkg/lock-frontend. It is held by process 4667 (apt-get)...Aguardando apt de outro processo (PID 6219)... ate 2123 s
+Waiting for cache lock: Could not get lock /var/lib/dpkg/lock-frontend. It is held by process 4667 (apt-get)...Aguardando apt de outro processo (PID 6219)... ate 2358 s

@@ -1,0 +1,8 @@
+[ 3928.957193] traps: PANIC: double fault, error_code: 0x0
+[ 3928.957193] double fault: 0000 [#1] PREEMPT SMP NOPTI
+[ 3928.957193] CPU: 1 PID: 3004 Comm: landscape-sysin Not tainted 6.8.0-142-generic #142-Ubuntu
+[ 3928.957193] RIP: 0010:kmalloc_trace+0xf4/0x360
+[ 3928.957193] RIP: 0033:0x71fae84eda37
+[ 3928.957193] RIP: 0010:kmalloc_trace+0xf4/0x360
+[ 3928.957193] Kernel panic - not syncing: Fatal exception in interrupt
+[ 3928.957193] ---[ end Kernel panic - not syncing: Fatal exception in interrupt ]---

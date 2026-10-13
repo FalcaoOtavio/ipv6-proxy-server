@@ -1,0 +1,31 @@
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]: Could not bring up proxy on port 30002; fencing it
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]: Traceback (most recent call last):
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]:   File "/opt/ipv6-proxy-server/proxy_api/backend.py", line 294, in reconcile
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]:     self._launch(record)
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]:   File "/opt/ipv6-proxy-server/proxy_api/backend.py", line 212, in _launch
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]:     self.supervisor.start(record.port, self.config_path(record.port))
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]:   File "/opt/ipv6-proxy-server/proxy_api/supervisor.py", line 74, in start
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]:     self._systemctl("start", self.unit(port))
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]:   File "/opt/ipv6-proxy-server/proxy_api/supervisor.py", line 64, in _systemctl
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]:     return self.run(["systemctl", *args], check)
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]:   File "/opt/ipv6-proxy-server/proxy_api/supervisor.py", line 48, in run_command
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]:     return subprocess.run(argv, check=check, capture_output=True, text=True, timeout=30)
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]:   File "/usr/lib/python3.12/subprocess.py", line 550, in run
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]:     stdout, stderr = process.communicate(input, timeout=timeout)
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]:                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]:   File "/usr/lib/python3.12/subprocess.py", line 1209, in communicate
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]:     stdout, stderr = self._communicate(input, endtime, timeout)
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]:                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]:   File "/usr/lib/python3.12/subprocess.py", line 2116, in _communicate
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]:     self._check_timeout(endtime, orig_timeout, stdout, stderr)
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]:   File "/usr/lib/python3.12/subprocess.py", line 1253, in _check_timeout
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]:     raise TimeoutExpired(
+Oct 12 17:40:27.321605 e2e-ubuntu uvicorn[7839]: subprocess.TimeoutExpired: Command '['systemctl', 'start', 'ipv6-proxy@30002.service']' timed out after 30 seconds
+Oct 12 17:40:34.572095 e2e-ubuntu uvicorn[7839]: INFO:     Application startup complete.
+Oct 12 17:40:34.815791 e2e-ubuntu uvicorn[7839]: INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+Oct 12 17:41:36.925470 e2e-ubuntu uvicorn[7839]: INFO:     127.0.0.1:51410 - "POST /proxies HTTP/1.1" 201 Created
+Oct 12 17:42:09.900746 e2e-ubuntu uvicorn[7839]: INFO:     127.0.0.1:44272 - "DELETE /proxies/30000 HTTP/1.1" 204 No Content
+===
+601

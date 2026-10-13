@@ -1,0 +1,17 @@
+sha=55bc2e2361d542a7cab71a520c63259f00342c60
+ref=local
+date=2026-10-13T07:01:41Z
+env: PROXY_BLOCK_PRIVATE_DESTINATIONS=false (lab)
+600 root /etc/ipv6-proxy-api.env
+create 30021 30021 fd00:1234::3b0f:3e38:7be0:d4c6
+create 30022 30022 fd00:1234::aa33:ace8:3a53:785
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+KeyError: 'id'
+ipv6-proxy-api.service   loaded active running IPv6 proxy management API
+ipv6-proxy@30021.service loaded active running IPv6 proxy instance on port 30021 (3proxy)
+ipv6-proxy@30022.service loaded active running IPv6 proxy instance on port 30022 (3proxy)
+ipv6-proxy-api MainPID=6099 enabled=enabled
+ipv6-proxy@30021 MainPID=6632 enabled=enabled
+ipv6-proxy@30022 MainPID=6650 enabled=enabled
+3proxy_in_api_cgroup=0

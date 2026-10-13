@@ -15,7 +15,8 @@
 set -Eeuo pipefail
 umask 077
 
-BASE_SHA=aa2968556f861f56c7e5d37c70a859797a8d8772
+# Base release to upgrade from: aa29685 (fork main, default) or bdfe9c7 (ashford/isolated-mutations).
+BASE_SHA=${E2E_BASE_SHA:-aa2968556f861f56c7e5d37c70a859797a8d8772}
 FORK_URL=https://github.com/FalcaoOtavio/ipv6-proxy-server
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 repo=$(cd -- "$here/../.." && pwd)
@@ -38,6 +39,17 @@ E2E_ROUTED_IPV6_TARGET=${E2E_ROUTED_IPV6_TARGET:-}
 # (ACL + IPAddressDeny drop-in). The lab therefore runs with the block OFF (insecure, lab
 # only); set E2E_BLOCK_PRIVATE=true only with a public target and a routed subnet.
 E2E_BLOCK_PRIVATE=${E2E_BLOCK_PRIVATE:-false}
+# false skips install.sh --self-test on the update (recorded NOT_TESTED), e.g. while a
+# slow emulated host (QEMU TCG) exceeds the proxy readiness deadline.
+E2E_SELF_TEST=${E2E_SELF_TEST:-true}
+# Seconds to wait for the API after install/restart/boot (emulated hosts need minutes).
+E2E_API_WAIT=${E2E_API_WAIT:-60}
+# Set => written as PROXY_READY_TIMEOUT to the env before the update (labeled; slow hosts).
+E2E_READY_TIMEOUT=${E2E_READY_TIMEOUT:-}
+# Seconds the TUI gets to render in a pty (importing Textual takes ~30s under QEMU TCG).
+E2E_TUI_SECONDS=${E2E_TUI_SECONDS:-6}
+# Per-request API timeout (a mutation waits for systemd + proxy readiness).
+E2E_HTTP_TIMEOUT=${E2E_HTTP_TIMEOUT:-30}
 
 APP_DIR=/opt/ipv6-proxy-server
 ENV_FILE=/etc/ipv6-proxy-api.env
@@ -73,9 +85,9 @@ esac
 [[ $do_reboot == false || $phase == pre-reboot ]] || die '--reboot so vale com --phase pre-reboot'
 
 if $dry_run; then
-    printf 'phase=%s target_ref=%s base=%s subnet=%s interface=%s ipv4=%s state=%s routed_target=%s ssrf_block=%s\n' \
+    printf 'phase=%s target_ref=%s base=%s subnet=%s interface=%s ipv4=%s state=%s routed_target=%s ssrf_block=%s self_test=%s\n' \
         "$phase" "$E2E_TARGET_REF ($E2E_SOURCE)" "$BASE_SHA" "$E2E_SUBNET" "$E2E_INTERFACE" "$E2E_IPV4" "$E2E_STATE_DIR" \
-        "${E2E_ROUTED_IPV6_TARGET:-<unset: NOT_TESTED>}" "$E2E_BLOCK_PRIVATE"
+        "${E2E_ROUTED_IPV6_TARGET:-<unset: NOT_TESTED>}" "$E2E_BLOCK_PRIVATE" "$E2E_SELF_TEST"
     printf 'step %s\n' "${steps[@]}"
     $do_reboot && printf 'step reboot\n'
     exit 0
@@ -116,22 +128,22 @@ token_conf() {
 api() {  # method path [json] -> sets $api_status and $api_body (never a subshell: callers read both)
     local out
     api_status=000 api_body=''
-    out=$(curl --config "$curl_conf" --noproxy '*' --silent --max-time 30 -X "$1" \
+    out=$(curl --config "$curl_conf" --noproxy '*' --silent --max-time "$E2E_HTTP_TIMEOUT" -X "$1" \
         -H 'Content-Type: application/json' ${3:+--data "$3"} -w '\n%{http_code}' "$API$2") || return 1
     api_status=${out##*$'\n'}
     api_body=${out%$'\n'*}
 }
-wait_api() {
-    for _ in $(seq 60); do
+wait_api() {  # [seconds, default $E2E_API_WAIT]
+    for _ in $(seq "${1:-$E2E_API_WAIT}"); do
         token_conf && api GET /proxies && [[ $api_status == 200 ]] && return 0
         sleep 1
     done
     return 1
 }
 token_hash() { sed -n 's/^PROXY_API_TOKEN=//p' "$ENV_FILE" | sha256sum | cut -d' ' -f1; }
-backup_private() {
-    local dirs=(/var/backups/ipv6-proxy-*)
-    [[ -d ${dirs[0]} ]] && [[ $(stat -c %a "${dirs[@]}" | sort -u) == 700 ]]
+backup_private() {  # /var/backups/ipv6-proxy/ and every backup inside it are 0700
+    local dirs=(/var/backups/ipv6-proxy/*/)
+    [[ -d ${dirs[0]} ]] && [[ $(stat -c %a /var/backups/ipv6-proxy "${dirs[@]}" | sort -u) == 700 ]]
 }
 unit_pid() { systemctl show --property=MainPID --value "$1"; }
 pids() {  # stable "unit pid" listing of the API and every proxy instance
@@ -179,8 +191,16 @@ export E2E_PASSWORD_30002=base-socks-pw E2E_PASSWORD_30011=bob-pw-1 E2E_PASSWORD
 step_base_install() {
     if [[ -e $ENV_FILE ]]; then fail "host nao esta limpo: $ENV_FILE ja existe"; return; fi
     checkout "$BASE_SHA" "$work/base"
-    check 'install.sh base aa29685' bash "$work/base/install.sh" \
-        --subnet "$E2E_SUBNET" --interface "$E2E_INTERFACE" --ipv4 "$E2E_IPV4" || return
+    if ! bash "$work/base/install.sh" --subnet "$E2E_SUBNET" --interface "$E2E_INTERFACE" --ipv4 "$E2E_IPV4" \
+            2>&1 | tee "$work/base-install.log"; then
+        # The base installers give the API a fixed 30s; slow emulated hosts need longer.
+        # Only that failure is tolerated, and only when the API then answers (labeled).
+        if grep -q 'API nao iniciou' "$work/base-install.log" && wait_api 600; then
+            record "$current" NOT_TESTED "install.sh base ${BASE_SHA:0:7}: espera fixa de 30s pela API estourou (host lento); API respondeu depois"
+        else
+            tail -n 40 "$work/base-install.log"; fail "install.sh base ${BASE_SHA:0:7}"; return
+        fi
+    fi
     check 'API base respondendo' wait_api
 }
 step_base_proxies() {
@@ -198,11 +218,18 @@ step_update() {
         printf '# vm_e2e.sh: loopback lab, SSRF block %s\nPROXY_BLOCK_PRIVATE_DESTINATIONS=%s\n' \
             "$([[ $E2E_BLOCK_PRIVATE == true ]] && echo ON || echo OFF)" "$E2E_BLOCK_PRIVATE" >>"$ENV_FILE"
     fi
+    if [[ -n $E2E_READY_TIMEOUT ]] && ! grep -q '^PROXY_READY_TIMEOUT=' "$ENV_FILE"; then
+        printf '# vm_e2e.sh: slow (emulated) host\nPROXY_READY_TIMEOUT=%s\n' "$E2E_READY_TIMEOUT" >>"$ENV_FILE"
+        record "$current" NOTE "PROXY_READY_TIMEOUT=$E2E_READY_TIMEOUT gravado no env (host lento)"
+    fi
     # First migration from the single-process layout: one announced interruption, confirmed by --yes.
     # --self-test creates and removes its own proxy without touching the base ones.
-    check "install.sh --update --yes --self-test ($E2E_SOURCE $target_sha)" installer --update --yes --self-test || return
+    local self_test=(--self-test)
+    [[ $E2E_SELF_TEST == true ]] || self_test=()
+    check "install.sh --update --yes ${self_test[*]} ($E2E_SOURCE $target_sha)" installer --update --yes "${self_test[@]}" || return
+    [[ $E2E_SELF_TEST == true ]] || record "$current" NOT_TESTED 'E2E_SELF_TEST=false: install.sh --self-test nao executado'
     check 'API respondendo apos update' wait_api
-    check 'backup 0700 criado em /var/backups/ipv6-proxy-*' backup_private
+    check 'backup 0700 criado em /var/backups/ipv6-proxy/' backup_private
 }
 step_migration() {
     token_conf
@@ -255,7 +282,7 @@ step_harness_a() {
     api POST /proxies "{\"port\":$PORT_A,\"protocol\":\"http\"}"
     check 'cria A' [ "$api_status" = 201 ]
     id_a=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' <<<"$api_body")
-    curl --config "$curl_conf" --noproxy '*' -s -o /dev/null -w '%{http_code}' -X PATCH -H "If-Match: \"$id_a\"" \
+    curl --config "$curl_conf" --noproxy '*' -s --max-time "$E2E_HTTP_TIMEOUT" -o /dev/null -w '%{http_code}' -X PATCH -H "If-Match: \"$id_a\"" \
         -H 'Content-Type: application/json' --data '{"protocol":"socks5"}' "$API/proxies/$PORT_A" >"$work/patch.code"
     check 'PATCH A' grep -qx 200 "$work/patch.code"
     api POST "/proxies/$PORT_A/rotate"; check 'rotate A' [ "$api_status" = 200 ]
@@ -284,7 +311,7 @@ step_clients() {
     check '--cli-only/--tui-only nao reiniciam API nem proxies' diff -u "$work/pids.before" "$work/pids.after"
     check '--cli-only/--tui-only nao tocam env/state/unidades' diff -u "$work/hashes.before" "$work/hashes.after"
     if $tui; then
-        check 'TUI renderiza em pty e lista B' python3 "$here/e2e_probe.py" tui --seconds 6 --expect "$PORT_B" -- "$TUI"
+        check 'TUI renderiza em pty e lista B' python3 "$here/e2e_probe.py" tui --seconds "$E2E_TUI_SECONDS" --expect "$PORT_B" -- "$TUI"
     fi
     api GET /capabilities; check 'API /capabilities' [ "$api_status" = 200 ]
     check 'API status de B = running' [ "$(proxy_field "$PORT_B" status)" = running ]
