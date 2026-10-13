@@ -44,8 +44,10 @@ control=$(python3 -c "$probe" 6) v6=$(in_unit 6) v4=$(in_unit 4)
 [[ $v4 == connected ]] && res PASS "IPv4 127.0.0.1 alcancavel no mesmo cgroup ($v4)" || res FAIL "IPv4 no cgroup: $v4"
 
 # 3proxy layer, seen by a client over IPv4.
-code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 -x "http://$USER_B:$PASS_B@127.0.0.1:$PORT" -p http://[::1]:22/ 2>/dev/null)
+# curl reports a failed CONNECT tunnel as %{http_code}=000: read the proxy's status line instead.
+code=$(curl -sv --max-time 60 -x "http://$USER_B:$PASS_B@127.0.0.1:$PORT" -p http://[::1]:22/ -o /dev/null 2>&1 |
+    sed -nE 's/^< HTTP\/[0-9.]+ ([0-9]{3}).*/\1/p' | head -n 1)
 code=${code:-000}
-[[ $code != 200 && $code != 000 ]] && res PASS "CONNECT [::1] via proxy recusado pelo 3proxy (HTTP $code; cliente IPv4 recebeu resposta)" \
-    || res FAIL "CONNECT [::1] via proxy: HTTP $code"
+[[ $code == 403 ]] && res PASS "CONNECT [::1] via proxy recusado pela ACL do 3proxy (HTTP 403 para o cliente IPv4)" \
+    || res FAIL "CONNECT [::1] via proxy: HTTP $code (esperado 403)"
 exit "$rc"
