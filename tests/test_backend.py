@@ -396,3 +396,26 @@ def test_recover_adopts_or_starts_only_the_fenced_port(tmp_path):
     backend.recover(a.port, None)  # fenced mid-create: stopped and its address released
     assert_targets_only(host.commands, a.port, {"2001:db8::1"})
     assert a.port not in host.active and b.port in host.active and "2001:db8::1" not in host.addresses
+
+@pytest.mark.parametrize("block_before", [False, True])
+def test_reconcile_after_block_toggle_restarts_each_proxy_alone_and_logs_count(tmp_path, caplog, block_before):
+    # T34: env changed by hand + API restart => every divergent instance is restarted by
+    # itself (never a wildcard/collective command); the log says how many.
+    settings = settings_for(tmp_path)
+    records = [record(30000 + i, f"2001:db8::{i + 1}") for i in range(3)]
+    old = settings.model_copy(update={"block_private_destinations": block_before})
+    (tmp_path / "proxies").mkdir()
+    for item in records:
+        (tmp_path / "proxies" / f"{item.port}.cfg").write_text(render_config(old, item))
+    atomic_json(tmp_path / "owned-addresses.json", [str(r.ipv6) for r in records])
+    host = Host(addresses={str(r.ipv6) for r in records}, active={r.port for r in records})
+    backend = backend_for(tmp_path, host)
+    backend.settings = settings.model_copy(update={"block_private_destinations": not block_before})
+    backend.ready = lambda port: port in host.active
+    with caplog.at_level("INFO", logger="proxy_api.backend"):
+        assert backend.reconcile(records) == set()
+    assert mutating(host.commands) == [["systemctl", "restart", f"ipv6-proxy@{r.port}.service"] for r in records]
+    for item in records:
+        cfg = (tmp_path / "proxies" / f"{item.port}.cfg").read_text()
+        assert ("deny * * * * UDPASSOC" in cfg) is (not block_before)
+    assert "Reconciled 3 proxies: 0 adopted unchanged, 3 (re)started one at a time (ports 30000, 30001, 30002)" in caplog.text

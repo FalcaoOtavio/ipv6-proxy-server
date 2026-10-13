@@ -124,6 +124,20 @@ Com `PROXY_BLOCK_PRIVATE_DESTINATIONS=true` (padrão), destinos em loopback,
 `::ffff:0:0/96`, `fe80::/10`, `fc00::/7`, `ff00::/8` e a própria subnet são
 negados. É proteção anti-SSRF; não desligue em produção.
 
+## Liguei/desliguei o bloqueio e nada mudou
+
+Aplique com `sudo bash install.sh --update --yes` (mesmo na revisão
+instalada): ele reaplica a config dos proxies afetados, um por vez, e verifica
+o resultado. Conferir à mão: `grep -c '^deny' /var/lib/ipv6-proxy-api/proxies/<porta>.cfg`
+(2 com o bloqueio ligado, 0 desligado). Erros do instalador:
+
+- `configuracao dos proxies nao corresponde ... (portas: ...)`: a API não
+  regravou esses `.cfg`; veja `journalctl -u ipv6-proxy-api -n 100` (porta
+  isolada/`fenced`?) e repita após corrigir.
+- `ipv6-proxy@<porta>.service nao foi reiniciado (MainPID ...)`: o `.cfg` mudou
+  mas o processo segue com a config antiga. Rollback já feito; repita o
+  `--update` ou `sudo systemctl restart ipv6-proxy@<porta>` e confira.
+
 ## SOCKS5 UDP ASSOCIATE não responde
 
 Esperado com o bloqueio anti-SSRF ligado: UDP ASSOCIATE é negado e

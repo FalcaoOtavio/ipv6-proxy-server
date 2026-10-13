@@ -171,10 +171,10 @@ def fake_installation(tmp_path, flavor, ports=(30000, 30001)):
         (app / "VERSION").write_text("sha=local\nref=local\ndate=x\n")
     return root
 
-def rendered(item):
+def rendered(item, block=True):
     record = SimpleNamespace(username=None, password=None, **{**item, "ipv6": IPv6Address(item["ipv6"])})
     settings = SimpleNamespace(bind_ipv4=IPv4Address("192.0.2.10"), subnet=IPv6Network(SUBNET),
-                               block_private_destinations=True)
+                               block_private_destinations=block)
     return render_config(settings, record)
 
 def stub_source(sha="local"):
@@ -704,7 +704,8 @@ def test_update_changing_rendered_config_with_yes(tmp_path):
     changed_render(root)
     # The new API restarts 30000 (config changed) and keeps 30001.
     cfg = root / "var/lib/ipv6-proxy-api/proxies/30000.cfg"
-    (tmp_path / "on-api-start").write_text(f'printf "new\\n" > "{cfg}"; '
+    (tmp_path / "new.cfg").write_text(rendered({"port": 30000, "protocol": "http", "ipv6": "2001:db8::1"}))
+    (tmp_path / "on-api-start").write_text(f'cp "{tmp_path}/new.cfg" "{cfg}"; '
                                            f'sed -i "s/^30000.service .*/30000.service 7777/" "{tmp_path}/pids"\n')
     result = run(tmp_path, stub_source() + "mode=update\nassume_yes=true\nupdate_install independent")
     assert "Confirmado por --yes" in result.stdout and "Atualizacao concluida" in result.stdout
@@ -829,10 +830,8 @@ def test_dropin_denies_internal_ipv6_never_ipv4():
     assert "IPAddressDeny" not in (ROOT / "deploy/ipv6-proxy@.service").read_text()  # never static
 
 @pytest.mark.parametrize("block,present_before,present_after", [
-    (None, False, True),     # default on: missing drop-in is installed
+    (None, False, True),     # default on: missing drop-in is installed, configs already have the deny
     ("true", False, True),
-    ("false", True, False),  # off: drop-in removed
-    (" No ", True, False),
 ])
 def test_update_syncs_dropin_without_restarting_proxies(tmp_path, block, present_before, present_after):
     root = synced_installation(tmp_path)
@@ -858,6 +857,9 @@ def test_update_with_dropin_in_sync_is_a_noop(tmp_path, block, present):
     set_block(root, block)
     if not present:
         dropin_path(root).unlink()
+        for cfg in (root / "var/lib/ipv6-proxy-api/proxies").glob("*.cfg"):  # what the API rendered with the block off
+            port = int(cfg.stem)
+            cfg.write_text(rendered({"port": port, "protocol": "http", "ipv6": f"2001:db8::{port - 29999}"}, block=False))
     result = run(tmp_path, stub_source() + "mode=update\nupdate_install independent")
     assert "Nada a atualizar" in result.stdout and mutating_systemctl(tmp_path) == []
 
@@ -882,3 +884,79 @@ def test_fresh_install_writes_block_and_dropin(tmp_path, block, present):
     written = (root / "etc/ipv6-proxy-api.env").read_text()
     assert f"PROXY_BLOCK_PRIVATE_DESTINATIONS={'true' if present else 'false'}" in written
     assert dropin_path(root).exists() == present
+
+# --- Toggling PROXY_BLOCK_PRIVATE_DESTINATIONS on the same revision (T34) ------------------
+
+def toggled_installation(tmp_path, block_after, ports=(30000, 30001)):
+    """Same-SHA install whose proxies run the config of the opposite block setting; env now says block_after."""
+    root = synced_installation(tmp_path)
+    state = root / "var/lib/ipv6-proxy-api"
+    items = [{"port": p, "protocol": "http", "ipv6": f"2001:db8::{i + 1}"} for i, p in enumerate(ports)]
+    if not block_after:
+        set_block(root, "false")  # drop-in still installed from the "on" era
+    else:
+        set_block(root, "false")
+        run(tmp_path, stub_source() + "resolve_source\nstage_release\nplan_changes\napply_release")  # drop-in gone
+        env = root / "etc/ipv6-proxy-api.env"
+        env.write_text(env.read_text().replace("PROXY_BLOCK_PRIVATE_DESTINATIONS=false", "PROXY_BLOCK_PRIVATE_DESTINATIONS=true"))
+    for item in items:
+        (state / "proxies" / f"{item['port']}.cfg").write_text(rendered(item, block=not block_after))
+    new = tmp_path / "new-cfg"
+    new.mkdir()
+    for item in items:
+        (new / f"{item['port']}.cfg").write_text(rendered(item, block=block_after))
+    (tmp_path / "calls").unlink(missing_ok=True)
+    return root, items
+
+def api_reapplies(tmp_path, root, ports):
+    # The new API restarts each divergent proxy itself: new cfg, new MainPID.
+    state = root / "var/lib/ipv6-proxy-api/proxies"
+    (tmp_path / "on-api-start").write_text("".join(
+        f'cp "{tmp_path}/new-cfg/{p}.cfg" "{state}/{p}.cfg"; '
+        f'sed -i "s/^{p}.service .*/{p}.service {7000 + p}/" "{tmp_path}/pids"\n' for p in ports))
+
+@pytest.mark.parametrize("block_after", [True, False])
+def test_block_toggle_same_sha_reapplies_configs_one_by_one(tmp_path, block_after):
+    root, items = toggled_installation(tmp_path, block_after)
+    api_reapplies(tmp_path, root, [i["port"] for i in items])
+    result = run(tmp_path, stub_source() + "mode=update\nassume_yes=true\nupdate_install independent")
+    assert "2 proxies serao reiniciados uma vez (um por vez)" in result.stdout and "portas: 30000 30001" in result.stdout
+    assert "Configuracao aplicada e verificada" in result.stdout and "Atualizacao concluida" in result.stdout
+    assert "Nenhum proxy foi reiniciado" not in result.stdout
+    # The installer itself only reloads units and restarts the API: proxies restart one by one inside it.
+    assert mutating_systemctl(tmp_path) == ["systemctl daemon-reload", "systemctl restart ipv6-proxy-api.service"]
+    assert dropin_path(root).exists() == block_after
+    for item in items:
+        cfg = (root / f"var/lib/ipv6-proxy-api/proxies/{item['port']}.cfg").read_text()
+        assert ("deny * * * * UDPASSOC" in cfg) is block_after
+
+@pytest.mark.parametrize("block_after", [True, False])
+def test_block_toggle_without_yes_refuses_untouched(tmp_path, block_after):
+    root, _ = toggled_installation(tmp_path, block_after)
+    before = digest(root)
+    result = run(tmp_path, stub_source() + "mode=update\nupdate_install independent", check=False)
+    assert result.returncode == 1 and "--yes" in result.stderr and "Nada foi alterado" in result.stderr
+    assert digest(root) == before and mutating_systemctl(tmp_path) == []
+
+def test_block_toggle_only_affected_proxies_restart(tmp_path):
+    # 30001 already had the new config: it must keep its PID; any restart of it rolls back.
+    root, items = toggled_installation(tmp_path, True)
+    state = root / "var/lib/ipv6-proxy-api/proxies"
+    (state / "30001.cfg").write_text(rendered(items[1], block=True))
+    api_reapplies(tmp_path, root, [30000])
+    result = run(tmp_path, stub_source() + "mode=update\nassume_yes=true\nupdate_install independent")
+    assert "1 proxies serao reiniciados" in result.stdout and "portas: 30000)" in result.stdout
+    assert "30001.service 31001" in (tmp_path / "pids").read_text()
+
+@pytest.mark.parametrize("failure", ["cfg-not-rewritten", "pid-unchanged"])
+def test_block_toggle_not_applied_fails_and_rolls_back(tmp_path, failure):
+    # The E2E false positive: drop-in swapped, configs/PIDs untouched => error, never "concluida".
+    root, items = toggled_installation(tmp_path, True)
+    state = root / "var/lib/ipv6-proxy-api/proxies"
+    if failure == "pid-unchanged":  # cfg rewritten but the process kept running the old one
+        (tmp_path / "on-api-start").write_text(f'cp "{tmp_path}"/new-cfg/*.cfg "{state}/"\n')
+    result = run(tmp_path, stub_source() + "mode=update\nassume_yes=true\nupdate_install independent", check=False)
+    assert result.returncode == 1 and "Atualizacao concluida" not in result.stdout
+    expected = "nao corresponde" if failure == "cfg-not-rewritten" else "nao foi reiniciado (MainPID"
+    assert expected in result.stderr and "Rollback concluido" in result.stderr
+    assert not dropin_path(root).exists()  # back to the pre-update state

@@ -282,11 +282,13 @@ class LinuxBackend:
         if fresh:
             self.addresses |= fresh
             atomic_json(self.journal, sorted(self.addresses))
-        launched = []
+        launched, adopted = [], 0
         for record in records:
             try:
                 since = self._bring_up(record, existing)
-                if since is not None:
+                if since is None:
+                    adopted += 1
+                else:
                     launched.append((record, since))
             except Exception:
                 logger.exception("Could not bring up proxy on port %s; fencing it", record.port)
@@ -300,6 +302,9 @@ class LinuxBackend:
             except Exception:
                 logger.exception("Proxy on port %s did not become ready; fencing it", record.port)
                 failed.add(record.port)
+        # Each divergent/missing instance got its own systemctl start/restart, in series.
+        logger.info("Reconciled %d proxies: %d adopted unchanged, %d (re)started one at a time%s",
+                    len(records), adopted, len(launched), f" (ports {', '.join(str(r.port) for r, _ in launched)})" if launched else "")
         in_use = {str(record.ipv6) for record in records} | self._orphan_addresses()
         for address in sorted(self.addresses - in_use):
             self._release(address)
