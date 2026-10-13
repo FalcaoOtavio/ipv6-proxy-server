@@ -81,6 +81,21 @@ sudo journalctl -u ipv6-proxy-api -n 50       # log da API
 ## Atualizar
 
 ```bash
+ipv6-proxy update --check           # sem sudo; exit 0 atualizado, 10 ha atualizacao
+sudo ipv6-proxy update --self-test  # ref padrao: ref= de /opt/ipv6-proxy-server/VERSION, senao main
+sudo ipv6-proxy update --ref "$REF" [--yes]
+```
+
+`ipv6-proxy update` resolve o SHA remoto (`git ls-remote`), baixa o
+`install.sh` desse SHA para um diretorio temporario 0700 (sem proxy) e executa
+`install.sh --update --ref <ref>` com as flags repassadas; a confirmacao
+`REINICIAR` usa o terminal e o exit code do instalador e propagado. Se o SHA
+remoto ja esta instalado, imprime `Nada a atualizar` (use `--yes` para
+reinstalar). Nao depende da API estar no ar.
+
+Alternativa manual (equivalente):
+
+```bash
 REF=<sha-ou-tag-aprovado>
 curl -fsSLo install-ipv6-proxy.sh "https://raw.githubusercontent.com/FalcaoOtavio/ipv6-proxy-server/$REF/install.sh"
 sudo bash install-ipv6-proxy.sh --update --ref "$REF" --self-test

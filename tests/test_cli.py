@@ -311,8 +311,11 @@ def test_invalid_success_payload_is_rejected(env_file):
 
 def test_cli_is_only_an_api_client():
     source = SCRIPT.read_text()
-    for forbidden in ("proxy_api", "systemctl", "subprocess", "ip -6", "3proxy.cfg", "manager.lock"):
+    for forbidden in ("proxy_api", "systemctl", "ip -6", "3proxy.cfg", "manager.lock"):
         assert forbidden not in source
+    # Only `update` spawns processes (git ls-remote and install.sh --update).
+    api_part = source[:source.index("def read_version(")]
+    assert "subprocess." not in api_part
 
 
 @pytest.mark.parametrize("field,value", [

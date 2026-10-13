@@ -9,7 +9,9 @@ import http.client
 import json
 import os
 import re
+import shutil
 import stat
+import subprocess
 import sys
 import tempfile
 import urllib.error
@@ -20,6 +22,14 @@ from pathlib import Path
 
 API_URL = "http://127.0.0.1:8000"
 ENV_FILE = Path("/etc/ipv6-proxy-api.env")
+VERSION_FILE = Path("/opt/ipv6-proxy-server/VERSION")
+REPO_URL = "https://github.com/FalcaoOtavio/ipv6-proxy-server.git"
+RAW_URL = "https://raw.githubusercontent.com/FalcaoOtavio/ipv6-proxy-server"
+# Same rule as install.sh parse_args.
+REF_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$")
+SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+UPDATE_AVAILABLE = 10
+MAX_INSTALLER = 2 * 1024 * 1024
 # Allow all 64,512 supported ports, including maximum-length view fields.
 MAX_BODY = 16 * 1024 * 1024
 MAX_ENV = 64 * 1024
@@ -128,7 +138,18 @@ def build_parser():
     add_if_match(delete)
     add_mutation_options(delete)
     add_output(delete)
+
+    update = subparsers.add_parser("update", help="Atualiza esta instalacao (install.sh --update)")
+    update.add_argument("--ref", type=git_ref, help="Branch, tag ou SHA completo (padrao: ref de VERSION ou main)")
+    update.add_argument("--yes", action="store_true")
+    update.add_argument("--self-test", action="store_true")
+    update.add_argument("--check", action="store_true", help="So compara instalado x disponivel (exit 10 se houver atualizacao)")
     return parser
+
+def git_ref(value):
+    if not REF_RE.match(value):
+        raise argparse.ArgumentTypeError("--ref invalido: use nome de branch/tag ou SHA")
+    return value
 
 
 def add_output(parser):
@@ -713,6 +734,89 @@ def execute(args, token, stdin, stdout, stderr, opener=None):
         result = parse_response("delete", status_code, body, args.port)
     render(args.command, result, args.output, stdout)
 
+def read_version(path):
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    return dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
+
+def ls_remote(ref):
+    try:
+        result = subprocess.run(
+            ["git", "ls-remote", "--", REPO_URL, f"refs/heads/{ref}", f"refs/tags/{ref}", f"refs/tags/{ref}^{{}}"],
+            capture_output=True, text=True, timeout=60,
+            env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise CliError(f"falha ao consultar {REPO_URL}: {exc}", 1) from exc
+    if result.returncode != 0:
+        raise CliError(f"git ls-remote falhou: {result.stderr.strip()[:300]}", 1)
+    return result.stdout
+
+def resolve_remote(ref):
+    if SHA_RE.match(ref):
+        return ref
+    refs = {}
+    for line in ls_remote(ref).splitlines():
+        sha, _, name = line.partition("\t")
+        refs[name] = sha
+    # Annotated tags: the peeled ^{} entry is the commit.
+    for name in (f"refs/heads/{ref}", f"refs/tags/{ref}^{{}}", f"refs/tags/{ref}"):
+        if SHA_RE.match(refs.get(name, "")):
+            return refs[name]
+    raise CliError(f"--ref {ref} nao existe em {REPO_URL} (SHA abreviado nao e aceito; use o SHA completo)", 2)
+
+def download_installer(sha, dest):
+    # No proxy: this host's own proxies must not carry its update.
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    url = f"{RAW_URL}/{sha}/install.sh"
+    try:
+        with opener.open(url, timeout=TIMEOUT) as response:
+            body = response.read(MAX_INSTALLER + 1)
+    except (urllib.error.URLError, OSError) as exc:
+        raise CliError(f"falha ao baixar {url}: {exc}", 1) from exc
+    if len(body) > MAX_INSTALLER or not body.startswith(b"#!"):
+        raise CliError(f"conteudo inesperado em {url}", 1)
+    dest.write_bytes(body)
+
+def run_update(args, uid, stdout, stderr):
+    installed = read_version(VERSION_FILE)
+    ref = args.ref or installed.get("ref") or "main"
+    # "local" marks an install from a local checkout (install.sh resolve_source).
+    if ref == "local" or not REF_RE.match(ref):
+        ref = "main"
+    installed_sha = installed.get("sha", "")
+    if args.check:
+        remote = resolve_remote(ref)
+        print(f"Instalado:  {installed_sha or 'desconhecido'} (ref={installed.get('ref', '?')})", file=stdout)
+        print(f"Disponivel: {remote} (ref={ref})", file=stdout)
+        if remote == installed_sha:
+            print("Instalacao atualizada.", file=stdout)
+            return 0
+        print("Ha atualizacao: sudo ipv6-proxy update", file=stdout)
+        return UPDATE_AVAILABLE
+    if uid != 0:
+        print("Erro: execute com sudo: sudo ipv6-proxy update (ou --check sem sudo).", file=stderr)
+        return 3
+    remote = resolve_remote(ref)
+    if remote == installed_sha and not args.yes:
+        print(f"Nada a atualizar: {remote} ja instalado (use --yes para reinstalar).", file=stdout)
+        return 0
+    print(f"Atualizando {installed_sha or 'desconhecido'} -> {remote} (ref={ref})", file=stdout, flush=True)
+    work = Path(tempfile.mkdtemp(prefix="ipv6-proxy-update."))  # mode 0700
+    try:
+        installer = work / "install.sh"
+        download_installer(remote, installer)
+        # The installer comes from the resolved SHA; --ref keeps the branch/tag name so
+        # VERSION keeps tracking it (a SHA there would pin every later update).
+        command = ["bash", str(installer), "--update", "--ref", ref]
+        command += ["--yes"] * args.yes + ["--self-test"] * args.self_test
+        # stdin/stdout inherited: install.sh may ask for REINICIAR on the tty.
+        return subprocess.run(command, check=False).returncode
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
 def main(argv=None, stdin=None, stdout=None, stderr=None, env_file=ENV_FILE,
          expected_uid=0, effective_uid=None, opener=None):
     stdin = stdin or sys.stdin
@@ -721,6 +825,16 @@ def main(argv=None, stdin=None, stdout=None, stderr=None, env_file=ENV_FILE,
     parser = build_parser()
     args = parser.parse_args(argv)
     uid = os.geteuid() if effective_uid is None else effective_uid
+    if args.command == "update":
+        # Independent of the API: it may be down precisely because it needs an update.
+        try:
+            return run_update(args, uid, stdout, stderr)
+        except CliError as exc:
+            print(f"Erro: {exc}", file=stderr)
+            return exc.exit_code
+        except KeyboardInterrupt:
+            print("\nOperacao interrompida.", file=stderr)
+            return 130
     if uid != 0:
         print("Erro: execute os comandos operacionais com sudo.", file=stderr)
         return 3
