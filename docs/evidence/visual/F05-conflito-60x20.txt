@@ -1,0 +1,20 @@
+ Porta  Status    Proto   Usuário  Senha  IPv6              
+ 59478  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.163
+ 59479  ✕ falhou  SOCKS5  —        —      ::ffff:127.0.0.3  
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                            
+                                                           ▏
+ ✕ Conflito: porta já em uso ou faixa de portas esgotada.   
+ Nada foi alterado.                                         
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            

@@ -1,0 +1,24 @@
+ Porta  Status    Proto   Usuário  Senha  IPv6                                  
+ 43857  ● ativo   HTTP    alice    ••••   ::ffff:127.0.0.224                    
+ 43858  ✕ falhou  SOCKS5  —        —      ::ffff:127.0.0.125                    
+                                                                                
+                                                                                
+        ╭──────────────────────────────────────────────────────────────╮        
+        │ Editar proxy da porta 43858                                  │        
+        │ Porta                                                        │        
+        │ 43859                                                        │        
+        │ Protocolo                                                    │        
+        │ HTTP                                                      ▼  │        
+        │ Usuário                                                      │        
+        │ bob                                                          │        
+        │ Nova senha (vazio = manter credenciais)                      │        
+        │ ••••••••                                                     │        
+        │ ▐X▌ Remover autenticação                                     │        
+        │                                                              │        
+        │    Confirmar         Cancelar                                │        
+        ╰──────────────────────────────────────────────────────────────╯        
+                                                                                
+                                                                                
+ ✕ Conflito: porta já em uso ou faixa de portas esgotada. Nada foi alterado.    
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                          
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                

@@ -1,0 +1,768 @@
+{
+  "F01": [
+    {
+      "viewport": "80x24",
+      "criterion": "IPv6 exibido exatamente como na API",
+      "ok": true,
+      "seen": "API: 2001:db8:abcd:1234:7eea:58de:b57c:d840 | tela: 48373  ● ativo  HTTP   —        —      2001:db8:abcd:1234:7eea:58de:b57c:d840",
+      "evidence": "docs/evidence/visual/F01-ipv6-real-80x24.png"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "estado vazio com instrução de criar",
+      "ok": true,
+      "seen": "‘Nenhum proxy cadastrado. Pressione c…’",
+      "evidence": "docs/evidence/visual/F01-vazio-80x24.png"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "tabela com porta, protocolo, IPv6 e status em texto/símbolo",
+      "ok": true,
+      "seen": "cabeçalho: Porta  Status   Proto   Usuário  Senha  IPv6",
+      "evidence": "docs/evidence/visual/F01-lista-80x24.png"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "coluna IPv6 visível no viewport",
+      "ok": true,
+      "seen": "IPv6 visível"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "status atualiza por atalho de recarregar (a)",
+      "ok": true,
+      "seen": "3proxy da porta 43858 morto (kill -9); após a: ‘✕ falhou’ + aviso journalctl",
+      "evidence": "docs/evidence/visual/F01-status-atualizado-80x24.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "IPv6 exibido exatamente como na API",
+      "ok": true,
+      "seen": "API: 2001:db8:abcd:1234:5edd:a3cc:fca5:64bd | tela: 52558  ● ativo  HTTP   —        —      2001:db8:abcd:1234:5edd:a3cc:fca5:64bd",
+      "evidence": "docs/evidence/visual/F01-ipv6-real-120x40.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "estado vazio com instrução de criar",
+      "ok": true,
+      "seen": "‘Nenhum proxy cadastrado. Pressione c…’",
+      "evidence": "docs/evidence/visual/F01-vazio-120x40.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "tabela com porta, protocolo, IPv6 e status em texto/símbolo",
+      "ok": true,
+      "seen": "cabeçalho: Porta  Status   Proto   Usuário  Senha  IPv6",
+      "evidence": "docs/evidence/visual/F01-lista-120x40.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "coluna IPv6 visível no viewport",
+      "ok": true,
+      "seen": "IPv6 visível"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "status atualiza por atalho de recarregar (a)",
+      "ok": true,
+      "seen": "3proxy da porta 56244 morto (kill -9); após a: ‘✕ falhou’ + aviso journalctl",
+      "evidence": "docs/evidence/visual/F01-status-atualizado-120x40.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "IPv6 exibido exatamente como na API",
+      "ok": true,
+      "seen": "API: 2001:db8:abcd:1234:664c:b26f:e4f7:8908 | tela: TP   —        —      2001:db8:abcd:1234:664c:b26f:e4f7:8908",
+      "evidence": "docs/evidence/visual/F01-ipv6-real-60x20.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "estado vazio com instrução de criar",
+      "ok": true,
+      "seen": "‘Nenhum proxy cadastrado. Pressione c…’",
+      "evidence": "docs/evidence/visual/F01-vazio-60x20.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "tabela com porta, protocolo, IPv6 e status em texto/símbolo",
+      "ok": true,
+      "seen": "cabeçalho: Porta  Status   Proto   Usuário  Senha  IPv6",
+      "evidence": "docs/evidence/visual/F01-lista-60x20.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "coluna IPv6 visível no viewport",
+      "ok": true,
+      "seen": "IPv6 visível"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "status atualiza por atalho de recarregar (a)",
+      "ok": true,
+      "seen": "3proxy da porta 59479 morto (kill -9); após a: ‘✕ falhou’ + aviso journalctl",
+      "evidence": "docs/evidence/visual/F01-status-atualizado-60x20.png"
+    }
+  ],
+  "F08": [
+    {
+      "viewport": "80x24",
+      "criterion": "token inválido: erro acionável sem traceback",
+      "ok": true,
+      "seen": "status mostra 'Token inválido. Confira PROXY_API_TOKEN em /etc/ipv6-proxy-api.env'",
+      "evidence": "docs/evidence/visual/F08-token-invalido-80x24.png"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "sai limpo com q após erro",
+      "ok": true,
+      "seen": "exit 0"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "API indisponível: erro acionável sem traceback",
+      "ok": true,
+      "seen": "para recarregar. | ✕ API indisponível em http://127.0.0.1:37905. Verifique: sudo systemctl status | ipv6-proxy-api | l Lote  e Editar  r Rotacionar  d Excluir  x Exportar | ? Ajuda  c Criar  a Recarregar  s Senha  q Sair",
+      "evidence": "docs/evidence/visual/F08-api-indisponivel-80x24.png"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "recarregar com API fora não trava",
+      "ok": true,
+      "seen": "processo vivo após a"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "legível sem quebra/crash",
+      "ok": true,
+      "seen": "80x24: tabela, status e rodapé renderizados",
+      "evidence": "docs/evidence/visual/F08-lista-cheia-80x24.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "token inválido: erro acionável sem traceback",
+      "ok": true,
+      "seen": "status mostra 'Token inválido. Confira PROXY_API_TOKEN em /etc/ipv6-proxy-api.env'",
+      "evidence": "docs/evidence/visual/F08-token-invalido-120x40.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "sai limpo com q após erro",
+      "ok": true,
+      "seen": "exit 0"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "API indisponível: erro acionável sem traceback",
+      "ok": true,
+      "seen": "a para recarregar. | ✕ API indisponível em http://127.0.0.1:38379. Verifique: sudo systemctl status ipv6-proxy-api | l Lote  e Editar  r Rotacionar  d Excluir  x Exportar | ? Ajuda  c Criar  a Recarregar  s Senha  q Sair",
+      "evidence": "docs/evidence/visual/F08-api-indisponivel-120x40.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "recarregar com API fora não trava",
+      "ok": true,
+      "seen": "processo vivo após a"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "legível sem quebra/crash",
+      "ok": true,
+      "seen": "120x40: tabela, status e rodapé renderizados",
+      "evidence": "docs/evidence/visual/F08-lista-cheia-120x40.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "token inválido: erro acionável sem traceback",
+      "ok": true,
+      "seen": "status mostra 'Token inválido. Confira PROXY_API_TOKEN em /etc/ipv6-proxy-api.env'",
+      "evidence": "docs/evidence/visual/F08-token-invalido-60x20.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "sai limpo com q após erro",
+      "ok": true,
+      "seen": "exit 0"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "API indisponível: erro acionável sem traceback",
+      "ok": true,
+      "seen": "para recarregar. | ✕ API indisponível em http://127.0.0.1:54695. Verifique: | sudo systemctl status ipv6-proxy-api | l Lote  e Editar  r Rotacionar  d Excluir  x Exportar | ? Ajuda  c Criar  a Recarregar  s Senha  q Sair",
+      "evidence": "docs/evidence/visual/F08-api-indisponivel-60x20.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "recarregar com API fora não trava",
+      "ok": true,
+      "seen": "processo vivo após a"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "legível sem quebra/crash",
+      "ok": true,
+      "seen": "60x20: tabela, status e rodapé renderizados",
+      "evidence": "docs/evidence/visual/F08-lista-cheia-60x20.png"
+    }
+  ],
+  "F02": [
+    {
+      "viewport": "80x24",
+      "criterion": "atalhos visíveis no rodapé",
+      "ok": true,
+      "seen": "rodapé: '? Ajuda  c Criar  a Recarregar  s Senha  q Sair'",
+      "evidence": "docs/evidence/visual/F02-rodape-80x24.png"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "? abre ajuda PT-BR com todos os atalhos",
+      "ok": true,
+      "seen": "12 atalhos presentes",
+      "evidence": "docs/evidence/visual/F02-ajuda-80x24.png"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "Esc fecha ajuda",
+      "ok": true,
+      "seen": "ajuda fechada"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "Esc fecha diálogo sem efeito colateral",
+      "ok": true,
+      "seen": "formulário com porta 43857 cancelado; registros: 0"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "q sai com código 0",
+      "ok": true,
+      "seen": "exit 0"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "atalhos visíveis no rodapé",
+      "ok": true,
+      "seen": "rodapé: '? Ajuda  c Criar  a Recarregar  s Senha  q Sair'",
+      "evidence": "docs/evidence/visual/F02-rodape-120x40.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "? abre ajuda PT-BR com todos os atalhos",
+      "ok": true,
+      "seen": "12 atalhos presentes",
+      "evidence": "docs/evidence/visual/F02-ajuda-120x40.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "Esc fecha ajuda",
+      "ok": true,
+      "seen": "ajuda fechada"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "Esc fecha diálogo sem efeito colateral",
+      "ok": true,
+      "seen": "formulário com porta 56243 cancelado; registros: 0"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "q sai com código 0",
+      "ok": true,
+      "seen": "exit 0"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "atalhos visíveis no rodapé",
+      "ok": true,
+      "seen": "rodapé: '? Ajuda  c Criar  a Recarregar  s Senha  q Sair'",
+      "evidence": "docs/evidence/visual/F02-rodape-60x20.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "? abre ajuda PT-BR com todos os atalhos",
+      "ok": true,
+      "seen": "12 atalhos presentes",
+      "evidence": "docs/evidence/visual/F02-ajuda-60x20.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "Esc fecha ajuda",
+      "ok": true,
+      "seen": "ajuda fechada"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "Esc fecha diálogo sem efeito colateral",
+      "ok": true,
+      "seen": "formulário com porta 59478 cancelado; registros: 0"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "q sai com código 0",
+      "ok": true,
+      "seen": "exit 0"
+    }
+  ],
+  "F03": [
+    {
+      "viewport": "80x24",
+      "criterion": "porta inválida: erro inline",
+      "ok": true,
+      "seen": "‘✕ Porta deve ser um número entre 1024 e 65535.’",
+      "evidence": "docs/evidence/visual/F03-erro-porta-80x24.png"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "credenciais inválidas: erro inline",
+      "ok": true,
+      "seen": "‘✕ Usuário: 1-64 caracteres…’",
+      "evidence": "docs/evidence/visual/F03-erro-credenciais-80x24.png"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "senha digitada mascarada",
+      "ok": true,
+      "seen": "campo Senha mostra só •",
+      "evidence": "docs/evidence/visual/F03-senha-mascarada-80x24.png"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "feedback de sucesso e novo item na lista",
+      "ok": true,
+      "seen": "status ‘Proxy criado na porta 43857 com IPv6 …’; linha 43857 ● ativo",
+      "evidence": "docs/evidence/visual/F03-criado-80x24.png"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "protocolo escolhido no formulário",
+      "ok": true,
+      "seen": "porta 43858 criada como socks5"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "porta inválida: erro inline",
+      "ok": true,
+      "seen": "‘✕ Porta deve ser um número entre 1024 e 65535.’",
+      "evidence": "docs/evidence/visual/F03-erro-porta-120x40.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "credenciais inválidas: erro inline",
+      "ok": true,
+      "seen": "‘✕ Usuário: 1-64 caracteres…’",
+      "evidence": "docs/evidence/visual/F03-erro-credenciais-120x40.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "senha digitada mascarada",
+      "ok": true,
+      "seen": "campo Senha mostra só •",
+      "evidence": "docs/evidence/visual/F03-senha-mascarada-120x40.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "feedback de sucesso e novo item na lista",
+      "ok": true,
+      "seen": "status ‘Proxy criado na porta 56243 com IPv6 …’; linha 56243 ● ativo",
+      "evidence": "docs/evidence/visual/F03-criado-120x40.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "protocolo escolhido no formulário",
+      "ok": true,
+      "seen": "porta 56244 criada como socks5"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "porta inválida: erro inline",
+      "ok": true,
+      "seen": "‘✕ Porta deve ser um número entre 1024 e 65535.’",
+      "evidence": "docs/evidence/visual/F03-erro-porta-60x20.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "credenciais inválidas: erro inline",
+      "ok": true,
+      "seen": "‘✕ Usuário: 1-64 caracteres…’",
+      "evidence": "docs/evidence/visual/F03-erro-credenciais-60x20.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "senha digitada mascarada",
+      "ok": true,
+      "seen": "campo Senha mostra só •",
+      "evidence": "docs/evidence/visual/F03-senha-mascarada-60x20.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "feedback de sucesso e novo item na lista",
+      "ok": true,
+      "seen": "status ‘Proxy criado na porta 59478 com IPv6 …’; linha 59478 ● ativo",
+      "evidence": "docs/evidence/visual/F03-criado-60x20.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "protocolo escolhido no formulário",
+      "ok": true,
+      "seen": "porta 59479 criada como socks5"
+    }
+  ],
+  "F05": [
+    {
+      "viewport": "80x24",
+      "criterion": "conflito de porta mostra erro sem alterar nada",
+      "ok": true,
+      "seen": "porta 43858→43857: ‘Conflito: porta já em uso…’; nada mudou",
+      "evidence": "docs/evidence/visual/F05-conflito-80x24.png"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "altera credenciais/protocolo/porta",
+      "ok": true,
+      "seen": "43858 SOCKS5 → 43859 HTTP usuário bob",
+      "evidence": "docs/evidence/visual/F05-editado-80x24.png"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "demais proxies inalterados",
+      "ok": true,
+      "seen": "supervisor tocou só [43858, 43859]; 43857 idêntico",
+      "evidence": "docs/evidence/visual/F05-formulario-80x24.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "conflito de porta mostra erro sem alterar nada",
+      "ok": true,
+      "seen": "porta 56244→56243: ‘Conflito: porta já em uso…’; nada mudou",
+      "evidence": "docs/evidence/visual/F05-conflito-120x40.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "altera credenciais/protocolo/porta",
+      "ok": true,
+      "seen": "56244 SOCKS5 → 56245 HTTP usuário bob",
+      "evidence": "docs/evidence/visual/F05-editado-120x40.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "demais proxies inalterados",
+      "ok": true,
+      "seen": "supervisor tocou só [56244, 56245]; 56243 idêntico",
+      "evidence": "docs/evidence/visual/F05-formulario-120x40.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "conflito de porta mostra erro sem alterar nada",
+      "ok": true,
+      "seen": "porta 59479→59478: ‘Conflito: porta já em uso…’; nada mudou",
+      "evidence": "docs/evidence/visual/F05-conflito-60x20.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "altera credenciais/protocolo/porta",
+      "ok": true,
+      "seen": "59479 SOCKS5 → 59480 HTTP usuário bob",
+      "evidence": "docs/evidence/visual/F05-editado-60x20.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "demais proxies inalterados",
+      "ok": true,
+      "seen": "supervisor tocou só [59479, 59480]; 59478 idêntico",
+      "evidence": "docs/evidence/visual/F05-formulario-60x20.png"
+    }
+  ],
+  "F06": [
+    {
+      "viewport": "80x24",
+      "criterion": "rotação mostra novo IPv6 só do alvo",
+      "ok": true,
+      "seen": "porta 43859: ::ffff:127.0.0.125 → ::ffff:127.0.0.200; outras iguais",
+      "evidence": "docs/evidence/visual/F06-rotacionado-80x24.png"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "exclusão exige confirmar o alvo (porta)",
+      "ok": true,
+      "seen": "porta errada → ‘Digite exatamente …; nada foi alterado.’",
+      "evidence": "docs/evidence/visual/F06-exclusao-errada-80x24.png"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "cancelar não altera nada",
+      "ok": true,
+      "seen": "Esc em excluir e em rotacionar; registros idênticos"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "navegar/cancelar durante requisição não opera outro proxy",
+      "ok": true,
+      "seen": "rotação de 43857 retida; ↓ + d/r/e/Esc/a → ‘Aguarde…’; supervisor tocou só [43857]; [43859, 43860] intactos [busy=True busy_delete=True dialog=False rotated=True]",
+      "evidence": "docs/evidence/visual/F06-corrida-em-andamento-80x24.png"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "exclusão confirmada remove só o alvo",
+      "ok": true,
+      "seen": "porta 43860 removida; demais intactas",
+      "evidence": "docs/evidence/visual/F06-excluido-80x24.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "rotação mostra novo IPv6 só do alvo",
+      "ok": true,
+      "seen": "porta 56245: ::ffff:127.0.0.159 → ::ffff:127.0.0.153; outras iguais",
+      "evidence": "docs/evidence/visual/F06-rotacionado-120x40.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "exclusão exige confirmar o alvo (porta)",
+      "ok": true,
+      "seen": "porta errada → ‘Digite exatamente …; nada foi alterado.’",
+      "evidence": "docs/evidence/visual/F06-exclusao-errada-120x40.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "cancelar não altera nada",
+      "ok": true,
+      "seen": "Esc em excluir e em rotacionar; registros idênticos"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "navegar/cancelar durante requisição não opera outro proxy",
+      "ok": true,
+      "seen": "rotação de 56243 retida; ↓ + d/r/e/Esc/a → ‘Aguarde…’; supervisor tocou só [56243]; [56245, 56246] intactos [busy=True busy_delete=True dialog=False rotated=True]",
+      "evidence": "docs/evidence/visual/F06-corrida-em-andamento-120x40.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "exclusão confirmada remove só o alvo",
+      "ok": true,
+      "seen": "porta 56246 removida; demais intactas",
+      "evidence": "docs/evidence/visual/F06-excluido-120x40.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "rotação mostra novo IPv6 só do alvo",
+      "ok": true,
+      "seen": "porta 59480: ::ffff:127.0.0.3 → ::ffff:127.0.0.6; outras iguais",
+      "evidence": "docs/evidence/visual/F06-rotacionado-60x20.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "exclusão exige confirmar o alvo (porta)",
+      "ok": true,
+      "seen": "porta errada → ‘Digite exatamente …; nada foi alterado.’",
+      "evidence": "docs/evidence/visual/F06-exclusao-errada-60x20.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "cancelar não altera nada",
+      "ok": true,
+      "seen": "Esc em excluir e em rotacionar; registros idênticos"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "navegar/cancelar durante requisição não opera outro proxy",
+      "ok": true,
+      "seen": "rotação de 59478 retida; ↓ + d/r/e/Esc/a → ‘Aguarde…’; supervisor tocou só [59478]; [59480, 59481] intactos [busy=True busy_delete=True dialog=False rotated=True]",
+      "evidence": "docs/evidence/visual/F06-corrida-em-andamento-60x20.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "exclusão confirmada remove só o alvo",
+      "ok": true,
+      "seen": "porta 59481 removida; demais intactas",
+      "evidence": "docs/evidence/visual/F06-excluido-60x20.png"
+    }
+  ],
+  "F04": [
+    {
+      "viewport": "80x24",
+      "criterion": "validação antes de aplicar",
+      "ok": true,
+      "seen": "quantidade 0 → ‘Quantidade deve ser um número entre 1 e 1000’",
+      "evidence": "docs/evidence/visual/F04-validacao-80x24.png"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "quantidade, porta inicial, protocolo e modo de credenciais",
+      "ok": true,
+      "seen": "API: {43867: ('lote', 'http'), 43869: ('lote', 'http')}; 3 a partir de 43867, HTTP, comum lote/•••, parcial",
+      "evidence": "docs/evidence/visual/F04-formulario-80x24.png"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "resultado mostra criados e falhas",
+      "ok": true,
+      "seen": "‘Criados: 2 … Falhas: 1 — 43868’ (porta 43868 ocupada por socket externo)",
+      "evidence": "docs/evidence/visual/F04-resultado-80x24.png"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "modo aleatório cria com usuários distintos",
+      "ok": true,
+      "seen": "2 criados; aviso ‘Senhas aleatórias ficam só nesta sessão: exporte com x’",
+      "evidence": "docs/evidence/visual/F04-aleatorio-80x24.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "validação antes de aplicar",
+      "ok": true,
+      "seen": "quantidade 0 → ‘Quantidade deve ser um número entre 1 e 1000’",
+      "evidence": "docs/evidence/visual/F04-validacao-120x40.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "quantidade, porta inicial, protocolo e modo de credenciais",
+      "ok": true,
+      "seen": "API: {56253: ('lote', 'http'), 56255: ('lote', 'http')}; 3 a partir de 56253, HTTP, comum lote/•••, parcial",
+      "evidence": "docs/evidence/visual/F04-formulario-120x40.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "resultado mostra criados e falhas",
+      "ok": true,
+      "seen": "‘Criados: 2 … Falhas: 1 — 56254’ (porta 56254 ocupada por socket externo)",
+      "evidence": "docs/evidence/visual/F04-resultado-120x40.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "modo aleatório cria com usuários distintos",
+      "ok": true,
+      "seen": "2 criados; aviso ‘Senhas aleatórias ficam só nesta sessão: exporte com x’",
+      "evidence": "docs/evidence/visual/F04-aleatorio-120x40.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "validação antes de aplicar",
+      "ok": true,
+      "seen": "quantidade 0 → ‘Quantidade deve ser um número entre 1 e 1000’",
+      "evidence": "docs/evidence/visual/F04-validacao-60x20.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "quantidade, porta inicial, protocolo e modo de credenciais",
+      "ok": true,
+      "seen": "API: {59488: ('lote', 'http'), 59490: ('lote', 'http')}; 3 a partir de 59488, HTTP, comum lote/•••, parcial",
+      "evidence": "docs/evidence/visual/F04-formulario-60x20.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "resultado mostra criados e falhas",
+      "ok": true,
+      "seen": "‘Criados: 2 … Falhas: 1 — 59489’ (porta 59489 ocupada por socket externo)",
+      "evidence": "docs/evidence/visual/F04-resultado-60x20.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "modo aleatório cria com usuários distintos",
+      "ok": true,
+      "seen": "2 criados; aviso ‘Senhas aleatórias ficam só nesta sessão: exporte com x’",
+      "evidence": "docs/evidence/visual/F04-aleatorio-60x20.png"
+    }
+  ],
+  "F07": [
+    {
+      "viewport": "80x24",
+      "criterion": "senhas mascaradas por padrão",
+      "ok": true,
+      "seen": "coluna Senha ‘••••’ / ‘n/d’",
+      "evidence": "docs/evidence/visual/F07-mascarado-80x24.png"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "revelar só por ação explícita (s), só o selecionado",
+      "ok": true,
+      "seen": "após s: senha da porta 43867 visível (1 ocorrência)",
+      "evidence": "docs/evidence/visual/F07-revelado-80x24.png"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "s de novo oculta",
+      "ok": true,
+      "seen": "senha oculta"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "exporta IPv4:porta:usuario:senha em arquivo 0600 com caminho",
+      "ok": true,
+      "seen": "6 linhas, modo 0o600, caminho no status; ex.: ['127.0.0.1:43857:alice:S3cretPw']",
+      "evidence": "docs/evidence/visual/F07-exportado-80x24.png"
+    },
+    {
+      "viewport": "80x24",
+      "criterion": "diálogo informa omitidos (senha desconhecida)",
+      "ok": true,
+      "seen": "aviso ‘N omitido(s): senha desconhecida’",
+      "evidence": "docs/evidence/visual/F07-dialogo-80x24.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "senhas mascaradas por padrão",
+      "ok": true,
+      "seen": "coluna Senha ‘••••’ / ‘n/d’",
+      "evidence": "docs/evidence/visual/F07-mascarado-120x40.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "revelar só por ação explícita (s), só o selecionado",
+      "ok": true,
+      "seen": "após s: senha da porta 56253 visível (1 ocorrência)",
+      "evidence": "docs/evidence/visual/F07-revelado-120x40.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "s de novo oculta",
+      "ok": true,
+      "seen": "senha oculta"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "exporta IPv4:porta:usuario:senha em arquivo 0600 com caminho",
+      "ok": true,
+      "seen": "6 linhas, modo 0o600, caminho no status; ex.: ['127.0.0.1:56243:alice:S3cretPw']",
+      "evidence": "docs/evidence/visual/F07-exportado-120x40.png"
+    },
+    {
+      "viewport": "120x40",
+      "criterion": "diálogo informa omitidos (senha desconhecida)",
+      "ok": true,
+      "seen": "aviso ‘N omitido(s): senha desconhecida’",
+      "evidence": "docs/evidence/visual/F07-dialogo-120x40.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "senhas mascaradas por padrão",
+      "ok": true,
+      "seen": "coluna Senha ‘••••’ / ‘n/d’",
+      "evidence": "docs/evidence/visual/F07-mascarado-60x20.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "revelar só por ação explícita (s), só o selecionado",
+      "ok": true,
+      "seen": "após s: senha da porta 59488 visível (1 ocorrência)",
+      "evidence": "docs/evidence/visual/F07-revelado-60x20.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "s de novo oculta",
+      "ok": true,
+      "seen": "senha oculta"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "exporta IPv4:porta:usuario:senha em arquivo 0600 com caminho",
+      "ok": true,
+      "seen": "6 linhas, modo 0o600, caminho no status; ex.: ['127.0.0.1:59478:alice:S3cretPw']",
+      "evidence": "docs/evidence/visual/F07-exportado-60x20.png"
+    },
+    {
+      "viewport": "60x20",
+      "criterion": "diálogo informa omitidos (senha desconhecida)",
+      "ok": true,
+      "seen": "aviso ‘N omitido(s): senha desconhecida’",
+      "evidence": "docs/evidence/visual/F07-dialogo-60x20.png"
+    }
+  ]
+}

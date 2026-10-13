@@ -1,0 +1,40 @@
+ Porta  Status   Proto  Usuário  Senha  IPv6                                                                            
+ 56243  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.160                                                              
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+ ✓ Proxy criado na porta 56243 com IPv6 ::ffff:127.0.0.160.                                                             
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                                                                  
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                                                        

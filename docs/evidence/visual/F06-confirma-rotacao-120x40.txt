@@ -1,0 +1,40 @@
+ Porta  Status   Proto  Usuário  Senha  IPv6                                                                            
+ 56243  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.160                                                              
+ 56245  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.159                                                              
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                            ╭──────────────────────────────────────────────────────────────╮                            
+                            │ Rotacionar o IPv6 da porta 56245?                            │                            
+                            │ Só o 3proxy desta porta reinicia; as sessões dela caem.      │                            
+                            │                                                              │                            
+                            │    Confirmar         Cancelar                                │                            
+                            ╰──────────────────────────────────────────────────────────────╯                            
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+ ✓ Proxy 56244 atualizado: porta 56245, HTTP.                                                                           
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                                                                  
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                                                        

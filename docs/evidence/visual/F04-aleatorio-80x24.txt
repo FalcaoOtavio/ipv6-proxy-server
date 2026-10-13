@@ -1,0 +1,24 @@
+ Porta  Status   Proto  Usuário  Senha  IPv6                                    
+ 43857  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.33                       
+ 43859  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.200                      
+ 43867  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.153                      
+ 43869  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.49                       
+ 43871  ● ativo  HTTP   u43871   ••••   ::ffff:127.0.0.34                       
+ 43872  ● ativo  HTTP   u43872   ••••   ::ffff:127.0.0.136                      
+                                                                                
+        ╭──────────────────────────────────────────────────────────────╮        
+        │ Resultado do lote                                            │        
+        │ Criados: 2 (portas 43871–43872)                              │        
+        │ Senhas aleatórias ficam só nesta sessão: exporte com x antes │        
+        │ de sair.                                                     │        
+        │   Fechar (Esc)                                               │        
+        ╰──────────────────────────────────────────────────────────────╯        
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+ ✓ Lote concluído: 2 criado(s), 0 falha(s).                                     
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                          
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                

@@ -1,0 +1,20 @@
+ Porta  Status   Proto  Usuário  Senha  IPv6                
+ 59478  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.163  
+ 59480  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.6    
+                                                            
+                                                            
+                                                            
+╭──────────────────────────────────────────────────────────╮
+│ Excluir o proxy da porta 59478?                          │
+│ Só o 3proxy desta porta reinicia; as sessões dela caem.  │
+│ Digite 59478 para confirmar                              │
+│ 1234                                                     │
+│ ✕ Digite exatamente 59478; nada foi alterado.            │
+│    Confirmar         Cancelar                            │
+╰──────────────────────────────────────────────────────────╯
+                                                            
+                                                            
+ ✓ Porta 59480: novo IPv6 ::ffff:127.0.0.6 (era             
+ ::ffff:127.0.0.3).                                         
+ l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
+ ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            
