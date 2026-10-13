@@ -613,3 +613,33 @@ async def test_f01_data_is_never_parsed_as_markup_or_emoji():
         assert "falhou [bold]x[/bold] :1234: [@click=app.quit]y[/]" in status(app)
         assert "falhou [bold]x[/bold] :1234:" in visible(app)
         assert app.is_running
+
+def contrast(fg, bg):
+    """WCAG 2 contrast ratio of two textual Colors."""
+    def luminance(color):
+        channels = [c / 255 for c in color.rgb]
+        r, g, b = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    light, dark = sorted((luminance(fg), luminance(bg)), reverse=True)
+    return (light + 0.05) / (dark + 0.05)
+
+@pytest.mark.asyncio
+async def test_visual_contrast_inline_error_inputs_and_status(api):
+    """T41 (V-01/V-02/V-06): inline error AA, empty compact input visible, status in theme colors."""
+    from rich.style import Style
+    api.client.create({"port": 30001})
+    app = tui(api)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await settle(pilot, app, lambda: rows(app))
+        cell = app.query_one(DataTable).get_cell_at((0, 1))
+        assert Style.parse(str(cell.style)).color.triplet.hex.upper() == app.get_css_variables()["text-success"]
+        await pilot.press("c")
+        await pilot.pause()
+        await fill(pilot, app, port="80")
+        await click_ok(pilot, app)
+        await pilot.pause()
+        surface = app.screen.query_one("VerticalScroll").styles.background  # error line is transparent
+        assert contrast(app.screen.query_one("#error", Static).styles.color, surface) >= 4.5
+        username = app.screen.query_one("#username", Input)
+        assert username.value == "" and not username.has_focus
+        assert username.styles.background != surface

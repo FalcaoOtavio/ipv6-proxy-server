@@ -57,7 +57,7 @@ class Dialog(ModalScreen):
         border: round $primary; background: $surface; padding: 0 1;
     }
     Dialog .title { text-style: bold; }
-    Dialog .error { color: $error; text-style: bold; }
+    Dialog .error { color: $text-error; text-style: bold; }
     Dialog Input, Dialog Select { margin-bottom: 0; }
     Dialog Horizontal { height: auto; }
     Dialog Button { margin-right: 1; }

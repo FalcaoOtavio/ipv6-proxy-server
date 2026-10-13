@@ -1,5 +1,5 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                                    
- 48373  ● ativo  HTTP   —        —      2001:db8:abcd:1234:7eea:58de:b57c:d840  
+ 54296  ● ativo  HTTP   —        —      2001:db8:abcd:1234:c3cf:1027:f8fa:c132  
                                                                                 
                                                                                 
                                                                                 

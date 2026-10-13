@@ -1,6 +1,6 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                                                                            
- 56243  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.160                                                              
- 56245  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.153                                                              
+ 47577  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.189                                                              
+ 47579  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.165                                                              
                                                                                                                         
                                                                                                                         
                                                                                                                         
@@ -15,11 +15,11 @@
                                                                                                                         
                                                                                                                         
                             ╭──────────────────────────────────────────────────────────────╮                            
-                            │ Excluir o proxy da porta 56243?                              │                            
+                            │ Excluir o proxy da porta 47577?                              │                            
                             │ Só o 3proxy desta porta reinicia; as sessões dela caem.      │                            
-                            │ Digite 56243 para confirmar                                  │                            
+                            │ Digite 47577 para confirmar                                  │                            
                             │ 1234                                                         │                            
-                            │ ✕ Digite exatamente 56243; nada foi alterado.                │                            
+                            │ ✕ Digite exatamente 47577; nada foi alterado.                │                            
                             │    Confirmar         Cancelar                                │                            
                             ╰──────────────────────────────────────────────────────────────╯                            
                                                                                                                         
@@ -35,6 +35,6 @@
                                                                                                                         
                                                                                                                         
                                                                                                                         
- ✓ Porta 56245: novo IPv6 ::ffff:127.0.0.153 (era ::ffff:127.0.0.159).                                                  
+ ✓ Porta 47579: novo IPv6 ::ffff:127.0.0.165 (era ::ffff:127.0.0.234).                                                  
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                                                                  
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                                                        

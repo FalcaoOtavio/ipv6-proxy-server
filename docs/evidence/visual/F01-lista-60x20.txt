@@ -1,6 +1,6 @@
  Porta  Status   Proto   Usuário  Senha  IPv6               
- 59478  ● ativo  HTTP    alice    ••••   ::ffff:127.0.0.163 
- 59479  ● ativo  SOCKS5  —        —      ::ffff:127.0.0.3   
+ 51945  ● ativo  HTTP    alice    ••••   ::ffff:127.0.0.78  
+ 51946  ● ativo  SOCKS5  —        —      ::ffff:127.0.0.155 
                                                             
                                                             
                                                             
@@ -15,6 +15,6 @@
                                                             
                                                             
                                                             
- ✓ Proxy criado na porta 59479 com IPv6 ::ffff:127.0.0.3.   
+ ✓ Proxy criado na porta 51946 com IPv6 ::ffff:127.0.0.155. 
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            

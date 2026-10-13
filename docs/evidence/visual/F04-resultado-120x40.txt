@@ -1,8 +1,8 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                                                                            
- 56243  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.49                                                               
- 56245  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.153                                                              
- 56253  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.244                                                              
- 56255  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.66                                                               
+ 47577  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.150                                                              
+ 47579  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.165                                                              
+ 47587  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.202                                                              
+ 47589  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.62                                                               
                                                                                                                         
                                                                                                                         
                                                                                                                         
@@ -16,8 +16,8 @@
                                                                                                                         
                             ╭──────────────────────────────────────────────────────────────╮                            
                             │ Resultado do lote                                            │                            
-                            │ Criados: 2 (portas 56253–56255)                              │                            
-                            │ Falhas: 1 — 56254                                            │                            
+                            │ Criados: 2 (portas 47587–47589)                              │                            
+                            │ Falhas: 1 — 47588                                            │                            
                             │ Veja: sudo journalctl -u ipv6-proxy@<porta>                  │                            
                             │   Fechar (Esc)                                               │                            
                             ╰──────────────────────────────────────────────────────────────╯                            

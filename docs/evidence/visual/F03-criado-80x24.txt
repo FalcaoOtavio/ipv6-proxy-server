@@ -1,5 +1,5 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                                    
- 43857  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.224                      
+ 45246  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.23                       
                                                                                 
                                                                                 
                                                                                 
@@ -19,6 +19,6 @@
                                                                                 
                                                                                 
                                                                                 
- ✓ Proxy criado na porta 43857 com IPv6 ::ffff:127.0.0.224.                     
+ ✓ Proxy criado na porta 45246 com IPv6 ::ffff:127.0.0.23.                      
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar                          
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair                                

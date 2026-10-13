@@ -1,7 +1,7 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                
- 59478  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.163  
- 59480  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.6    
- 59481  ● ativo  HTTP   —        —      ::ffff:127.0.0.238  
+ 51945  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.78   
+ 51947  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.180  
+ 51948  ● ativo  HTTP   —        —      ::ffff:127.0.0.87   
                                                             
                                                             
                                                             
@@ -14,7 +14,7 @@
                                                             
                                                             
                                                             
- ✕ Aguarde: Rotacionando porta 59478 em andamento; a lista  
+ ✕ Aguarde: Rotacionando porta 51945 em andamento; a lista  
  recarrega ao final.                                        
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            

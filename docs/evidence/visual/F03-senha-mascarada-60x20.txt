@@ -4,7 +4,7 @@
 ╭──────────────────────────────────────────────────────────╮
 │ Criar proxy                                              │
 │ Porta (vazio = primeira livre)                           │
-│ 59478                                                    │
+│ 51945                                                    │
 │ Protocolo                                                │
 │ HTTP                                                  ▼  │
 │ Usuário (vazio = sem autenticação)                       │

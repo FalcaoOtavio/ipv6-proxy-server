@@ -1,11 +1,11 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                                    
- 43857  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.33                       
- 43859  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.200                      
- 43867  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.153                      
- 43869  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.49                       
- 43871  ● ativo  HTTP   u43871   ••••   ::ffff:127.0.0.34                       
- 43872  ● ativo  HTTP   u43872   ••••   ::ffff:127.0.0.136                      
- 43877  ● ativo  HTTP   outro    n/d    ::ffff:127.0.0.50                       
+ 45246  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.96                       
+ 45248  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.69                       
+ 45256  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.151                      
+ 45258  ● ativo  HTTP   lote     ••••   ::ffff:127.0.0.79                       
+ 45260  ● ativo  HTTP   u45260   ••••   ::ffff:127.0.0.2                        
+ 45261  ● ativo  HTTP   u45261   ••••   ::ffff:127.0.0.203                      
+ 45266  ● ativo  HTTP   outro    n/d    ::ffff:127.0.0.185                      
                                                                                 
                                                                                 
                                                                                 

@@ -1,12 +1,12 @@
  Porta  Status   Proto  Usuário  Senha  IPv6                
- 59478  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.163  
- 59480  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.3    
+ 51945  ● ativo  HTTP   alice    ••••   ::ffff:127.0.0.78   
+ 51947  ● ativo  HTTP   bob      ••••   ::ffff:127.0.0.155  
                                                             
                                                             
                                                             
                                                             
 ╭──────────────────────────────────────────────────────────╮
-│ Rotacionar o IPv6 da porta 59480?                        │
+│ Rotacionar o IPv6 da porta 51947?                        │
 │ Só o 3proxy desta porta reinicia; as sessões dela caem.  │
 │                                                          │
 │    Confirmar         Cancelar                            │
@@ -15,6 +15,6 @@
                                                             
                                                             
                                                             
- ✓ Proxy 59479 atualizado: porta 59480, HTTP.               
+ ✓ Proxy 51946 atualizado: porta 51947, HTTP.               
  l Lote  e Editar  r Rotacionar  d Excluir  x Exportar      
  ? Ajuda  c Criar  a Recarregar  s Senha  q Sair            
