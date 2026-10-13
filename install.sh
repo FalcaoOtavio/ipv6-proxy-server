@@ -311,7 +311,7 @@ confirm_proxy_restarts() {
         say "ATENCAO: nao foi possivel pre-calcular a configuracao gerada; a API pode reiniciar ate $total proxies."
     else
         count=$(wc -w <<<"$ports")
-        say "ATENCAO: esta revisao muda a configuracao gerada de $count proxies (portas: $ports)."
+        say "ATENCAO: esta atualizacao (revisao e/ou $env_file) muda a configuracao gerada de $count proxies (portas: $ports)."
         say "$count proxies serao reiniciados uma vez (um por vez), cada um com interrupcao de alguns segundos."
         say 'Os demais continuam sem interrupcao. Se algum falhar, a versao anterior e restaurada e'
         say 'somente os proxies ja reiniciados voltam a configuracao anterior (tambem um por vez).'
@@ -417,7 +417,8 @@ block = env.get("PROXY_BLOCK_PRIVATE_DESTINATIONS", "true").strip().lower() not 
 settings = SimpleNamespace(bind_ipv4=IPv4Address(env["PROXY_BIND_IPV4"]),
                            subnet=IPv6Network(env["PROXY_IPV6_SUBNET"]), block_private_destinations=block)
 changed = []
-for item in json.loads((state / "state.json").read_text())["proxies"]:
+# No state.json yet (no proxy ever created): nothing rendered, nothing to compare.
+for item in json.loads((state / "state.json").read_text())["proxies"] if (state / "state.json").exists() else []:
     record = SimpleNamespace(**{"username": None, "password": None, **item})
     record.ipv6 = IPv6Address(item["ipv6"])
     path = state / "proxies" / f"{int(item['port'])}.cfg"
@@ -425,6 +426,34 @@ for item in json.loads((state / "state.json").read_text())["proxies"]:
         changed.append(str(record.port))
 print(" ".join(changed))
 PY
+}
+
+verify_configs_applied() {
+    # After the API restart: every proxies/<port>.cfg is what this release renders from
+    # the env, the private-destination rules match PROXY_BLOCK_PRIVATE_DESTINATIONS, and
+    # every proxy whose config changed ($1) got a new MainPID (before/after snapshots $2 $3).
+    local ports=$1 left port file pid_before pid_after
+    left=$(config_changes)
+    [[ $left != '?' ]] || fail_tx "nao foi possivel verificar proxies/*.cfg contra $env_file apos reiniciar a API (python3 do sistema); nada foi confirmado"
+    [[ -z $left ]] || fail_tx "configuracao dos proxies nao corresponde a $env_file apos reiniciar a API (portas: $left); veja journalctl -u ipv6-proxy-api -n 100"
+    for port in $(state_ports); do
+        file=$state_dir/proxies/$port.cfg
+        [[ -f $file ]] || continue  # never rendered: fenced proxy, reported by the API
+        if block_private_enabled; then
+            { grep -qx 'deny \* \* \* \* UDPASSOC' "$file" && grep -q '^deny \* \* [^*]' "$file"; } \
+                || fail_tx "$file sem as regras deny (PROXY_BLOCK_PRIVATE_DESTINATIONS ligado); o bloqueio NAO esta ativo nessa porta"
+        elif grep -q '^deny ' "$file"; then
+            fail_tx "$file ainda tem regras deny com PROXY_BLOCK_PRIVATE_DESTINATIONS desligado"
+        fi
+    done
+    [[ $ports != '?' ]] || return 0
+    for port in $ports; do
+        pid_before=$(awk -v p="$port" '$1 == p { print $2 }' "$2")
+        pid_after=$(awk -v p="$port" '$1 == p { print $2 }' "$3")
+        if [[ -n $pid_before && $pid_before != 0 && $pid_before == "$pid_after" ]]; then
+            fail_tx "ipv6-proxy@$port.service nao foi reiniciado (MainPID $pid_before) apos mudar a configuracao; ele ainda roda a configuracao anterior"
+        fi
+    done
 }
 
 anything_changes() {
@@ -869,7 +898,17 @@ update_install() {
     plan_changes
     migrating=false
     [[ $version == independent ]] || migrating=true
-    if [[ $migrating == false ]] && ! anything_changes; then
+    # Rendered with the env as it is now: an env edit (e.g. PROXY_BLOCK_PRIVATE_DESTINATIONS)
+    # on the same revision changes proxy configs too, and only an API restart applies it.
+    config_ports=''
+    if [[ $migrating == false ]]; then
+        config_ports=$(config_changes)
+        if [[ $config_ports == '?' && $app_changed == false ]]; then
+            say "Aviso: nao foi possivel comparar a configuracao gerada dos proxies com $env_file; nenhum proxy sera reiniciado." >&2
+            config_ports=''
+        fi
+    fi
+    if [[ $migrating == false && -z $config_ports ]] && ! anything_changes; then
         write_curl_config
         say "Nada a atualizar: revisao $source_sha ja instalada; nenhum servico foi tocado."
         if [[ $self_test == true ]]; then
@@ -881,7 +920,7 @@ update_install() {
     [[ $mode == update ]] || die "Instalacao existente com mudancas pendentes; para aplicar use --update. Instalacao preservada."
     if [[ $migrating == true ]]; then
         confirm_migration "$(state_ports | wc -l)" "$version"
-    elif [[ $app_changed == true ]]; then
+    elif [[ $app_changed == true || -n $config_ports ]]; then
         confirm_proxy_restarts "$(config_changes)" "$(state_ports | wc -l)"
     fi
     backup_installation
@@ -896,7 +935,7 @@ update_install() {
         systemctl start ipv6-proxy-api.service
         healthcheck || fail_tx 'healthcheck apos migracao'
         rm -f -- "$state_dir/3proxy.cfg"
-    elif [[ $app_changed == true || $api_unit_changed == true ]]; then
+    elif [[ $app_changed == true || $api_unit_changed == true || -n $config_ports ]]; then
         # A proxy already down before the update is not this update's failure.
         local active_before
         active_before=$(systemctl list-units --plain --no-legend --type=service --state=active 'ipv6-proxy@*.service' \
@@ -909,10 +948,13 @@ update_install() {
         instance_snapshot "$active_before" >"$work_dir/instances.after"
         moved=$(restarted_unchanged "$work_dir/instances.before" "$work_dir/instances.after" | tr '\n' ' ')
         [[ -z $moved ]] || fail_tx "proxies sem mudanca de config reiniciados durante a atualizacao: $moved"
+        verify_configs_applied "$config_ports" "$work_dir/instances.before" "$work_dir/instances.after"
     else
         wait_api || fail_tx 'API nao responde'
     fi
-    if [[ ($template_changed == true || $dropin_changed == true) && $migrating == false ]]; then
+    if [[ -n $config_ports ]]; then
+        say "Configuracao aplicada e verificada: $(wc -w <<<"$config_ports") proxies reiniciados um por vez (portas: $config_ports); os demais seguem com o mesmo processo."
+    elif [[ ($template_changed == true || $dropin_changed == true) && $migrating == false ]]; then
         say 'Nota: ipv6-proxy@.service (ou o drop-in 50-block-private.conf) mudou; cada proxy adota a nova unidade no proximo reinicio dele (editar/rotacionar/reboot). Nenhum proxy foi reiniciado.'
     fi
     end_tx

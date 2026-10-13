@@ -172,10 +172,21 @@ sem HTTPS e controle de acesso. Contrato completo em [API.md](API.md).
   ambiente do instalador (padrao `true`), ex.: laboratorio em loopback/ULA:
   `sudo PROXY_BLOCK_PRIVATE_DESTINATIONS=false bash install.sh ...` (CI e
   `tests/e2e/vm_e2e.sh` fazem isso, rotulado). Depois disso a fonte e o env.
-- Mudou a variavel no env? Rode `sudo bash install.sh --update`: o drop-in e
-  criado/removido (com backup e rollback), so `systemctl daemon-reload`, nenhum
-  proxy e reiniciado; cada `ipv6-proxy@<porta>` adota o drop-in na proxima
-  partida (editar/rotacionar/reboot ou `systemctl restart ipv6-proxy@<porta>`).
+- Mudou a variavel no env? Rode `sudo bash install.sh --update` (mesmo na
+  revisao ja instalada). O instalador compara cada `proxies/<porta>.cfg` com o
+  que o env **novo** gera, anuncia "N proxies serao reiniciados uma vez (um por
+  vez)" e exige `REINICIAR` ou `--yes` (sem isso nada e alterado). Depois:
+  backup, drop-in criado/removido, `daemon-reload`, reinicio so da API, que
+  reaplica a config de cada proxy afetado um a um (nunca em conjunto). Ao final
+  verifica que todo `.cfg` tem `deny * * * * UDPASSOC` e o `deny` de destinos
+  privados (ligado) ou nenhum `deny` (desligado), e que o MainPID mudou em cada
+  proxy afetado e so neles; senao falha com o motivo e faz rollback (nunca
+  imprime "Atualizacao concluida" com a protecao sem efeito).
+- Mudou o env e reiniciou so a API (`systemctl restart ipv6-proxy-api`)? Seguro
+  tambem: na partida a API reinicia, um por vez, cada proxy cuja config gerada
+  diverge e registra no journal `Reconciled N proxies: A adopted unchanged, R
+  (re)started one at a time (ports ...)`. O drop-in, porem, so e
+  criado/removido pelo `--update`.
 
 ## Limitacoes
 
