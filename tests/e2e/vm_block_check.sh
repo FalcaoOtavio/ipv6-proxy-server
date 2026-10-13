@@ -29,17 +29,18 @@ deny=$(systemctl show -p IPAddressDeny --value "ipv6-proxy@$PORT")
 pid_after=$(systemctl show -p MainPID --value "ipv6-proxy@$PORT")
 printf 'INFO\tMainPID ipv6-proxy@%s antes=%s depois=%s (mudanca de ACL reinicia so os afetados)\n' "$PORT" "$pid_before" "$pid_after"
 
-# Kernel layer: run a probe inside the instance's own cgroup (bypasses 3proxy entirely).
-cg=/sys/fs/cgroup$(systemctl show -p ControlGroup --value "ipv6-proxy@$PORT")
+# Kernel layer: a probe joins the instance's own cgroup (bypasses 3proxy entirely). IPAddressDeny
+# drops the packets, so a denied connect() times out (or gets EPERM); a control probe outside connects.
 probe='import socket,sys
-def try_(fam,addr):
-    s=socket.socket(fam,socket.SOCK_STREAM); s.settimeout(5)
-    try: s.connect(addr); return "connected"
-    except OSError as e: return type(e).__name__+":"+str(e.errno)
-    finally: s.close()
-print(try_(socket.AF_INET6,("::1",22)), try_(socket.AF_INET,("127.0.0.1",22)))'
-read -r v6 v4 < <(bash -c "echo \$\$ >'$cg/cgroup.procs' && exec python3 -c '$probe'")
-[[ $v6 == PermissionError* ]] && res PASS "kernel recusa [::1] no cgroup da unidade ($v6)" || res FAIL "kernel nao recusou [::1] no cgroup ($v6)"
+fam,host=(socket.AF_INET6,"::1") if sys.argv[1]=="6" else (socket.AF_INET,"127.0.0.1")
+s=socket.socket(fam,socket.SOCK_STREAM); s.settimeout(8)
+try: s.connect((host,22)); print("connected")
+except OSError as e: print(type(e).__name__)'
+CG=/sys/fs/cgroup$(systemctl show -p ControlGroup --value "ipv6-proxy@$PORT")
+in_unit() { CG=$CG PROBE=$probe bash -c 'echo $$ >"$CG/cgroup.procs" && exec python3 -c "$PROBE" "$1"' _ "$1"; }
+control=$(python3 -c "$probe" 6) v6=$(in_unit 6) v4=$(in_unit 4)
+[[ $control == connected ]] && res PASS "controle fora da unidade alcanca [::1]:22" || res FAIL "controle fora da unidade: $control (sshd em [::1]:22?)"
+[[ $v6 != connected ]] && res PASS "kernel bloqueia [::1] no cgroup de ipv6-proxy@$PORT ($v6)" || res FAIL "kernel nao bloqueou [::1] no cgroup ($v6)"
 [[ $v4 == connected ]] && res PASS "IPv4 127.0.0.1 alcancavel no mesmo cgroup ($v4)" || res FAIL "IPv4 no cgroup: $v4"
 
 # 3proxy layer, seen by a client over IPv4.
