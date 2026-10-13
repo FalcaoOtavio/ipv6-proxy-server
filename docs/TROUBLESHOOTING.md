@@ -181,6 +181,18 @@ de 2 min para subir.
   que ainda assim ficou `fenced`: [recupere](#porta-fenced) com
   `POST /proxies/<porta>/recover`.
 
+## Instalador: lock do apt ocupado
+
+Sintoma: `Aguardando apt de outro processo (PID X)...` e depois
+`Erro: apt de outro processo (PID X) ainda segura /var/lib/apt/lists/lock apos N s`
+(ou, antes da correção, `E: Could not get lock /var/lib/apt/lists/lock`, rc=100).
+Comum logo após o 1º boot: apt-daily/unattended-upgrades está rodando.
+
+- Veja o processo: `ps -o pid,etime,cmd -p X`. O instalador nunca o encerra.
+- Espere terminar (`systemctl status apt-daily.service unattended-upgrades.service`)
+  e execute o mesmo comando de novo; nada foi instalado.
+- Ou aumente a espera: `sudo bash install.sh --apt-lock-timeout 1800 ...` (0..7200 s).
+
 ## Ainda não validado
 
 Comportamento com systemd real em Linux limpo, após reboot real e com IPv6

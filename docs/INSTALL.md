@@ -33,7 +33,11 @@ O instalador:
 2. recusa 3proxy de outro gerenciador (lista os PIDs, nao encerra nenhum) e
    instalacao legada por cron (`proxy-startup.sh`, `/root/proxyserver`);
 3. instala dependencias via apt e compila o 3proxy 0.9.4 fixado
-   (SHA `346880eb2e73836385e5f7648f738efcece580ac`) em `/usr/local/bin/3proxy`;
+   (SHA `346880eb2e73836385e5f7648f738efcece580ac`) em `/usr/local/bin/3proxy`.
+   Se outro apt (ex.: apt-daily/unattended-upgrades no 1o boot de uma VPS) segura
+   o lock, espera ate `--apt-lock-timeout` (padrao 600 s, 0..7200) mostrando
+   "Aguardando apt de outro processo (PID X)..." sem encerrar o processo; esgotado
+   o prazo, falha antes de instalar qualquer coisa (reexecute depois);
 4. instala a API e o venv em `/opt/ipv6-proxy-server` (o venv tambem roda o
    `ExecStartPre` de cada proxy), as unidades `ipv6-proxy-api.service` e
    `ipv6-proxy@.service`, o CLI `/usr/local/bin/ipv6-proxy` e, se presente na
