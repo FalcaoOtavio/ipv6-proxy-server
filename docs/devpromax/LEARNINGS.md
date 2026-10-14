@@ -13,3 +13,7 @@
 - **VM descartável sem root/KVM:** QEMU extraído com `apt-get download` + `dpkg -x`, modo TCG, imagem cloud oficial + NoCloud, boot via kernel/initrd com
   timeout de dispositivos maior. Lento (~15 min/boot sob carga), mas achou 4 bugs reais (timeouts, fencing, toggle de segurança, lock do apt) que os testes em
   loopback não pegavam. Use sempre que houver systemd/instalador no escopo — candidato a skill.
+
+## Gates web do `dpm project finish` em projeto CLI/TUI (2026-10-13)
+- `finish` exige `dpm e2e run`/`dpm perf check` contra URL de produção sempre que há features em `docs/features.yaml`, mesmo para TUI sem deploy. Também procura `docs/DESIGN.md` fora do repo (copiar de repo/docs).
+- Pendência pós-entrega: DevProMax precisa de flag "sem web" no plano para pular esses gates (liberado pelo Hermes na #168, não aplicado).

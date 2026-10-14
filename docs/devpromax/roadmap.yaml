@@ -1,3 +1,3 @@
 items:
-  - {key: R04b, title: "Correções de QA/revisão/segurança (estimativa de retrabalho)", points: 8, phase: qa}
-  - {key: R08, title: "Docs finais (MAP, ISSUES, LEARNINGS)", points: 2, phase: docs}
+  - {key: R10, title: "CR-1 — QA curta (unit + 3proxy real) após T37", points: 2, phase: qa}
+  - {key: R11, title: "CR-1 — regenerar dist/ + PR_PROPOSAL + docs (MAP/JOURNAL) e finish", points: 2, phase: docs}

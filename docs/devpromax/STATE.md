@@ -40,3 +40,19 @@
   Main = 55045144. vm reexecutando rodada obrigatória no SHA novo. Depois: QA curta final + T14 done + docs/PR_PROPOSAL/dist regenerados + finish.
 - 2026-10-13: T29 E2E VM PASS (cp-0033), T36 release (cp-0034). Final = 139a726d1ad0f4ff84a7eb97fd910db6dd486e5b (branch local dpm/independent-proxies);
   dist/ regenerado e verificado. Fork intocado. Restante declarado: IPv6 roteado, Debian/Ubuntu 22.04/26.04 não executados, push/PR #152.
+- 2026-10-13 CR-1 (update): T37 mergeado (cp-0036, fd99a99, 441 passed). T38 E2E VM do `ipv6-proxy update` com vm (na fila após reinício do DPM).
+  Ao terminar: merge evidência → dist/PR_PROPOSAL regenerados (release) → `dpm change done 1` → `dpm project finish`. Sem push/PR.
+- T38 PASS 22/22 (cp-0037, main 39d0708, e2e registrado). T39 release (release3) → change done 1 → project finish.
+- CR-1 concluído: T39 (cp-0038, main 4773972; branch local dpm/independent-proxies = 03c6436). change done 1. project finish.
+- 2026-10-13: finish RECUSADO pós-CR-1 por gates web (e2e browser prod, DESIGN.md, visual, perf) inaplicáveis a CLI/TUI sem deploy. Perguntado ao Hermes. NÃO registrar testes falsos.
+- T40 designer (DESIGN.md + visual pty). ADR gates web: e2e/perf não simulados, aguardam #168.
+- T40 merge cp-0039 (DESIGN.md + visual aprovado c/ ressalvas). T41 (design) corrige V-01/V-02 e re-registra visual.
+- #168 respondida: liberar/forçar finish sem gates web. Após T41: tentar finish; se recusar só por e2e/perf web, reportar ao Hermes (dpm hermes notify) — não simular.
+- T41 mergeado (V-01/02/06 corrigidos). T42 release4 (SHA final + dist) → finish (liberado #168).
+- T42 mergeado; SHA final 6b1d3ab (branch local). finish.
+- finish recusado só por e2e/visual-prod/perf (URL). Hermes notificado para aplicar bypass (#168). Nada mais a fazer até lá.
+- visual registrado (TUI pty, aprovado). finish recusa só e2e-prod + perf mobile (exigem URL web inexistente). Aguardando bypass do DevProMax (#168/notify). Não simular.
+- 2026-10-13 18:48 finish ainda recusado (e2e/perf URL). Pergunta de escalonamento enviada.
+- #178 timeout → ADR provisória: entrega técnica concluída (6b1d3ab); bypass dos gates web no DevProMax = pendência pós-entrega. Sem mais ação possível.
+- 2026-10-14 Otávio autorizou publicação: branch dpm/independent-proxies=6b1d3ab no fork + PR #1 (https://github.com/FalcaoOtavio/ipv6-proxy-server/pull/1). CI Tests rodando. vm-e2e dispatch 403 (App sem actions:write).
+- CI GitHub Actions PASS (push+PR) em 6b1d3ab. vm-e2e não disparado (403).

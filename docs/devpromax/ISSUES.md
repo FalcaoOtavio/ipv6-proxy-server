@@ -138,3 +138,11 @@
 
 ## ISS-010 · Instalação limpa logo após 1º boot falhava no lock do apt (achado E2E VM)
 - Solução: espera do lock com --apt-lock-timeout (600 s), sem matar processo alheio (T35). Ressalva: sob TCG o apt do 1º boot passou de 10 min.
+
+## ISS-023 — dpm project finish recusa projeto CLI/TUI sem deploy por gates web (e2e browser em URL de 
+- **Quando:** 2026-10-13 12:29 · **Autor:** `ipv6-proxy-server-independente--orchestrator`
+- **Sintoma:** dpm project finish recusa projeto CLI/TUI sem deploy por gates web (e2e browser em URL de produção, perf mobile)
+- **Causa raiz:** finish aplica gates de produto web a todo projeto com features; não há URL de produção (entrega local, ADR-0008)
+- **Solução:** Hermes liberou (#168); requer bypass no DevProMax. Não simular registros.
+- **Como evitar:** DevProMax: marcar projeto como sem-web/CLI no plano e pular gates e2e/perf de URL
+- **Commit:** -
