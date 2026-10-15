@@ -56,3 +56,5 @@
 - #178 timeout → ADR provisória: entrega técnica concluída (6b1d3ab); bypass dos gates web no DevProMax = pendência pós-entrega. Sem mais ação possível.
 - 2026-10-14 Otávio autorizou publicação: branch dpm/independent-proxies=6b1d3ab no fork + PR #1 (https://github.com/FalcaoOtavio/ipv6-proxy-server/pull/1). CI Tests rodando. vm-e2e dispatch 403 (App sem actions:write).
 - CI GitHub Actions PASS (push+PR) em 6b1d3ab. vm-e2e não disparado (403).
+- 2026-10-14 FINALIZADO (cp-0042, zip ipv6-proxy-server-independente-20261014-0927.zip). Gates web pulados por autorização do Otávio (has_ui=0, ADR). PR #1 aberto, não mergeado.
+- 2026-10-15 CR-2 'Faça push': branch dpm/independent-proxies no fork = fcad3d5 (FF, +docs DevProMax); CI push/PR verde. main do fork intocado.
